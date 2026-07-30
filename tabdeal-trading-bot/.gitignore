@@ -5,4 +5,5 @@ __pycache__/
 venv/
 logs/
 *.log
+data/
 .pytest_cache/

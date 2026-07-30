@@ -1,4 +1,5 @@
 import logging
+import os
 import threading
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
@@ -6,8 +7,11 @@ from typing import Dict, List, Optional
 from src.bot import TradingBot
 from src.config import Config
 from src.exchange_client import ExchangeClient
+from src.news_filter import NewsFilter
+from src.pnl import net_pnl_percent, pnl_amount
 from src.risk_manager import RiskManager
-from src.strategy import SmaCrossoverStrategy
+from src.strategy import TechnicalStrategy
+from src.trade_journal import TradeJournal
 
 logger = logging.getLogger("tabdeal_bot")
 
@@ -62,11 +66,13 @@ class BotRunner:
             dry_run=config.dry_run,
         )
 
-        def strategy_factory():
-            return SmaCrossoverStrategy(
-                fast_period=config.sma_fast_period,
-                slow_period=config.sma_slow_period,
-            )
+        news_filter = NewsFilter(
+            api_token=config.cryptopanic_api_token if config.news_enabled else None,
+            cache_minutes=config.news_cache_minutes,
+        )
+
+        def strategy_factory(symbol: str):
+            return TechnicalStrategy(symbol=symbol, news_filter=news_filter)
 
         risk_manager = RiskManager(
             stop_loss_percent=config.stop_loss_percent,
@@ -74,6 +80,8 @@ class BotRunner:
             max_daily_loss_percent=config.max_daily_loss_percent,
             max_trades_per_day=config.max_trades_per_day,
         )
+        trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
+
         bot = TradingBot(
             exchange=exchange,
             strategy_factory=strategy_factory,
@@ -85,6 +93,8 @@ class BotRunner:
             quantity_precision=config.quantity_precision,
             max_concurrent_positions=config.max_concurrent_positions,
             poll_interval_seconds=config.poll_interval_seconds,
+            fee_percent=config.trading_fee_percent,
+            trade_journal=trade_journal,
         )
 
         with self._lock:
@@ -124,11 +134,21 @@ class BotRunner:
             positions = {}
             for symbol, position in bot.positions.items():
                 current_price = bot.last_price.get(symbol)
+                net_percent = None
+                net_amount = None
+                if current_price:
+                    gross_percent = position.unrealized_pnl_percent(current_price)
+                    net_percent = net_pnl_percent(gross_percent, bot.fee_percent)
+                    net_amount = pnl_amount(position.entry_price, position.quantity, net_percent)
+
                 positions[symbol] = {
                     "entry_price": position.entry_price,
                     "quantity": position.quantity,
-                    "pnl_percent": (
-                        position.unrealized_pnl_percent(current_price) if current_price else None
-                    ),
+                    "stop_price": position.stop_price,
+                    "target_price": position.target_price,
+                    "stop_loss_percent": position.stop_loss_percent,
+                    "take_profit_percent": position.take_profit_percent,
+                    "pnl_percent": net_percent,
+                    "pnl_amount": net_amount,
                 }
             self._status.positions = positions

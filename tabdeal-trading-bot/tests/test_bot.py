@@ -1,8 +1,10 @@
 import datetime as dt
+import os
 
 from src.bot import TradingBot
 from src.risk_manager import RiskManager
 from src.strategy import Signal, Strategy
+from src.trade_journal import TradeJournal
 
 
 class ConstantSignalStrategy(Strategy):
@@ -40,7 +42,7 @@ def make_bot(exchange, watchlist, max_concurrent=2, signal=Signal.BUY):
     )
     bot = TradingBot(
         exchange=exchange,
-        strategy_factory=lambda: ConstantSignalStrategy(signal),
+        strategy_factory=lambda symbol: ConstantSignalStrategy(signal),
         risk_manager=risk_manager,
         quote_asset="IRT",
         watchlist_size=10,
@@ -101,3 +103,40 @@ def test_dropped_watchlist_symbol_still_managed_until_closed():
     bot._tick()
 
     assert "A_IRT" not in bot.positions
+
+
+def test_fee_reduces_realized_pnl_and_records_journal(tmp_path):
+    exchange = FakeExchange({"A_IRT": 100})
+    journal = TradeJournal(os.path.join(tmp_path, "trades.jsonl"))
+    risk_manager = RiskManager(
+        stop_loss_percent=2, take_profit_percent=3, max_daily_loss_percent=5, max_trades_per_day=10
+    )
+    bot = TradingBot(
+        exchange=exchange,
+        strategy_factory=lambda symbol: ConstantSignalStrategy(Signal.BUY),
+        risk_manager=risk_manager,
+        quote_asset="IRT",
+        watchlist_size=10,
+        watchlist_refresh_minutes=999999,
+        quote_order_amount=1000,
+        quantity_precision=4,
+        max_concurrent_positions=1,
+        poll_interval_seconds=1,
+        fee_percent=0.5,
+        trade_journal=journal,
+    )
+    bot.watchlist = ["A_IRT"]
+    bot._last_watchlist_refresh = dt.datetime.utcnow()
+
+    bot._tick()
+    assert "A_IRT" in bot.positions
+
+    exchange.prices["A_IRT"] = 110  # +10% gross, well above the 3% take-profit
+    bot._tick()
+
+    assert "A_IRT" not in bot.positions
+
+    summary = journal.summary()
+    assert summary["day"]["trades"] == 1
+    # gross ~10%, fee 0.5% * 2 legs = 1%, so net should be noticeably below gross
+    assert 8.5 < summary["day"]["net_pnl_percent"] < 9.5

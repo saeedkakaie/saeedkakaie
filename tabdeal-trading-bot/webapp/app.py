@@ -6,7 +6,9 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from flask import Flask, jsonify, render_template, request  # noqa: E402
 
 from src.config import Config, ConfigError  # noqa: E402
+from src.exchange_client import ExchangeClient  # noqa: E402
 from src.logger_setup import setup_logger  # noqa: E402
+from src.trade_journal import TradeJournal  # noqa: E402
 from webapp.bot_runner import BotRunner  # noqa: E402
 from webapp.env_writer import read_env_file, update_env_file  # noqa: E402
 
@@ -14,6 +16,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
 ENV_EXAMPLE_PATH = os.path.join(BASE_DIR, ".env.example")
 LOG_PATH = os.path.join(BASE_DIR, "logs", "bot.log")
+TRADE_HISTORY_PATH = os.path.join(BASE_DIR, "data", "trade_history.jsonl")
 
 if not os.path.exists(ENV_PATH) and os.path.exists(ENV_EXAMPLE_PATH):
     with open(ENV_EXAMPLE_PATH, "r", encoding="utf-8") as src, open(ENV_PATH, "w", encoding="utf-8") as dst:
@@ -31,12 +34,15 @@ FORM_FIELDS = [
     "MAX_CONCURRENT_POSITIONS",
     "QUOTE_ORDER_AMOUNT",
     "QUANTITY_PRECISION",
+    "TRADING_FEE_PERCENT",
     "STOP_LOSS_PERCENT",
     "TAKE_PROFIT_PERCENT",
     "MAX_DAILY_LOSS_PERCENT",
     "MAX_TRADES_PER_DAY",
     "SMA_FAST_PERIOD",
     "SMA_SLOW_PERIOD",
+    "NEWS_ENABLED",
+    "NEWS_CACHE_MINUTES",
     "POLL_INTERVAL_SECONDS",
     "DRY_RUN",
 ]
@@ -53,6 +59,7 @@ def get_config():
     data = {field: env.get(field, "") for field in FORM_FIELDS}
     data["has_api_key"] = bool(env.get("TABDEAL_API_KEY"))
     data["has_api_secret"] = bool(env.get("TABDEAL_API_SECRET"))
+    data["has_news_token"] = bool(env.get("CRYPTOPANIC_API_TOKEN"))
     return jsonify(data)
 
 
@@ -67,7 +74,7 @@ def save_config():
     for field in FORM_FIELDS:
         if field in payload and payload[field] != "":
             value = payload[field]
-            if field == "DRY_RUN":
+            if field in ("DRY_RUN", "NEWS_ENABLED"):
                 value = "true" if str(value).lower() in ("true", "1", "on") else "false"
             updates[field] = value
 
@@ -75,6 +82,8 @@ def save_config():
         updates["TABDEAL_API_KEY"] = payload["TABDEAL_API_KEY"].strip()
     if payload.get("TABDEAL_API_SECRET"):
         updates["TABDEAL_API_SECRET"] = payload["TABDEAL_API_SECRET"].strip()
+    if payload.get("CRYPTOPANIC_API_TOKEN"):
+        updates["CRYPTOPANIC_API_TOKEN"] = payload["CRYPTOPANIC_API_TOKEN"].strip()
 
     update_env_file(ENV_PATH, updates)
     return jsonify({"ok": True})
@@ -101,6 +110,31 @@ def start():
 def stop():
     runner.stop()
     return jsonify({"ok": True})
+
+
+@app.route("/api/balances", methods=["GET"])
+def balances():
+    try:
+        config = Config.load(ENV_PATH)
+    except ConfigError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    if not config.api_key or not config.api_secret:
+        return jsonify({"error": "ابتدا API Key و API Secret را در تنظیمات ذخیره کنید."}), 400
+
+    exchange = ExchangeClient(api_key=config.api_key, api_secret=config.api_secret, dry_run=True)
+    result = exchange.get_all_balances()
+
+    if result is None:
+        return jsonify({"error": "دریافت موجودی از تبدیل ممکن نشد. لاگ‌ها را بررسی کنید."}), 502
+
+    return jsonify({"balances": result, "quote_asset": config.quote_asset})
+
+
+@app.route("/api/performance", methods=["GET"])
+def performance():
+    journal = TradeJournal(TRADE_HISTORY_PATH)
+    return jsonify(journal.summary())
 
 
 @app.route("/api/logs", methods=["GET"])

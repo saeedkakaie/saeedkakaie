@@ -54,14 +54,19 @@ class RiskManager:
         return True
 
     def should_close_position(self, position: Position, current_price: float) -> bool:
+        """
+        حد ضرر/سود مخصوص همین پوزیشن را بررسی می‌کند (که ممکن است در لحظه‌ی
+        باز شدن به‌صورت پویا بر اساس نوسان بازار محاسبه شده باشد، نه
+        مقادیر ثابت تنظیمات).
+        """
         pnl_percent = position.unrealized_pnl_percent(current_price)
 
-        if pnl_percent <= -abs(self.stop_loss_percent):
-            logger.info("حد ضرر فعال شد: %.2f%% <= -%.2f%%", pnl_percent, self.stop_loss_percent)
+        if pnl_percent <= -abs(position.stop_loss_percent):
+            logger.info("حد ضرر فعال شد: %.2f%% <= -%.2f%%", pnl_percent, position.stop_loss_percent)
             return True
 
-        if pnl_percent >= abs(self.take_profit_percent):
-            logger.info("حد سود فعال شد: %.2f%% >= %.2f%%", pnl_percent, self.take_profit_percent)
+        if pnl_percent >= abs(position.take_profit_percent):
+            logger.info("حد سود فعال شد: %.2f%% >= %.2f%%", pnl_percent, position.take_profit_percent)
             return True
 
         return False

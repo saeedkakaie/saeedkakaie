@@ -29,11 +29,13 @@
   .pill-off { background: #444; }
   .pill-dry { background: #a70; }
   .pill-live { background: #a11; }
-  .pill-buy { background: #163; }
-  .pill-sell { background: #611; }
-  .pill-hold { background: #333; }
+  .pill-buy { background: #1a7a3a; color: #eafff0; font-weight: bold; }
+  .pill-sell { background: #a4222a; color: #fff0ef; font-weight: bold; }
+  .pill-hold { background: #3a3f4a; color: #ccc; }
   table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
   th, td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #2a2f3a; }
+  tr.row-buy { background: rgba(26, 122, 58, 0.14); }
+  tr.row-sell { background: rgba(164, 34, 42, 0.14); }
   th { color: #888; font-weight: normal; }
   #logs { background: #05070a; border-radius: 8px; padding: 10px; height: 260px; overflow-y: auto;
     font-family: monospace; font-size: 11px; white-space: pre-wrap; }
@@ -92,6 +94,10 @@
         </div>
       </div>
 
+      <label>کارمزد هر پای معامله (%)</label>
+      <input type="number" step="0.01" id="TRADING_FEE_PERCENT">
+      <div class="hint">نرخ واقعی کارمزد حساب خودتان را از تبدیل بگیرید؛ در محاسبه سود/زیان دو برابر این عدد (خرید+فروش) کم می‌شود.</div>
+
       <div class="row2">
         <div>
           <label>حد ضرر (%)</label>
@@ -114,6 +120,7 @@
         </div>
       </div>
 
+      <div class="hint" style="margin-top:14px">استراتژی پیش‌فرض ترکیبی (RSI+MACD+باند بولینگر+Stochastic+روند) است. دو فیلد زیر فقط برای استراتژی ساده‌ی جایگزین (SMA) کاربرد دارند.</div>
       <div class="row2">
         <div>
           <label>SMA سریع</label>
@@ -136,6 +143,49 @@
       <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
       <div class="msg" id="config_msg"></div>
     </div>
+
+    <div class="card">
+      <h2>فیلتر خبر (اختیاری)</h2>
+      <div class="hint">با یک توکن رایگان از cryptopanic.com، ربات قبل از خرید عنوان اخبار اخیر هر کوین را چک می‌کند و روی خبر بد قوی از خرید صرف‌نظر می‌کند. بدون این توکن هم ربات کامل کار می‌کند.</div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="NEWS_ENABLED">
+        <label style="margin:0">فعال‌سازی فیلتر خبر</label>
+      </div>
+
+      <label>CryptoPanic API Token</label>
+      <input type="password" id="cryptopanic_token" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+
+      <label>مدت کش خبر هر کوین (دقیقه)</label>
+      <input type="number" id="NEWS_CACHE_MINUTES">
+
+      <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>موجودی حساب</h2>
+      <button class="btn-start" onclick="refreshBalances()">بروزرسانی موجودی</button>
+      <div class="msg" id="balances_msg"></div>
+      <table id="balances_table">
+        <thead><tr><th>دارایی</th><th>موجودی آزاد</th><th>در سفارش</th></tr></thead>
+        <tbody id="balances_body"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>عملکرد معاملات (پس از کارمزد)</h2>
+      <div class="hint">درصد هر دوره، مجموع درصد سود/زیان معاملات بسته‌شده‌ی همان دوره است، نه بازده مرکب پرتفوی.</div>
+      <table>
+        <thead><tr><th>دوره</th><th>تعداد معامله</th><th>درصد</th><th>مبلغ</th></tr></thead>
+        <tbody>
+          <tr><td>امروز</td><td id="perf_day_trades">-</td><td id="perf_day_pct">-</td><td id="perf_day_amount">-</td></tr>
+          <tr><td>این ماه</td><td id="perf_month_trades">-</td><td id="perf_month_pct">-</td><td id="perf_month_amount">-</td></tr>
+          <tr><td>امسال</td><td id="perf_year_trades">-</td><td id="perf_year_pct">-</td><td id="perf_year_amount">-</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div>
@@ -156,7 +206,7 @@
 
       <table id="watchlist_table">
         <thead>
-          <tr><th>نماد</th><th>قیمت</th><th>سیگنال</th><th>پوزیشن</th><th>سود/زیان</th></tr>
+          <tr><th>نماد</th><th>قیمت (تومان)</th><th>سیگنال</th><th>پوزیشن</th><th>هدف فروش / حد ضرر</th><th>سود/زیان</th></tr>
         </thead>
         <tbody id="watchlist_body"></tbody>
       </table>
@@ -171,8 +221,9 @@
 
 <script>
 const CONFIG_FIELDS = ["QUOTE_ASSET","WATCHLIST_SIZE","WATCHLIST_REFRESH_MINUTES","MAX_CONCURRENT_POSITIONS",
-  "QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
-  "MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD","SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"];
+  "QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","TRADING_FEE_PERCENT","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
+  "MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD","SMA_SLOW_PERIOD",
+  "NEWS_CACHE_MINUTES","POLL_INTERVAL_SECONDS"];
 
 async function loadConfig() {
   const res = await fetch('/api/config');
@@ -181,6 +232,7 @@ async function loadConfig() {
     document.getElementById(key).value = data[key] ?? "";
   }
   document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
+  document.getElementById("NEWS_ENABLED").checked = (data.NEWS_ENABLED === "true");
 }
 
 async function saveConfig() {
@@ -189,8 +241,10 @@ async function saveConfig() {
     payload[key] = document.getElementById(key).value;
   }
   payload.DRY_RUN = document.getElementById("DRY_RUN").checked;
+  payload.NEWS_ENABLED = document.getElementById("NEWS_ENABLED").checked;
   payload.TABDEAL_API_KEY = document.getElementById("api_key").value;
   payload.TABDEAL_API_SECRET = document.getElementById("api_secret").value;
+  payload.CRYPTOPANIC_API_TOKEN = document.getElementById("cryptopanic_token").value;
 
   const res = await fetch('/api/config', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
@@ -199,6 +253,52 @@ async function saveConfig() {
   document.getElementById("config_msg").innerText = data.ok ? "ذخیره شد." : (data.error || "خطا");
   document.getElementById("api_key").value = "";
   document.getElementById("api_secret").value = "";
+  document.getElementById("cryptopanic_token").value = "";
+}
+
+async function refreshBalances() {
+  const msgEl = document.getElementById("balances_msg");
+  msgEl.innerText = "در حال دریافت...";
+  const res = await fetch('/api/balances');
+  const data = await res.json();
+  const body = document.getElementById("balances_body");
+  body.innerHTML = "";
+
+  if (data.error) {
+    msgEl.innerText = data.error;
+    return;
+  }
+  msgEl.innerText = "";
+
+  for (const b of (data.balances || [])) {
+    const tr = document.createElement("tr");
+    const isQuote = b.asset === data.quote_asset;
+    const freeText = isQuote ? fmtToman(b.free) : Number(b.free).toLocaleString('en-US', {maximumFractionDigits: 8});
+    const lockedText = isQuote ? fmtToman(b.locked) : Number(b.locked).toLocaleString('en-US', {maximumFractionDigits: 8});
+    tr.innerHTML = `<td>${b.asset}</td><td>${freeText}</td><td>${lockedText}</td>`;
+    body.appendChild(tr);
+  }
+
+  if (!data.balances || data.balances.length === 0) {
+    msgEl.innerText = "موجودی غیرصفری یافت نشد.";
+  }
+}
+
+function fmtPct(v) {
+  return (v === null || v === undefined) ? "-" : v.toFixed(2) + "%";
+}
+
+async function refreshPerformance() {
+  const res = await fetch('/api/performance');
+  const data = await res.json();
+
+  for (const [key, period] of [["day", "day"], ["month", "month"], ["year", "year"]]) {
+    const p = data[period];
+    if (!p) continue;
+    document.getElementById(`perf_${key}_trades`).innerText = p.trades;
+    document.getElementById(`perf_${key}_pct`).innerText = fmtPct(p.net_pnl_percent);
+    document.getElementById(`perf_${key}_amount`).innerText = fmtToman(p.net_pnl_amount);
+  }
 }
 
 async function startBot() {
@@ -213,6 +313,11 @@ async function stopBot() {
 
 function fmt(v, suffix) {
   return (v === null || v === undefined) ? "-" : v + (suffix || "");
+}
+
+function fmtToman(v) {
+  if (v === null || v === undefined) return "-";
+  return Number(v).toLocaleString('en-US', {maximumFractionDigits: 2}) + " تومان";
 }
 
 function signalClass(sig) {
@@ -249,12 +354,22 @@ async function refreshStatus() {
     const position = positions[symbol];
 
     const tr = document.createElement("tr");
+    if (signal === "BUY") tr.className = "row-buy";
+    if (signal === "SELL") tr.className = "row-sell";
+    const targetStop = position
+      ? `هدف: ${fmtToman(position.target_price)}<br>ضرر: ${fmtToman(position.stop_price)}`
+      : "-";
+    const pnlCell = position && position.pnl_percent !== null && position.pnl_percent !== undefined
+      ? `${position.pnl_percent.toFixed(2)}%<br>${fmtToman(position.pnl_amount)}`
+      : "-";
+
     tr.innerHTML = `
       <td>${symbol}</td>
-      <td>${fmt(price)}</td>
+      <td>${fmtToman(price)}</td>
       <td><span class="${signalClass(signal)}">${signal || "-"}</span></td>
-      <td>${position ? (position.quantity + " @ " + position.entry_price) : "-"}</td>
-      <td>${position && position.pnl_percent !== null && position.pnl_percent !== undefined ? position.pnl_percent.toFixed(2) + "%" : "-"}</td>
+      <td>${position ? (position.quantity + " @ " + fmtToman(position.entry_price)) : "-"}</td>
+      <td>${targetStop}</td>
+      <td>${pnlCell}</td>
     `;
     body.appendChild(tr);
   }
@@ -276,8 +391,10 @@ async function refreshLogs() {
 loadConfig();
 refreshStatus();
 refreshLogs();
+refreshPerformance();
 setInterval(refreshStatus, 3000);
 setInterval(refreshLogs, 4000);
+setInterval(refreshPerformance, 15000);
 </script>
 </body>
 </html>

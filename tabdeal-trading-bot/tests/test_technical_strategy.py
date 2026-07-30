@@ -1,0 +1,86 @@
+import random
+
+from src.strategy import Signal, TechnicalStrategy
+
+
+class FakeNewsFilter:
+    def __init__(self, score, enabled=True):
+        self._score = score
+        self.enabled = enabled
+
+    def sentiment(self, base_asset):
+        return self._score
+
+
+def test_decide_buy_on_confluence_crossing_up():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    strategy._prev_confluence = 1
+    assert strategy._decide(3) == Signal.BUY
+
+
+def test_decide_hold_when_no_new_crossing():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    strategy._prev_confluence = 3
+    assert strategy._decide(4) == Signal.HOLD
+
+
+def test_decide_sell_on_confluence_crossing_down():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    strategy._prev_confluence = -1
+    assert strategy._decide(-3) == Signal.SELL
+
+
+def test_decide_news_veto_blocks_buy():
+    strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=-0.8))
+    strategy._prev_confluence = 1
+    assert strategy._decide(3) == Signal.HOLD
+
+
+def test_decide_news_boost_lowers_threshold():
+    strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.8))
+    strategy._prev_confluence = 1
+    assert strategy._decide(2) == Signal.BUY
+
+
+def test_decide_mild_positive_news_does_not_lower_threshold():
+    strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.1))
+    strategy._prev_confluence = 1
+    assert strategy._decide(2) == Signal.HOLD
+
+
+def test_hold_when_insufficient_price_history():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    for price in [100, 101, 99, 102]:
+        assert strategy.update(price) == Signal.HOLD
+
+
+def test_suggested_risk_levels_none_when_insufficient_data():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    for price in [100, 101, 102]:
+        strategy.update(price)
+    assert strategy.suggested_risk_levels() is None
+
+
+def test_suggested_risk_levels_bounded_and_consistent_ratio():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    random.seed(42)
+    price = 100.0
+    for _ in range(40):
+        price *= 1 + random.uniform(-0.02, 0.02)
+        strategy.update(price)
+
+    levels = strategy.suggested_risk_levels()
+    assert levels is not None
+    stop_loss, take_profit = levels
+    assert TechnicalStrategy.MIN_STOP_LOSS_PERCENT <= stop_loss <= TechnicalStrategy.MAX_STOP_LOSS_PERCENT
+    assert take_profit == stop_loss * TechnicalStrategy.RISK_REWARD_RATIO
+
+
+def test_update_runs_without_error_over_long_series():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    random.seed(1)
+    price = 100.0
+    for _ in range(200):
+        price *= 1 + random.uniform(-0.01, 0.01)
+        signal = strategy.update(price)
+        assert isinstance(signal, Signal)

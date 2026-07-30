@@ -57,6 +57,27 @@ class ExchangeClient:
             )
             return None
 
+    def get_all_balances(self) -> Optional[list]:
+        """
+        همه‌ی دارایی‌های با موجودی غیرصفر را برمی‌گرداند: [{"asset": ..., "free": ..., "locked": ...}, ...]
+        در صورت خطا None برمی‌گرداند (مثلا کلید API نامعتبر یا ساختار پاسخ متفاوت).
+        """
+        try:
+            account = self.client.account()
+            balances = []
+            for balance in account["balances"]:
+                free = float(balance.get("free", 0) or 0)
+                locked = float(balance.get("locked", 0) or 0)
+                if free > 0 or locked > 0:
+                    balances.append({"asset": balance["asset"], "free": free, "locked": locked})
+            balances.sort(key=lambda b: b["free"], reverse=True)
+            return balances
+        except Exception as exc:
+            logger.error(
+                "دریافت موجودی حساب ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s", exc
+            )
+            return None
+
     def buy_market(self, symbol: str, quote_amount: float, quantity_precision: int) -> Optional[dict]:
         price = self.get_current_price(symbol)
         quantity = round(quote_amount / price, quantity_precision)

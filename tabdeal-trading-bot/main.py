@@ -1,11 +1,14 @@
+import os
 import sys
 
 from src.bot import TradingBot
 from src.config import Config, ConfigError
 from src.exchange_client import ExchangeClient
 from src.logger_setup import setup_logger
+from src.news_filter import NewsFilter
 from src.risk_manager import RiskManager
-from src.strategy import SmaCrossoverStrategy
+from src.strategy import TechnicalStrategy
+from src.trade_journal import TradeJournal
 
 
 def main() -> None:
@@ -36,11 +39,13 @@ def main() -> None:
         dry_run=config.dry_run,
     )
 
-    def strategy_factory():
-        return SmaCrossoverStrategy(
-            fast_period=config.sma_fast_period,
-            slow_period=config.sma_slow_period,
-        )
+    news_filter = NewsFilter(
+        api_token=config.cryptopanic_api_token if config.news_enabled else None,
+        cache_minutes=config.news_cache_minutes,
+    )
+
+    def strategy_factory(symbol: str):
+        return TechnicalStrategy(symbol=symbol, news_filter=news_filter)
 
     risk_manager = RiskManager(
         stop_loss_percent=config.stop_loss_percent,
@@ -48,6 +53,8 @@ def main() -> None:
         max_daily_loss_percent=config.max_daily_loss_percent,
         max_trades_per_day=config.max_trades_per_day,
     )
+
+    trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
 
     bot = TradingBot(
         exchange=exchange,
@@ -60,6 +67,8 @@ def main() -> None:
         quantity_precision=config.quantity_precision,
         max_concurrent_positions=config.max_concurrent_positions,
         poll_interval_seconds=config.poll_interval_seconds,
+        fee_percent=config.trading_fee_percent,
+        trade_journal=trade_journal,
     )
 
     try:

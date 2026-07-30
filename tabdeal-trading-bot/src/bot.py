@@ -6,9 +6,11 @@ from typing import Callable, Dict, Optional
 
 from src.exchange_client import ExchangeClient, ExchangeError
 from src.market_scanner import discover_watchlist
+from src.pnl import net_pnl_percent, pnl_amount
 from src.position import Position
 from src.risk_manager import RiskManager
 from src.strategy import Signal, Strategy
+from src.trade_journal import ClosedTrade, TradeJournal
 
 logger = logging.getLogger("tabdeal_bot")
 
@@ -23,7 +25,7 @@ class TradingBot:
     def __init__(
         self,
         exchange: ExchangeClient,
-        strategy_factory: Callable[[], Strategy],
+        strategy_factory: Callable[[str], Strategy],
         risk_manager: RiskManager,
         quote_asset: str,
         watchlist_size: int,
@@ -32,6 +34,8 @@ class TradingBot:
         quantity_precision: int,
         max_concurrent_positions: int,
         poll_interval_seconds: int,
+        fee_percent: float = 0.0,
+        trade_journal: Optional[TradeJournal] = None,
     ):
         self.exchange = exchange
         self.strategy_factory = strategy_factory
@@ -43,6 +47,8 @@ class TradingBot:
         self.quantity_precision = quantity_precision
         self.max_concurrent_positions = max_concurrent_positions
         self.poll_interval_seconds = poll_interval_seconds
+        self.fee_percent = fee_percent
+        self.trade_journal = trade_journal
 
         self.watchlist: list = []
         self.strategies: Dict[str, Strategy] = {}
@@ -102,7 +108,7 @@ class TradingBot:
 
         for symbol in new_watchlist:
             if symbol not in self.strategies:
-                self.strategies[symbol] = self.strategy_factory()
+                self.strategies[symbol] = self.strategy_factory(symbol)
 
         self.watchlist = new_watchlist
         self._last_watchlist_refresh = now
@@ -124,7 +130,7 @@ class TradingBot:
 
     def _tick_symbol(self, symbol: str) -> None:
         price = self.exchange.get_current_price(symbol)
-        strategy = self.strategies.setdefault(symbol, self.strategy_factory())
+        strategy = self.strategies.setdefault(symbol, self.strategy_factory(symbol))
         signal = strategy.update(price)
 
         self.last_price[symbol] = price
@@ -148,12 +154,32 @@ class TradingBot:
         if not order:
             return
 
-        self.positions[symbol] = Position(entry_price=float(order["price"]), quantity=float(order["quantity"]))
+        strategy = self.strategies.get(symbol)
+        levels = strategy.suggested_risk_levels() if strategy else None
+        if levels:
+            stop_loss_percent, take_profit_percent = levels
+        else:
+            stop_loss_percent = self.risk_manager.stop_loss_percent
+            take_profit_percent = self.risk_manager.take_profit_percent
+
+        position = Position(
+            entry_price=float(order["price"]),
+            quantity=float(order["quantity"]),
+            stop_loss_percent=stop_loss_percent,
+            take_profit_percent=take_profit_percent,
+        )
+        self.positions[symbol] = position
+
         logger.info(
-            "پوزیشن باز شد (%s): قیمت ورود=%s، مقدار=%s، تعداد پوزیشن‌های باز=%s",
+            "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، حد ضرر=%.2f%% (قیمت %.4f)، "
+            "حد سود=%.2f%% (قیمت %.4f)، تعداد پوزیشن‌های باز=%s",
             symbol,
-            self.positions[symbol].entry_price,
-            self.positions[symbol].quantity,
+            position.entry_price,
+            position.quantity,
+            stop_loss_percent,
+            position.stop_price,
+            take_profit_percent,
+            position.target_price,
             len(self.positions),
         )
 
@@ -173,8 +199,35 @@ class TradingBot:
         if not order:
             return
 
-        pnl_percent = position.unrealized_pnl_percent(float(order["price"]))
-        logger.info("پوزیشن بسته شد (%s): قیمت خروج=%s، سود/زیان=%.2f%%", symbol, order["price"], pnl_percent)
+        exit_price = float(order["price"])
+        gross_pnl_percent = position.unrealized_pnl_percent(exit_price)
+        net_pnl = net_pnl_percent(gross_pnl_percent, self.fee_percent)
+        net_amount = pnl_amount(position.entry_price, position.quantity, net_pnl)
 
-        self.risk_manager.register_closed_trade(pnl_percent)
+        logger.info(
+            "پوزیشن بسته شد (%s): خروج=%s، سود/زیان خام=%.2f%%، پس از کارمزد=%.2f%% (%.2f %s)",
+            symbol,
+            exit_price,
+            gross_pnl_percent,
+            net_pnl,
+            net_amount,
+            self.quote_asset,
+        )
+
+        self.risk_manager.register_closed_trade(net_pnl)
+
+        if self.trade_journal:
+            self.trade_journal.record(
+                ClosedTrade(
+                    timestamp=datetime.now().isoformat(),
+                    symbol=symbol,
+                    entry_price=position.entry_price,
+                    exit_price=exit_price,
+                    quantity=position.quantity,
+                    gross_pnl_percent=gross_pnl_percent,
+                    net_pnl_percent=net_pnl,
+                    net_pnl_amount=net_amount,
+                )
+            )
+
         del self.positions[symbol]
