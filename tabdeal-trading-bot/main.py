@@ -33,14 +33,14 @@ def main() -> None:
     exchange = ExchangeClient(
         api_key=config.api_key,
         api_secret=config.api_secret,
-        symbol=config.symbol,
         dry_run=config.dry_run,
     )
 
-    strategy = SmaCrossoverStrategy(
-        fast_period=config.sma_fast_period,
-        slow_period=config.sma_slow_period,
-    )
+    def strategy_factory():
+        return SmaCrossoverStrategy(
+            fast_period=config.sma_fast_period,
+            slow_period=config.sma_slow_period,
+        )
 
     risk_manager = RiskManager(
         stop_loss_percent=config.stop_loss_percent,
@@ -51,10 +51,14 @@ def main() -> None:
 
     bot = TradingBot(
         exchange=exchange,
-        strategy=strategy,
+        strategy_factory=strategy_factory,
         risk_manager=risk_manager,
+        quote_asset=config.quote_asset,
+        watchlist_size=config.watchlist_size,
+        watchlist_refresh_minutes=config.watchlist_refresh_minutes,
         quote_order_amount=config.quote_order_amount,
         quantity_precision=config.quantity_precision,
+        max_concurrent_positions=config.max_concurrent_positions,
         poll_interval_seconds=config.poll_interval_seconds,
     )
 

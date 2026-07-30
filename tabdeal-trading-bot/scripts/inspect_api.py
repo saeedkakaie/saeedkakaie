@@ -2,8 +2,9 @@
 اسکریپت کمکی برای بررسی خروجی خام API تبدیل قبل از اجرای ربات.
 
 هدف: چون ساختار دقیق پاسخ‌ها در مستندات پشت لاگین (docs.tabdeal.org) است،
-این اسکریپت به شما کمک می‌کند مطمئن شوید فرضیات کد (مثل ساختار depth،
-account balances و دقت اعشار quantity) با پاسخ واقعی API هم‌خوانی دارد.
+این اسکریپت به شما کمک می‌کند مطمئن شوید فرضیات کد (ساختار exchange_info
+برای کشف خودکار نمادها، depth، account balances) با پاسخ واقعی API
+هم‌خوانی دارد.
 
 اجرا:
     python scripts/inspect_api.py
@@ -15,7 +16,8 @@ import sys
 sys.path.insert(0, ".")
 
 from src.config import Config, ConfigError  # noqa: E402
-from tabdeal.spot import Spot  # noqa: E402
+from src.exchange_client import ExchangeClient  # noqa: E402
+from src.market_scanner import discover_watchlist  # noqa: E402
 
 
 def pretty(label: str, data) -> None:
@@ -30,13 +32,30 @@ def main() -> None:
         print(f"خطا در تنظیمات: {exc}")
         sys.exit(1)
 
-    client = Spot(config.api_key, config.api_secret)
+    exchange = ExchangeClient(config.api_key, config.api_secret, dry_run=True)
+    client = exchange.client
 
     pretty("ping", client.ping())
     pretty("time", client.time())
-    pretty(f"exchange_info({config.symbol})", client.exchange_info(symbol=config.symbol))
-    pretty(f"depth({config.symbol})", client.depth(symbol=config.symbol, limit=5))
-    pretty(f"trades({config.symbol})", client.trades(symbol=config.symbol, limit=3))
+
+    info = client.exchange_info()
+    symbols = info.get("symbols") or info.get("data") or []
+    print(f"\n=== exchange_info: {len(symbols)} نماد یافت شد. نمونه‌ی ۳ تای اول: ===")
+    print(json.dumps(symbols[:3], indent=2, ensure_ascii=False, default=str))
+    print(
+        "\nاگر ساختار بالا با فرض‌های src/market_scanner.py (کلیدهای "
+        "tabdealSymbol/symbol و quoteAsset/quote_asset و status) فرق داشت، "
+        "لطفا آن فایل را متناسب با پاسخ واقعی اصلاح کنید."
+    )
+
+    print(f"\n=== کشف خودکار watchlist (quote_asset={config.quote_asset}, size={config.watchlist_size}) ===")
+    watchlist = discover_watchlist(exchange, config.quote_asset, config.watchlist_size)
+    print(watchlist)
+
+    if watchlist:
+        sample = watchlist[0]
+        pretty(f"depth({sample})", client.depth(symbol=sample, limit=5))
+        pretty(f"trades({sample})", client.trades(symbol=sample, limit=3))
 
     if config.api_key and config.api_secret:
         pretty("account", client.account())

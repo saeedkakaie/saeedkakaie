@@ -29,9 +29,16 @@
   .pill-off { background: #444; }
   .pill-dry { background: #a70; }
   .pill-live { background: #a11; }
+  .pill-buy { background: #163; }
+  .pill-sell { background: #611; }
+  .pill-hold { background: #333; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  th, td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #2a2f3a; }
+  th { color: #888; font-weight: normal; }
   #logs { background: #05070a; border-radius: 8px; padding: 10px; height: 260px; overflow-y: auto;
     font-family: monospace; font-size: 11px; white-space: pre-wrap; }
   .msg { font-size: 12px; margin-top: 8px; color: #f88; }
+  .hint { font-size: 11px; color: #777; margin-top: 3px; }
 </style>
 </head>
 <body>
@@ -51,8 +58,28 @@
       <label>API Secret</label>
       <input type="password" id="api_secret" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
 
-      <label>نماد (Symbol)</label>
-      <input type="text" id="SYMBOL">
+      <div class="row2">
+        <div>
+          <label>دارایی مبنا (Quote Asset)</label>
+          <input type="text" id="QUOTE_ASSET">
+        </div>
+        <div>
+          <label>تعداد نماد زیر نظر</label>
+          <input type="number" id="WATCHLIST_SIZE">
+        </div>
+      </div>
+      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند.</div>
+
+      <div class="row2">
+        <div>
+          <label>بازه بروزرسانی لیست (دقیقه)</label>
+          <input type="number" id="WATCHLIST_REFRESH_MINUTES">
+        </div>
+        <div>
+          <label>سقف پوزیشن هم‌زمان</label>
+          <input type="number" id="MAX_CONCURRENT_POSITIONS">
+        </div>
+      </div>
 
       <div class="row2">
         <div>
@@ -121,15 +148,18 @@
       <div class="status-grid" style="margin-top:14px">
         <div><span>وضعیت: </span><span id="s_running" class="pill pill-off">متوقف</span></div>
         <div><span>حالت: </span><span id="s_mode" class="pill pill-dry">DRY-RUN</span></div>
-        <div><span>نماد: </span><span id="s_symbol">-</span></div>
-        <div><span>آخرین قیمت: </span><span id="s_price">-</span></div>
-        <div><span>آخرین سیگنال: </span><span id="s_signal">-</span></div>
-        <div><span>پوزیشن باز: </span><span id="s_position">-</span></div>
-        <div><span>سود/زیان پوزیشن: </span><span id="s_pnl">-</span></div>
+        <div><span>پوزیشن‌های باز: </span><span id="s_open_count">-</span></div>
         <div><span>معاملات امروز: </span><span id="s_trades">-</span></div>
         <div><span>سود/زیان روزانه: </span><span id="s_daily_pnl">-</span></div>
         <div><span>مدار قطع ضرر: </span><span id="s_halted">-</span></div>
       </div>
+
+      <table id="watchlist_table">
+        <thead>
+          <tr><th>نماد</th><th>قیمت</th><th>سیگنال</th><th>پوزیشن</th><th>سود/زیان</th></tr>
+        </thead>
+        <tbody id="watchlist_body"></tbody>
+      </table>
     </div>
 
     <div class="card">
@@ -140,12 +170,14 @@
 </div>
 
 <script>
+const CONFIG_FIELDS = ["QUOTE_ASSET","WATCHLIST_SIZE","WATCHLIST_REFRESH_MINUTES","MAX_CONCURRENT_POSITIONS",
+  "QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
+  "MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD","SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"];
+
 async function loadConfig() {
   const res = await fetch('/api/config');
   const data = await res.json();
-  for (const key of ["SYMBOL","QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT",
-    "TAKE_PROFIT_PERCENT","MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD",
-    "SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"]) {
+  for (const key of CONFIG_FIELDS) {
     document.getElementById(key).value = data[key] ?? "";
   }
   document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
@@ -153,9 +185,7 @@ async function loadConfig() {
 
 async function saveConfig() {
   const payload = {};
-  for (const key of ["SYMBOL","QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT",
-    "TAKE_PROFIT_PERCENT","MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD",
-    "SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"]) {
+  for (const key of CONFIG_FIELDS) {
     payload[key] = document.getElementById(key).value;
   }
   payload.DRY_RUN = document.getElementById("DRY_RUN").checked;
@@ -185,6 +215,12 @@ function fmt(v, suffix) {
   return (v === null || v === undefined) ? "-" : v + (suffix || "");
 }
 
+function signalClass(sig) {
+  if (sig === "BUY") return "pill pill-buy";
+  if (sig === "SELL") return "pill pill-sell";
+  return "pill pill-hold";
+}
+
 async function refreshStatus() {
   const res = await fetch('/api/status');
   const s = await res.json();
@@ -197,15 +233,31 @@ async function refreshStatus() {
   modeEl.innerText = s.dry_run ? "DRY-RUN" : "LIVE";
   modeEl.className = "pill " + (s.dry_run ? "pill-dry" : "pill-live");
 
-  document.getElementById("s_symbol").innerText = fmt(s.symbol);
-  document.getElementById("s_price").innerText = fmt(s.last_price);
-  document.getElementById("s_signal").innerText = fmt(s.last_signal);
-  document.getElementById("s_position").innerText = s.position_quantity
-    ? `${s.position_quantity} @ ${s.position_entry_price}` : "ندارد";
-  document.getElementById("s_pnl").innerText = fmt(s.position_pnl_percent, "%");
+  const positions = s.positions || {};
+  document.getElementById("s_open_count").innerText = Object.keys(positions).length;
   document.getElementById("s_trades").innerText = fmt(s.trades_today);
   document.getElementById("s_daily_pnl").innerText = fmt(s.daily_pnl_percent, "%");
   document.getElementById("s_halted").innerText = s.halted ? "فعال (متوقف)" : "غیرفعال";
+
+  const watchlist = s.watchlist && s.watchlist.length ? s.watchlist : Object.keys(positions);
+  const body = document.getElementById("watchlist_body");
+  body.innerHTML = "";
+
+  for (const symbol of watchlist) {
+    const price = (s.prices || {})[symbol];
+    const signal = (s.signals || {})[symbol];
+    const position = positions[symbol];
+
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${symbol}</td>
+      <td>${fmt(price)}</td>
+      <td><span class="${signalClass(signal)}">${signal || "-"}</span></td>
+      <td>${position ? (position.quantity + " @ " + position.entry_price) : "-"}</td>
+      <td>${position && position.pnl_percent !== null && position.pnl_percent !== undefined ? position.pnl_percent.toFixed(2) + "%" : "-"}</td>
+    `;
+    body.appendChild(tr);
+  }
 
   if (s.error) {
     document.getElementById("control_msg").innerText = "خطا: " + s.error;

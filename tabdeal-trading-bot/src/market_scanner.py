@@ -1,0 +1,83 @@
+import logging
+from typing import List
+
+logger = logging.getLogger("tabdeal_bot")
+
+# اگر دریافت لیست نمادها از API به هر دلیل شکست بخورد، ربات با همین چند
+# نماد شناخته‌شده کار می‌کند تا کاملا متوقف نشود.
+FALLBACK_SYMBOLS = ["BTC_IRT", "ETH_IRT", "USDT_IRT"]
+
+
+def _extract_symbol(entry: dict) -> str:
+    return entry.get("tabdealSymbol") or entry.get("symbol") or ""
+
+
+def _extract_quote_asset(entry: dict) -> str:
+    return str(entry.get("quoteAsset") or entry.get("quote_asset") or "").upper()
+
+
+def _is_active(entry: dict) -> bool:
+    status = entry.get("status")
+    if status is None:
+        return True
+    return str(status).upper() in ("TRADING", "ACTIVE", "ENABLED", "1", "TRUE")
+
+
+def _estimate_activity(exchange, symbol: str) -> float:
+    """
+    چون در SDK رسمی endpoint مشخصی برای حجم ۲۴ ساعته وجود ندارد، این تابع
+    از مجموع ارزش (قیمت × مقدار) آخرین معاملات هر نماد به‌عنوان معیار
+    تقریبی فعالیت/نقدشوندگی استفاده می‌کند.
+    """
+    try:
+        trades = exchange.client.trades(symbol=symbol, limit=20)
+        total = 0.0
+        for trade in trades:
+            price = float(trade.get("price", 0) or 0)
+            qty = float(trade.get("qty") or trade.get("quantity") or 0)
+            total += price * qty
+        return total
+    except Exception:
+        return 0.0
+
+
+def discover_watchlist(exchange, quote_asset: str, size: int) -> List[str]:
+    """
+    لیست نمادهای فعال بازار را از exchange_info می‌خواند، به نمادهایی که
+    با quote_asset (مثلا IRT) معامله می‌شوند فیلتر می‌کند، و پرفعالیت‌ترین‌ها
+    را بر اساس ارزش آخرین معاملات برمی‌گرداند.
+    """
+    try:
+        info = exchange.client.exchange_info()
+        entries = info.get("symbols") or info.get("data") or []
+    except Exception as exc:
+        logger.error(
+            "خطا در دریافت لیست نمادها از exchange_info (%s). از لیست پیش‌فرض استفاده می‌شود.", exc
+        )
+        return list(FALLBACK_SYMBOLS)
+
+    candidates = []
+    for entry in entries:
+        symbol = _extract_symbol(entry)
+        if not symbol or "_" not in symbol:
+            continue
+
+        _, _, quote = symbol.partition("_")
+        quote_matches = quote.upper() == quote_asset.upper() or _extract_quote_asset(entry) == quote_asset.upper()
+
+        if quote_matches and _is_active(entry):
+            candidates.append(symbol)
+
+    if not candidates:
+        logger.warning(
+            "هیچ نمادی با quote asset=%s در exchange_info پیدا نشد. از لیست پیش‌فرض استفاده می‌شود.",
+            quote_asset,
+        )
+        return list(FALLBACK_SYMBOLS)
+
+    scored = [(_estimate_activity(exchange, symbol), symbol) for symbol in candidates]
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    watchlist = [symbol for _, symbol in scored[:size]]
+
+    logger.info("لیست خودکار %s نماد پرفعالیت انتخاب شد: %s", len(watchlist), ", ".join(watchlist))
+    return watchlist

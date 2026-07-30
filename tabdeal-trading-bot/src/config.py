@@ -12,7 +12,10 @@ class ConfigError(Exception):
 class Config:
     api_key: str
     api_secret: str
-    symbol: str
+    quote_asset: str
+    watchlist_size: int
+    watchlist_refresh_minutes: int
+    max_concurrent_positions: int
     quote_order_amount: float
     quantity_precision: int
     stop_loss_percent: float
@@ -42,7 +45,10 @@ class Config:
             return Config(
                 api_key=api_key,
                 api_secret=api_secret,
-                symbol=os.getenv("SYMBOL", "BTC_IRT"),
+                quote_asset=os.getenv("QUOTE_ASSET", "IRT"),
+                watchlist_size=int(os.getenv("WATCHLIST_SIZE", "15")),
+                watchlist_refresh_minutes=int(os.getenv("WATCHLIST_REFRESH_MINUTES", "60")),
+                max_concurrent_positions=int(os.getenv("MAX_CONCURRENT_POSITIONS", "3")),
                 quote_order_amount=float(os.getenv("QUOTE_ORDER_AMOUNT", "500000")),
                 quantity_precision=int(os.getenv("QUANTITY_PRECISION", "6")),
                 stop_loss_percent=float(os.getenv("STOP_LOSS_PERCENT", "2")),

@@ -25,7 +25,10 @@ app = Flask(__name__)
 runner = BotRunner()
 
 FORM_FIELDS = [
-    "SYMBOL",
+    "QUOTE_ASSET",
+    "WATCHLIST_SIZE",
+    "WATCHLIST_REFRESH_MINUTES",
+    "MAX_CONCURRENT_POSITIONS",
     "QUOTE_ORDER_AMOUNT",
     "QUANTITY_PRECISION",
     "STOP_LOSS_PERCENT",

@@ -1,7 +1,7 @@
 import logging
 import threading
 from dataclasses import asdict, dataclass, field
-from typing import Optional
+from typing import Dict, List, Optional
 
 from src.bot import TradingBot
 from src.config import Config
@@ -16,12 +16,10 @@ logger = logging.getLogger("tabdeal_bot")
 class BotStatus:
     running: bool = False
     dry_run: bool = True
-    symbol: str = ""
-    last_price: Optional[float] = None
-    last_signal: Optional[str] = None
-    position_entry_price: Optional[float] = None
-    position_quantity: Optional[float] = None
-    position_pnl_percent: Optional[float] = None
+    watchlist: List[str] = field(default_factory=list)
+    prices: Dict[str, float] = field(default_factory=dict)
+    signals: Dict[str, str] = field(default_factory=dict)
+    positions: Dict[str, dict] = field(default_factory=dict)
     trades_today: int = 0
     daily_pnl_percent: float = 0.0
     halted: bool = False
@@ -61,13 +59,15 @@ class BotRunner:
         exchange = ExchangeClient(
             api_key=config.api_key,
             api_secret=config.api_secret,
-            symbol=config.symbol,
             dry_run=config.dry_run,
         )
-        strategy = SmaCrossoverStrategy(
-            fast_period=config.sma_fast_period,
-            slow_period=config.sma_slow_period,
-        )
+
+        def strategy_factory():
+            return SmaCrossoverStrategy(
+                fast_period=config.sma_fast_period,
+                slow_period=config.sma_slow_period,
+            )
+
         risk_manager = RiskManager(
             stop_loss_percent=config.stop_loss_percent,
             take_profit_percent=config.take_profit_percent,
@@ -76,15 +76,19 @@ class BotRunner:
         )
         bot = TradingBot(
             exchange=exchange,
-            strategy=strategy,
+            strategy_factory=strategy_factory,
             risk_manager=risk_manager,
+            quote_asset=config.quote_asset,
+            watchlist_size=config.watchlist_size,
+            watchlist_refresh_minutes=config.watchlist_refresh_minutes,
             quote_order_amount=config.quote_order_amount,
             quantity_precision=config.quantity_precision,
+            max_concurrent_positions=config.max_concurrent_positions,
             poll_interval_seconds=config.poll_interval_seconds,
         )
 
         with self._lock:
-            self._status = BotStatus(running=True, dry_run=config.dry_run, symbol=config.symbol)
+            self._status = BotStatus(running=True, dry_run=config.dry_run)
             self._stop_event = threading.Event()
             stop_event = self._stop_event
 
@@ -108,19 +112,23 @@ class BotRunner:
 
     def _on_tick(self, bot: TradingBot) -> None:
         with self._lock:
-            self._status.last_price = bot.last_price
-            self._status.last_signal = bot.last_signal.value if bot.last_signal else None
+            self._status.watchlist = list(bot.watchlist)
+            self._status.prices = dict(bot.last_price)
+            self._status.signals = {
+                symbol: signal.value for symbol, signal in bot.last_signal.items()
+            }
             self._status.trades_today = bot.risk_manager.trades_today
             self._status.daily_pnl_percent = bot.risk_manager.daily_pnl_percent
             self._status.halted = bot.risk_manager.is_halted
 
-            if bot.position is not None:
-                self._status.position_entry_price = bot.position.entry_price
-                self._status.position_quantity = bot.position.quantity
-                self._status.position_pnl_percent = (
-                    bot.position.unrealized_pnl_percent(bot.last_price) if bot.last_price else None
-                )
-            else:
-                self._status.position_entry_price = None
-                self._status.position_quantity = None
-                self._status.position_pnl_percent = None
+            positions = {}
+            for symbol, position in bot.positions.items():
+                current_price = bot.last_price.get(symbol)
+                positions[symbol] = {
+                    "entry_price": position.entry_price,
+                    "quantity": position.quantity,
+                    "pnl_percent": (
+                        position.unrealized_pnl_percent(current_price) if current_price else None
+                    ),
+                }
+            self._status.positions = positions
