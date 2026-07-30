@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Dict, Optional
 
 from src.exchange_client import ExchangeClient, ExchangeError
-from src.market_scanner import discover_watchlist
+from src.market_scanner import discover_watchlist, fetch_quantity_precisions
 from src.pnl import net_pnl_percent, pnl_amount
 from src.position import Position
 from src.risk_manager import RiskManager
@@ -31,7 +31,7 @@ class TradingBot:
         watchlist_size: int,
         watchlist_refresh_minutes: int,
         quote_order_amount: float,
-        quantity_precision: int,
+        default_quantity_precision: int,
         max_concurrent_positions: int,
         poll_interval_seconds: int,
         fee_percent: float = 0.0,
@@ -44,7 +44,7 @@ class TradingBot:
         self.watchlist_size = watchlist_size
         self.watchlist_refresh_minutes = watchlist_refresh_minutes
         self.quote_order_amount = quote_order_amount
-        self.quantity_precision = quantity_precision
+        self.default_quantity_precision = default_quantity_precision
         self.max_concurrent_positions = max_concurrent_positions
         self.poll_interval_seconds = poll_interval_seconds
         self.fee_percent = fee_percent
@@ -55,6 +55,7 @@ class TradingBot:
         self.positions: Dict[str, Position] = {}
         self.last_price: Dict[str, float] = {}
         self.last_signal: Dict[str, Signal] = {}
+        self.symbol_precisions: Dict[str, int] = {}
         self._last_watchlist_refresh: Optional[datetime] = None
 
     def run_forever(
@@ -110,6 +111,11 @@ class TradingBot:
             if symbol not in self.strategies:
                 self.strategies[symbol] = self.strategy_factory(symbol)
 
+        symbols_needing_precision = list(set(new_watchlist) | set(self.positions.keys()))
+        self.symbol_precisions.update(
+            fetch_quantity_precisions(self.exchange, symbols_needing_precision, self.default_quantity_precision)
+        )
+
         self.watchlist = new_watchlist
         self._last_watchlist_refresh = now
 
@@ -150,7 +156,8 @@ class TradingBot:
         if not self.risk_manager.can_open_new_position():
             return
 
-        order = self.exchange.buy_market(symbol, self.quote_order_amount, self.quantity_precision)
+        quantity_precision = self.symbol_precisions.get(symbol, self.default_quantity_precision)
+        order = self.exchange.buy_market(symbol, self.quote_order_amount, quantity_precision)
         if not order:
             return
 

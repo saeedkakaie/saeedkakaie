@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Dict, List
 
 logger = logging.getLogger("tabdeal_bot")
 
@@ -104,3 +104,73 @@ def discover_watchlist(exchange, quote_asset: str, size: int) -> List[str]:
 
     logger.info("لیست خودکار %s نماد پرفعالیت انتخاب شد: %s", len(watchlist), ", ".join(watchlist))
     return watchlist
+
+
+def _precision_from_step_size(step_size: str) -> int:
+    step_size = step_size.strip().rstrip("0")
+    if "." not in step_size:
+        return 0
+    return len(step_size.split(".")[1])
+
+
+def _extract_quantity_precision(entry: dict, default: int) -> int:
+    """
+    دقت اعشار مجاز مقدار (quantity) هر نماد را تلاش می‌کند از exchange_info
+    استخراج کند. چون ساختار دقیق پاسخ تبدیل مستند نیست، چند فیلد رایج در
+    APIهای سبک باینانس را امتحان می‌کند (مقدار مستقیم precision، یا
+    stepSize داخل فیلتر LOT_SIZE)؛ اگر هیچ‌کدام پیدا نشد، مقدار پیش‌فرض
+    را برمی‌گرداند.
+    """
+    for key in ("baseAssetPrecision", "quantityPrecision", "basePrecision", "amountPrecision"):
+        if key in entry:
+            try:
+                return int(entry[key])
+            except (TypeError, ValueError):
+                pass
+
+    filters = entry.get("filters")
+    if isinstance(filters, list):
+        for f in filters:
+            if isinstance(f, dict) and f.get("filterType") in ("LOT_SIZE", "MARKET_LOT_SIZE"):
+                step = f.get("stepSize")
+                if step:
+                    try:
+                        return _precision_from_step_size(str(step))
+                    except (TypeError, ValueError):
+                        pass
+
+    return default
+
+
+def fetch_quantity_precisions(exchange, symbols: List[str], default_precision: int) -> Dict[str, int]:
+    """
+    برای لیست داده‌شده از نمادها، دقت اعشار مقدار هرکدام را جداگانه از
+    exchange_info می‌خواند. اگر برای نمادی پیدا نشود یا کل درخواست شکست
+    بخورد، از default_precision استفاده می‌شود (ربات هیچ‌وقت به‌خاطر این
+    متوقف نمی‌شود). قبل از اعتماد کامل، با scripts/inspect_api.py مقادیر
+    را برای نمادهای خودتان بررسی کنید.
+    """
+    fallback = {symbol: default_precision for symbol in symbols}
+
+    try:
+        info = exchange.client.exchange_info()
+        entries = _extract_entries(info)
+    except Exception as exc:
+        logger.warning(
+            "خطا در دریافت دقت اعشار نمادها (%s)، مقدار پیش‌فرض %s برای همه استفاده می‌شود.",
+            exc,
+            default_precision,
+        )
+        return fallback
+
+    symbol_set = set(symbols)
+    precisions = dict(fallback)
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        symbol = _extract_symbol(entry)
+        if symbol in symbol_set:
+            precisions[symbol] = _extract_quantity_precision(entry, default_precision)
+
+    return precisions

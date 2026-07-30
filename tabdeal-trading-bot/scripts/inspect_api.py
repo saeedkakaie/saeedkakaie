@@ -17,7 +17,7 @@ sys.path.insert(0, ".")
 
 from src.config import Config, ConfigError  # noqa: E402
 from src.exchange_client import ExchangeClient  # noqa: E402
-from src.market_scanner import discover_watchlist, _extract_entries  # noqa: E402
+from src.market_scanner import discover_watchlist, fetch_quantity_precisions, _extract_entries  # noqa: E402
 
 
 def pretty(label: str, data) -> None:
@@ -53,13 +53,23 @@ def main() -> None:
     watchlist = discover_watchlist(exchange, config.quote_asset, config.watchlist_size)
     print(watchlist)
 
+    print(f"\n=== دقت اعشار مقدار (quantity) هر نماد، پیش‌فرض={config.quantity_precision} ===")
+    precisions = fetch_quantity_precisions(exchange, watchlist, config.quantity_precision)
+    for symbol in watchlist:
+        print(f"  {symbol}: {precisions.get(symbol, config.quantity_precision)}")
+    print(
+        "\nاگر این عددها با فیلترهای واقعی exchange_info (بخش نمونه‌ی ۳ تای بالا) "
+        "همخوانی نداشت، src/market_scanner.py::_extract_quantity_precision را متناسب با "
+        "فیلد واقعی اصلاح کنید."
+    )
+
     if watchlist:
         sample = watchlist[0]
         pretty(f"depth({sample})", client.depth(symbol=sample, limit=5))
         pretty(f"trades({sample})", client.trades(symbol=sample, limit=3))
 
     if config.api_key and config.api_secret:
-        pretty("account", client.account())
+        pretty("account", exchange._get_account())
     else:
         print("\nAPI key/secret تنظیم نشده، بخش account() رد شد.")
 

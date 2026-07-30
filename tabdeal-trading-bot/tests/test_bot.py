@@ -48,13 +48,32 @@ def make_bot(exchange, watchlist, max_concurrent=2, signal=Signal.BUY):
         watchlist_size=10,
         watchlist_refresh_minutes=999999,
         quote_order_amount=1000,
-        quantity_precision=4,
+        default_quantity_precision=4,
         max_concurrent_positions=max_concurrent,
         poll_interval_seconds=1,
     )
     bot.watchlist = watchlist
     bot._last_watchlist_refresh = dt.datetime.utcnow()
     return bot
+
+
+def test_uses_per_symbol_precision_when_available():
+    exchange = FakeExchange({"A_IRT": 333})
+    bot = make_bot(exchange, ["A_IRT"], max_concurrent=1)
+    bot.symbol_precisions = {"A_IRT": 0}
+
+    bot._tick()
+
+    assert bot.positions["A_IRT"].quantity == round(1000 / 333, 0)
+
+
+def test_falls_back_to_default_precision_when_symbol_unknown():
+    exchange = FakeExchange({"A_IRT": 333})
+    bot = make_bot(exchange, ["A_IRT"], max_concurrent=1)  # symbol_precisions stays empty
+
+    bot._tick()
+
+    assert bot.positions["A_IRT"].quantity == round(1000 / 333, 4)
 
 
 def test_respects_max_concurrent_positions():
@@ -119,7 +138,7 @@ def test_fee_reduces_realized_pnl_and_records_journal(tmp_path):
         watchlist_size=10,
         watchlist_refresh_minutes=999999,
         quote_order_amount=1000,
-        quantity_precision=4,
+        default_quantity_precision=4,
         max_concurrent_positions=1,
         poll_interval_seconds=1,
         fee_percent=0.5,

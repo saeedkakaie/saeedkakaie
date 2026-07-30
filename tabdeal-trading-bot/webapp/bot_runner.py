@@ -91,7 +91,7 @@ class BotRunner:
             watchlist_size=config.watchlist_size,
             watchlist_refresh_minutes=config.watchlist_refresh_minutes,
             quote_order_amount=config.quote_order_amount,
-            quantity_precision=config.quantity_precision,
+            default_quantity_precision=config.quantity_precision,
             max_concurrent_positions=config.max_concurrent_positions,
             poll_interval_seconds=config.poll_interval_seconds,
             fee_percent=config.trading_fee_percent,
