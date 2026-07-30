@@ -9,11 +9,13 @@ FALLBACK_SYMBOLS = ["BTC_IRT", "ETH_IRT", "USDT_IRT"]
 
 
 def _extract_symbol(entry: dict) -> str:
-    return entry.get("tabdealSymbol") or entry.get("symbol") or ""
+    return entry.get("tabdealSymbol") or entry.get("symbol") or entry.get("name") or ""
 
 
 def _extract_quote_asset(entry: dict) -> str:
-    return str(entry.get("quoteAsset") or entry.get("quote_asset") or "").upper()
+    return str(
+        entry.get("quoteAsset") or entry.get("quote_asset") or entry.get("quoteCurrency") or ""
+    ).upper()
 
 
 def _is_active(entry: dict) -> bool:
@@ -21,6 +23,24 @@ def _is_active(entry: dict) -> bool:
     if status is None:
         return True
     return str(status).upper() in ("TRADING", "ACTIVE", "ENABLED", "1", "TRUE")
+
+
+def _extract_entries(info) -> list:
+    """
+    exchange_info ممکن است مستقیما یک لیست از نمادها برگرداند، یا یک
+    دیکشنری که لیست نمادها زیر یکی از کلیدهای رایج (symbols/data/result)
+    قرار دارد. این تابع هر دو حالت را پشتیبانی می‌کند.
+    """
+    if isinstance(info, list):
+        return info
+
+    if isinstance(info, dict):
+        for key in ("symbols", "data", "result", "results"):
+            value = info.get(key)
+            if isinstance(value, list):
+                return value
+
+    return []
 
 
 def _estimate_activity(exchange, symbol: str) -> float:
@@ -49,7 +69,7 @@ def discover_watchlist(exchange, quote_asset: str, size: int) -> List[str]:
     """
     try:
         info = exchange.client.exchange_info()
-        entries = info.get("symbols") or info.get("data") or []
+        entries = _extract_entries(info)
     except Exception as exc:
         logger.error(
             "خطا در دریافت لیست نمادها از exchange_info (%s). از لیست پیش‌فرض استفاده می‌شود.", exc
@@ -58,6 +78,9 @@ def discover_watchlist(exchange, quote_asset: str, size: int) -> List[str]:
 
     candidates = []
     for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+
         symbol = _extract_symbol(entry)
         if not symbol or "_" not in symbol:
             continue

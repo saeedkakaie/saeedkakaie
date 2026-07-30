@@ -2,11 +2,14 @@ from src.market_scanner import discover_watchlist
 
 
 class FakeClient:
-    def __init__(self, symbols, trades_by_symbol):
+    def __init__(self, symbols, trades_by_symbol, raw_shape="dict"):
         self._symbols = symbols
         self._trades_by_symbol = trades_by_symbol
+        self._raw_shape = raw_shape
 
     def exchange_info(self):
+        if self._raw_shape == "list":
+            return self._symbols
         return {"symbols": self._symbols}
 
     def trades(self, symbol, limit=20):
@@ -44,6 +47,23 @@ def test_size_limit_applied_to_most_active_symbols():
     watchlist = discover_watchlist(exchange, quote_asset="IRT", size=2)
 
     assert watchlist == ["C4_IRT", "C3_IRT"]
+
+
+def test_handles_exchange_info_returning_a_bare_list():
+    # روی صرافی واقعی تبدیل، exchange_info() یک لیست خام برمی‌گرداند نه دیکشنری.
+    symbols = [
+        {"tabdealSymbol": "BTC_IRT", "status": "TRADING"},
+        {"tabdealSymbol": "ETH_IRT", "status": "TRADING"},
+    ]
+    trades_by_symbol = {
+        "BTC_IRT": [{"price": "100", "qty": "10"}],
+        "ETH_IRT": [{"price": "50", "qty": "1"}],
+    }
+    exchange = FakeExchange(FakeClient(symbols, trades_by_symbol, raw_shape="list"))
+
+    watchlist = discover_watchlist(exchange, quote_asset="IRT", size=5)
+
+    assert watchlist == ["BTC_IRT", "ETH_IRT"]
 
 
 def test_fallback_on_exchange_info_failure():

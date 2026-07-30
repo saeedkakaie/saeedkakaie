@@ -17,7 +17,7 @@ sys.path.insert(0, ".")
 
 from src.config import Config, ConfigError  # noqa: E402
 from src.exchange_client import ExchangeClient  # noqa: E402
-from src.market_scanner import discover_watchlist  # noqa: E402
+from src.market_scanner import discover_watchlist, _extract_entries  # noqa: E402
 
 
 def pretty(label: str, data) -> None:
@@ -39,8 +39,9 @@ def main() -> None:
     pretty("time", client.time())
 
     info = client.exchange_info()
-    symbols = info.get("symbols") or info.get("data") or []
-    print(f"\n=== exchange_info: {len(symbols)} نماد یافت شد. نمونه‌ی ۳ تای اول: ===")
+    print(f"\n=== exchange_info: نوع پاسخ خام = {type(info).__name__} ===")
+    symbols = _extract_entries(info)
+    print(f"{len(symbols)} نماد یافت شد. نمونه‌ی ۳ تای اول:")
     print(json.dumps(symbols[:3], indent=2, ensure_ascii=False, default=str))
     print(
         "\nاگر ساختار بالا با فرض‌های src/market_scanner.py (کلیدهای "
