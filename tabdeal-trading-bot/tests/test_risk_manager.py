@@ -1,0 +1,47 @@
+from src.position import Position
+from src.risk_manager import RiskManager
+
+
+def make_risk_manager(**overrides):
+    defaults = dict(
+        stop_loss_percent=2,
+        take_profit_percent=3,
+        max_daily_loss_percent=5,
+        max_trades_per_day=10,
+    )
+    defaults.update(overrides)
+    return RiskManager(**defaults)
+
+
+def test_stop_loss_triggers_close():
+    rm = make_risk_manager(stop_loss_percent=2)
+    position = Position(entry_price=100, quantity=1)
+    assert rm.should_close_position(position, current_price=97.9) is True
+
+
+def test_take_profit_triggers_close():
+    rm = make_risk_manager(take_profit_percent=3)
+    position = Position(entry_price=100, quantity=1)
+    assert rm.should_close_position(position, current_price=103.5) is True
+
+
+def test_no_close_within_thresholds():
+    rm = make_risk_manager(stop_loss_percent=2, take_profit_percent=3)
+    position = Position(entry_price=100, quantity=1)
+    assert rm.should_close_position(position, current_price=100.5) is False
+
+
+def test_max_trades_per_day_blocks_new_position():
+    rm = make_risk_manager(max_trades_per_day=1)
+    assert rm.can_open_new_position() is True
+    rm.register_closed_trade(pnl_percent=1)
+    assert rm.can_open_new_position() is False
+
+
+def test_daily_loss_circuit_breaker_halts_bot():
+    rm = make_risk_manager(max_daily_loss_percent=5)
+    rm.register_closed_trade(pnl_percent=-3)
+    assert rm.can_open_new_position() is True
+    rm.register_closed_trade(pnl_percent=-3)
+    assert rm.is_halted is True
+    assert rm.can_open_new_position() is False
