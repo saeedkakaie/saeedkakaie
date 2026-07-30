@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import Optional
 
 from tabdeal.enums import OrderSides, OrderTypes
@@ -46,6 +47,29 @@ class ExchangeClient:
         self.dry_run = dry_run
         self.client = Spot(api_key, api_secret)
 
+    def _clock_skew_hint(self) -> str:
+        """
+        برای عیب‌یابی خطاهای «Invalid Signature» که اغلب علتشان اختلاف
+        ساعت سیستم با سرور است: ساعت سرور تبدیل (بدون نیاز به احراز هویت)
+        را می‌گیرد و با ساعت محلی مقایسه می‌کند. best-effort است؛ اگر خودش
+        هم شکست بخورد رشته‌ی خالی برمی‌گرداند.
+        """
+        try:
+            local_ms = time.time() * 1000
+            response = self.client.time()
+            server_ms = None
+            if isinstance(response, dict):
+                for key in ("serverTime", "server_time", "time"):
+                    if key in response:
+                        server_ms = float(response[key])
+                        break
+            if server_ms is None:
+                return ""
+            skew_seconds = (local_ms - server_ms) / 1000
+            return f" | اختلاف ساعت گوشی با سرور تبدیل تقریبا {skew_seconds:.1f} ثانیه است"
+        except Exception:
+            return ""
+
     def get_current_price(self, symbol: str) -> float:
         try:
             depth = self.client.depth(symbol=symbol, limit=5)
@@ -72,9 +96,10 @@ class ExchangeClient:
             return 0.0
         except Exception as exc:
             logger.error(
-                "دریافت موجودی برای %s ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s",
+                "دریافت موجودی برای %s ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s%s",
                 asset,
                 _describe_exception(exc),
+                self._clock_skew_hint(),
             )
             return None
 
@@ -95,8 +120,9 @@ class ExchangeClient:
             return balances
         except Exception as exc:
             logger.error(
-                "دریافت موجودی حساب ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s",
+                "دریافت موجودی حساب ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s%s",
                 _describe_exception(exc),
+                self._clock_skew_hint(),
             )
             return None
 
