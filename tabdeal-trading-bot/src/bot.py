@@ -1,5 +1,7 @@
 import logging
+import threading
 import time
+from typing import Callable, Optional
 
 from src.exchange_client import ExchangeClient, ExchangeError
 from src.position import Position, PositionOrNone
@@ -26,12 +28,18 @@ class TradingBot:
         self.quantity_precision = quantity_precision
         self.poll_interval_seconds = poll_interval_seconds
         self.position: PositionOrNone = None
+        self.last_price: Optional[float] = None
+        self.last_signal: Optional[Signal] = None
 
-    def run_forever(self) -> None:
+    def run_forever(
+        self,
+        stop_event: Optional[threading.Event] = None,
+        on_tick: Optional[Callable[["TradingBot"], None]] = None,
+    ) -> None:
         mode = "DRY-RUN (شبیه‌سازی)" if self.exchange.dry_run else "LIVE (معاملات واقعی)"
         logger.info("ربات شروع به کار کرد. نماد=%s، حالت=%s", self.exchange.symbol, mode)
 
-        while True:
+        while stop_event is None or not stop_event.is_set():
             try:
                 self._tick()
             except ExchangeError as exc:
@@ -39,11 +47,32 @@ class TradingBot:
             except Exception:
                 logger.exception("خطای پیش‌بینی‌نشده در چرخه معاملاتی، ادامه می‌دهیم.")
 
+            if on_tick:
+                try:
+                    on_tick(self)
+                except Exception:
+                    logger.exception("خطا در callback وضعیت.")
+
+            self._sleep_interruptible(stop_event)
+
+        logger.info("ربات متوقف شد.")
+
+    def _sleep_interruptible(self, stop_event: Optional[threading.Event]) -> None:
+        if stop_event is None:
             time.sleep(self.poll_interval_seconds)
+            return
+
+        remaining = self.poll_interval_seconds
+        while remaining > 0 and not stop_event.is_set():
+            step = min(1, remaining)
+            time.sleep(step)
+            remaining -= step
 
     def _tick(self) -> None:
         price = self.exchange.get_current_price()
         signal = self.strategy.update(price)
+        self.last_price = price
+        self.last_signal = signal
 
         if self.position is not None:
             self._manage_open_position(price, signal)

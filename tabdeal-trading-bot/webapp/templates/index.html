@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>داشبورد ربات تبدیل</title>
+<style>
+  body { font-family: Tahoma, sans-serif; background: #10131a; color: #e8e8e8; margin: 0; padding: 20px; }
+  h1 { font-size: 20px; }
+  .banner { background: #4a1d1d; border: 1px solid #a33; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #1b202b; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  label { display: block; font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 3px; }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; box-sizing: border-box; padding: 7px; border-radius: 6px; border: 1px solid #333;
+    background: #10131a; color: #eee;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 16px; font-size: 13px; margin-top: 14px; margin-left: 6px; }
+  .btn-save { background: #2b5; color: #fff; }
+  .btn-start { background: #2a7; color: #fff; }
+  .btn-stop { background: #c33; color: #fff; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+  .status-grid div span { color: #888; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
+  .pill-on { background: #163; }
+  .pill-off { background: #444; }
+  .pill-dry { background: #a70; }
+  .pill-live { background: #a11; }
+  #logs { background: #05070a; border-radius: 8px; padding: 10px; height: 260px; overflow-y: auto;
+    font-family: monospace; font-size: 11px; white-space: pre-wrap; }
+  .msg { font-size: 12px; margin-top: 8px; color: #f88; }
+</style>
+</head>
+<body>
+
+<h1>داشبورد ربات معامله‌گر صرافی تبدیل</h1>
+<div class="banner">
+  ⚠️ این صفحه فقط روی سیستم خودتان (127.0.0.1) در دسترس است و نباید روی شبکه/اینترنت باز شود.
+  کلید API فقط سمت سرور محلی ذخیره می‌شود. این ابزار توصیه مالی نیست؛ همیشه اول با DRY_RUN تست کنید.
+</div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <h2>تنظیمات</h2>
+      <label>API Key</label>
+      <input type="password" id="api_key" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+      <label>API Secret</label>
+      <input type="password" id="api_secret" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+
+      <label>نماد (Symbol)</label>
+      <input type="text" id="SYMBOL">
+
+      <div class="row2">
+        <div>
+          <label>مبلغ هر معامله (Quote)</label>
+          <input type="number" id="QUOTE_ORDER_AMOUNT">
+        </div>
+        <div>
+          <label>دقت اعشار مقدار</label>
+          <input type="number" id="QUANTITY_PRECISION">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>حد ضرر (%)</label>
+          <input type="number" step="0.1" id="STOP_LOSS_PERCENT">
+        </div>
+        <div>
+          <label>حد سود (%)</label>
+          <input type="number" step="0.1" id="TAKE_PROFIT_PERCENT">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>سقف ضرر روزانه (%)</label>
+          <input type="number" step="0.1" id="MAX_DAILY_LOSS_PERCENT">
+        </div>
+        <div>
+          <label>سقف معامله در روز</label>
+          <input type="number" id="MAX_TRADES_PER_DAY">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div>
+          <label>SMA سریع</label>
+          <input type="number" id="SMA_FAST_PERIOD">
+        </div>
+        <div>
+          <label>SMA کند</label>
+          <input type="number" id="SMA_SLOW_PERIOD">
+        </div>
+      </div>
+
+      <label>فاصله هر چرخه (ثانیه)</label>
+      <input type="number" id="POLL_INTERVAL_SECONDS">
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="DRY_RUN">
+        <label style="margin:0">حالت شبیه‌سازی (DRY RUN) — پیشنهاد می‌شود روشن بماند</label>
+      </div>
+
+      <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
+      <div class="msg" id="config_msg"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>وضعیت ربات</h2>
+      <button class="btn-start" onclick="startBot()">شروع</button>
+      <button class="btn-stop" onclick="stopBot()">توقف</button>
+      <div class="msg" id="control_msg"></div>
+
+      <div class="status-grid" style="margin-top:14px">
+        <div><span>وضعیت: </span><span id="s_running" class="pill pill-off">متوقف</span></div>
+        <div><span>حالت: </span><span id="s_mode" class="pill pill-dry">DRY-RUN</span></div>
+        <div><span>نماد: </span><span id="s_symbol">-</span></div>
+        <div><span>آخرین قیمت: </span><span id="s_price">-</span></div>
+        <div><span>آخرین سیگنال: </span><span id="s_signal">-</span></div>
+        <div><span>پوزیشن باز: </span><span id="s_position">-</span></div>
+        <div><span>سود/زیان پوزیشن: </span><span id="s_pnl">-</span></div>
+        <div><span>معاملات امروز: </span><span id="s_trades">-</span></div>
+        <div><span>سود/زیان روزانه: </span><span id="s_daily_pnl">-</span></div>
+        <div><span>مدار قطع ضرر: </span><span id="s_halted">-</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>لاگ‌ها</h2>
+      <div id="logs"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function loadConfig() {
+  const res = await fetch('/api/config');
+  const data = await res.json();
+  for (const key of ["SYMBOL","QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT",
+    "TAKE_PROFIT_PERCENT","MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD",
+    "SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"]) {
+    document.getElementById(key).value = data[key] ?? "";
+  }
+  document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
+}
+
+async function saveConfig() {
+  const payload = {};
+  for (const key of ["SYMBOL","QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","STOP_LOSS_PERCENT",
+    "TAKE_PROFIT_PERCENT","MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD",
+    "SMA_SLOW_PERIOD","POLL_INTERVAL_SECONDS"]) {
+    payload[key] = document.getElementById(key).value;
+  }
+  payload.DRY_RUN = document.getElementById("DRY_RUN").checked;
+  payload.TABDEAL_API_KEY = document.getElementById("api_key").value;
+  payload.TABDEAL_API_SECRET = document.getElementById("api_secret").value;
+
+  const res = await fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  document.getElementById("config_msg").innerText = data.ok ? "ذخیره شد." : (data.error || "خطا");
+  document.getElementById("api_key").value = "";
+  document.getElementById("api_secret").value = "";
+}
+
+async function startBot() {
+  const res = await fetch('/api/start', {method: 'POST'});
+  const data = await res.json();
+  document.getElementById("control_msg").innerText = data.ok ? "" : (data.error || "خطا");
+}
+
+async function stopBot() {
+  await fetch('/api/stop', {method: 'POST'});
+}
+
+function fmt(v, suffix) {
+  return (v === null || v === undefined) ? "-" : v + (suffix || "");
+}
+
+async function refreshStatus() {
+  const res = await fetch('/api/status');
+  const s = await res.json();
+
+  const runEl = document.getElementById("s_running");
+  runEl.innerText = s.running ? "در حال اجرا" : "متوقف";
+  runEl.className = "pill " + (s.running ? "pill-on" : "pill-off");
+
+  const modeEl = document.getElementById("s_mode");
+  modeEl.innerText = s.dry_run ? "DRY-RUN" : "LIVE";
+  modeEl.className = "pill " + (s.dry_run ? "pill-dry" : "pill-live");
+
+  document.getElementById("s_symbol").innerText = fmt(s.symbol);
+  document.getElementById("s_price").innerText = fmt(s.last_price);
+  document.getElementById("s_signal").innerText = fmt(s.last_signal);
+  document.getElementById("s_position").innerText = s.position_quantity
+    ? `${s.position_quantity} @ ${s.position_entry_price}` : "ندارد";
+  document.getElementById("s_pnl").innerText = fmt(s.position_pnl_percent, "%");
+  document.getElementById("s_trades").innerText = fmt(s.trades_today);
+  document.getElementById("s_daily_pnl").innerText = fmt(s.daily_pnl_percent, "%");
+  document.getElementById("s_halted").innerText = s.halted ? "فعال (متوقف)" : "غیرفعال";
+
+  if (s.error) {
+    document.getElementById("control_msg").innerText = "خطا: " + s.error;
+  }
+}
+
+async function refreshLogs() {
+  const res = await fetch('/api/logs');
+  const data = await res.json();
+  const el = document.getElementById("logs");
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  el.innerText = data.lines.join("");
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+loadConfig();
+refreshStatus();
+refreshLogs();
+setInterval(refreshStatus, 3000);
+setInterval(refreshLogs, 4000);
+</script>
+</body>
+</html>

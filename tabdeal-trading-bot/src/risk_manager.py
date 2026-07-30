@@ -83,3 +83,11 @@ class RiskManager:
     @property
     def is_halted(self) -> bool:
         return self._halted
+
+    @property
+    def trades_today(self) -> int:
+        return self._trades_today
+
+    @property
+    def daily_pnl_percent(self) -> float:
+        return self._daily_pnl_percent
