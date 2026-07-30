@@ -26,7 +26,7 @@ class Config:
     sma_fast_period: int
     sma_slow_period: int
     news_enabled: bool
-    cryptopanic_api_token: str
+    news_api_key: str
     news_cache_minutes: int
     poll_interval_seconds: int
     dry_run: bool
@@ -63,7 +63,7 @@ class Config:
                 sma_fast_period=int(os.getenv("SMA_FAST_PERIOD", "5")),
                 sma_slow_period=int(os.getenv("SMA_SLOW_PERIOD", "20")),
                 news_enabled=os.getenv("NEWS_ENABLED", "false").strip().lower() == "true",
-                cryptopanic_api_token=os.getenv("CRYPTOPANIC_API_TOKEN", ""),
+                news_api_key=os.getenv("NEWS_API_KEY", ""),
                 news_cache_minutes=int(os.getenv("NEWS_CACHE_MINUTES", "30")),
                 poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "30")),
                 dry_run=dry_run,

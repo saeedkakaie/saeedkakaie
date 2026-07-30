@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 from typing import Dict, Optional, Tuple
 
@@ -6,7 +7,10 @@ import requests
 
 logger = logging.getLogger("tabdeal_bot")
 
-CRYPTOPANIC_URL = "https://cryptopanic.com/api/v1/posts/"
+# CryptoCompare یک endpoint خبری عمومی دارد که بدون ثبت‌نام و بدون API Key
+# کار می‌کند (فقط با محدودیت نرخ پایین‌تر). اگر بعدا کلید گرفتید، از طریق
+# NEWS_API_KEY در .env سرعت/محدودیت بهتری می‌گیرید، ولی اجباری نیست.
+NEWS_API_URL = "https://min-api.cryptocompare.com/data/v2/news/"
 
 NEGATIVE_KEYWORDS = [
     "hack", "hacked", "exploit", "exploited", "scam", "rug pull", "rugpull",
@@ -20,24 +24,32 @@ POSITIVE_KEYWORDS = [
 ]
 
 
+def _contains_word(text: str, keyword: str) -> bool:
+    """تطبیق با مرز کلمه، تا مثلا 'ban' داخل 'bank' اشتباهی مچ نشود."""
+    return re.search(r"\b" + re.escape(keyword) + r"\b", text) is not None
+
+
 class NewsFilter:
     """
-    فیلتر سبک احساسات خبری با استفاده از API رایگان CryptoPanic، به‌علاوه
-    یک لایه‌ی کلیدواژه‌ای ساده روی عنوان خبرها. اگر توکن تنظیم نشده باشد یا
-    درخواست شکست بخورد، همیشه خنثی (۰.۰) برمی‌گرداند تا نبود این سرویس
-    مانع کار ربات نشود.
+    فیلتر سبک احساسات خبری با استفاده از API عمومی و رایگان CryptoCompare
+    (بدون نیاز به ثبت‌نام)، به‌علاوه یک لایه‌ی کلیدواژه‌ای ساده روی عنوان
+    خبرها (چون این سرویس، برخلاف CryptoPanic، رأی مثبت/منفی کاربران ندارد).
+
+    اگر NEWS_ENABLED خاموش باشد یا درخواست شکست بخورد، همیشه خنثی (۰.۰)
+    برمی‌گرداند تا نبود یا خطای این سرویس مانع کار ربات نشود.
 
     خروجی sentiment() عددی بین -1 (خبر بد) تا +1 (خبر خوب) است.
     """
 
-    def __init__(self, api_token: Optional[str], cache_minutes: int = 30):
-        self.api_token = api_token
+    def __init__(self, enabled: bool, api_key: Optional[str] = None, cache_minutes: int = 30):
+        self._enabled = bool(enabled)
+        self.api_key = api_key
         self.cache_seconds = max(1, cache_minutes) * 60
         self._cache: Dict[str, Tuple[float, float]] = {}
 
     @property
     def enabled(self) -> bool:
-        return bool(self.api_token)
+        return self._enabled
 
     def sentiment(self, base_asset: str) -> float:
         if not self.enabled:
@@ -54,13 +66,13 @@ class NewsFilter:
 
     def _fetch_sentiment(self, base_asset: str) -> float:
         try:
-            response = requests.get(
-                CRYPTOPANIC_URL,
-                params={"auth_token": self.api_token, "currencies": base_asset, "public": "true"},
-                timeout=10,
-            )
+            params = {"lang": "EN", "categories": base_asset}
+            if self.api_key:
+                params["api_key"] = self.api_key
+
+            response = requests.get(NEWS_API_URL, params=params, timeout=10)
             response.raise_for_status()
-            posts = response.json().get("results", [])
+            posts = response.json().get("Data", [])
         except Exception as exc:
             logger.warning(
                 "خطا در دریافت اخبار برای %s (%s)، خبر خنثی در نظر گرفته می‌شود.", base_asset, exc
@@ -77,15 +89,11 @@ class NewsFilter:
         positive = 0
         negative = 0
 
-        for post in posts:
-            votes = post.get("votes") or {}
-            positive += int(votes.get("positive", 0) or 0) + int(votes.get("liked", 0) or 0)
-            negative += int(votes.get("negative", 0) or 0) + int(votes.get("disliked", 0) or 0)
-
+        for post in posts[:20]:
             title = str(post.get("title", "")).lower()
-            if any(keyword in title for keyword in NEGATIVE_KEYWORDS):
+            if any(_contains_word(title, keyword) for keyword in NEGATIVE_KEYWORDS):
                 negative += 1
-            if any(keyword in title for keyword in POSITIVE_KEYWORDS):
+            if any(_contains_word(title, keyword) for keyword in POSITIVE_KEYWORDS):
                 positive += 1
 
         total = positive + negative

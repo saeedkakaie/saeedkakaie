@@ -67,7 +67,8 @@ class BotRunner:
         )
 
         news_filter = NewsFilter(
-            api_token=config.cryptopanic_api_token if config.news_enabled else None,
+            enabled=config.news_enabled,
+            api_key=config.news_api_key or None,
             cache_minutes=config.news_cache_minutes,
         )
 

@@ -59,7 +59,7 @@ def get_config():
     data = {field: env.get(field, "") for field in FORM_FIELDS}
     data["has_api_key"] = bool(env.get("TABDEAL_API_KEY"))
     data["has_api_secret"] = bool(env.get("TABDEAL_API_SECRET"))
-    data["has_news_token"] = bool(env.get("CRYPTOPANIC_API_TOKEN"))
+    data["has_news_token"] = bool(env.get("NEWS_API_KEY"))
     return jsonify(data)
 
 
@@ -82,8 +82,8 @@ def save_config():
         updates["TABDEAL_API_KEY"] = payload["TABDEAL_API_KEY"].strip()
     if payload.get("TABDEAL_API_SECRET"):
         updates["TABDEAL_API_SECRET"] = payload["TABDEAL_API_SECRET"].strip()
-    if payload.get("CRYPTOPANIC_API_TOKEN"):
-        updates["CRYPTOPANIC_API_TOKEN"] = payload["CRYPTOPANIC_API_TOKEN"].strip()
+    if payload.get("NEWS_API_KEY"):
+        updates["NEWS_API_KEY"] = payload["NEWS_API_KEY"].strip()
 
     update_env_file(ENV_PATH, updates)
     return jsonify({"ok": True})

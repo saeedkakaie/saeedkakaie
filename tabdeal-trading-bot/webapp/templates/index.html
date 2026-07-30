@@ -146,15 +146,15 @@
 
     <div class="card">
       <h2>فیلتر خبر (اختیاری)</h2>
-      <div class="hint">با یک توکن رایگان از cryptopanic.com، ربات قبل از خرید عنوان اخبار اخیر هر کوین را چک می‌کند و روی خبر بد قوی از خرید صرف‌نظر می‌کند. بدون این توکن هم ربات کامل کار می‌کند.</div>
+      <div class="hint">با سرویس رایگان و بدون ثبت‌نام CryptoCompare، ربات قبل از خرید عنوان اخبار اخیر هر کوین را چک می‌کند و روی خبر بد قوی از خرید صرف‌نظر می‌کند. کلید زیر کاملا اختیاریه (فقط برای محدودیت نرخ بالاتر).</div>
 
       <div class="checkbox-row">
         <input type="checkbox" id="NEWS_ENABLED">
         <label style="margin:0">فعال‌سازی فیلتر خبر</label>
       </div>
 
-      <label>CryptoPanic API Token</label>
-      <input type="password" id="cryptopanic_token" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+      <label>News API Key (اختیاری)</label>
+      <input type="password" id="news_api_key" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
 
       <label>مدت کش خبر هر کوین (دقیقه)</label>
       <input type="number" id="NEWS_CACHE_MINUTES">
@@ -244,7 +244,7 @@ async function saveConfig() {
   payload.NEWS_ENABLED = document.getElementById("NEWS_ENABLED").checked;
   payload.TABDEAL_API_KEY = document.getElementById("api_key").value;
   payload.TABDEAL_API_SECRET = document.getElementById("api_secret").value;
-  payload.CRYPTOPANIC_API_TOKEN = document.getElementById("cryptopanic_token").value;
+  payload.NEWS_API_KEY = document.getElementById("news_api_key").value;
 
   const res = await fetch('/api/config', {
     method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
@@ -253,7 +253,7 @@ async function saveConfig() {
   document.getElementById("config_msg").innerText = data.ok ? "ذخیره شد." : (data.error || "خطا");
   document.getElementById("api_key").value = "";
   document.getElementById("api_secret").value = "";
-  document.getElementById("cryptopanic_token").value = "";
+  document.getElementById("news_api_key").value = "";
 }
 
 async function refreshBalances() {
