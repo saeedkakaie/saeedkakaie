@@ -11,6 +11,25 @@ class ExchangeError(Exception):
     pass
 
 
+def _describe_exception(exc: Exception) -> str:
+    """
+    tabdeal.exceptions.ClientException پیام کامل خطای سرور (code/detail) را
+    در __str__ نشان نمی‌دهد، فقط message را. این تابع همه‌ی اطلاعات موجود
+    را برای لاگ/عیب‌یابی جمع می‌کند.
+    """
+    parts = [str(exc)]
+    code = getattr(exc, "code", None)
+    if code is not None:
+        parts.append(f"code={code}")
+    status = getattr(exc, "status", None)
+    if status is not None:
+        parts.append(f"status={status}")
+    detail = getattr(exc, "detail", None)
+    if detail:
+        parts.append(f"detail={detail}")
+    return " | ".join(parts)
+
+
 class ExchangeClient:
     """
     لایه‌ی نازک روی SDK رسمی tabdeal-python. یک نمونه از این کلاس با یک
@@ -34,13 +53,15 @@ class ExchangeClient:
             best_ask = float(depth["asks"][0][0])
             return (best_bid + best_ask) / 2
         except Exception as exc:
-            logger.warning("خطا در خواندن order book %s (%s)، تلاش با آخرین معاملات...", symbol, exc)
+            logger.warning(
+                "خطا در خواندن order book %s (%s)، تلاش با آخرین معاملات...", symbol, _describe_exception(exc)
+            )
 
         try:
             trades = self.client.trades(symbol=symbol, limit=1)
             return float(trades[0]["price"])
         except Exception as exc:
-            raise ExchangeError(f"دریافت قیمت لحظه‌ای {symbol} ممکن نشد: {exc}") from exc
+            raise ExchangeError(f"دریافت قیمت لحظه‌ای {symbol} ممکن نشد: {_describe_exception(exc)}") from exc
 
     def get_asset_balance(self, asset: str) -> Optional[float]:
         try:
@@ -53,7 +74,7 @@ class ExchangeClient:
             logger.error(
                 "دریافت موجودی برای %s ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s",
                 asset,
-                exc,
+                _describe_exception(exc),
             )
             return None
 
@@ -74,7 +95,8 @@ class ExchangeClient:
             return balances
         except Exception as exc:
             logger.error(
-                "دریافت موجودی حساب ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s", exc
+                "دریافت موجودی حساب ممکن نشد (ساختار پاسخ API را با inspect_api.py بررسی کنید): %s",
+                _describe_exception(exc),
             )
             return None
 
