@@ -128,7 +128,25 @@ def balances():
     if result is None:
         return jsonify({"error": "دریافت موجودی از تبدیل ممکن نشد. لاگ‌ها را بررسی کنید."}), 502
 
-    return jsonify({"balances": result, "quote_asset": config.quote_asset})
+    total_value = 0.0
+    for balance in result:
+        asset = balance["asset"]
+        amount = balance["free"] + balance["locked"]
+
+        if asset == config.quote_asset:
+            value = amount
+        else:
+            try:
+                price = exchange.get_current_price(f"{asset}_{config.quote_asset}")
+                value = amount * price
+            except Exception:
+                value = None
+
+        balance["value"] = value
+        if value is not None:
+            total_value += value
+
+    return jsonify({"balances": result, "quote_asset": config.quote_asset, "total_value": total_value})
 
 
 @app.route("/api/performance", methods=["GET"])

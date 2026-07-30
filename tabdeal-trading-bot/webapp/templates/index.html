@@ -169,8 +169,9 @@
       <button class="btn-start" onclick="refreshBalances()">بروزرسانی موجودی</button>
       <div class="msg" id="balances_msg"></div>
       <table id="balances_table">
-        <thead><tr><th>دارایی</th><th>موجودی آزاد</th><th>در سفارش</th></tr></thead>
+        <thead><tr><th>دارایی</th><th>موجودی آزاد</th><th>در سفارش</th><th>ارزش (تومان)</th></tr></thead>
         <tbody id="balances_body"></tbody>
+        <tfoot><tr><td colspan="3"><b>جمع کل</b></td><td id="balances_total"><b>-</b></td></tr></tfoot>
       </table>
     </div>
 
@@ -279,9 +280,12 @@ async function refreshBalances() {
     const isQuote = b.asset === data.quote_asset;
     const freeText = isQuote ? fmtToman(b.free) : Number(b.free).toLocaleString('en-US', {maximumFractionDigits: 8});
     const lockedText = isQuote ? fmtToman(b.locked) : Number(b.locked).toLocaleString('en-US', {maximumFractionDigits: 8});
-    tr.innerHTML = `<td>${b.asset}</td><td>${freeText}</td><td>${lockedText}</td>`;
+    const valueText = fmtToman(b.value);
+    tr.innerHTML = `<td>${b.asset}</td><td>${freeText}</td><td>${lockedText}</td><td>${valueText}</td>`;
     body.appendChild(tr);
   }
+
+  document.getElementById("balances_total").innerHTML = `<b>${fmtToman(data.total_value)}</b>`;
 
   if (!data.balances || data.balances.length === 0) {
     msgEl.innerText = "موجودی غیرصفری یافت نشد.";
