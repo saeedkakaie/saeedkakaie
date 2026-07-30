@@ -55,9 +55,9 @@
   <div>
     <div class="card">
       <h2>تنظیمات</h2>
-      <label>API Key</label>
+      <label>API Key <span id="api_key_status" class="hint"></span></label>
       <input type="password" id="api_key" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
-      <label>API Secret</label>
+      <label>API Secret <span id="api_secret_status" class="hint"></span></label>
       <input type="password" id="api_secret" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
 
       <div class="row2">
@@ -233,6 +233,9 @@ async function loadConfig() {
   }
   document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
   document.getElementById("NEWS_ENABLED").checked = (data.NEWS_ENABLED === "true");
+
+  document.getElementById("api_key_status").innerText = data.has_api_key ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
+  document.getElementById("api_secret_status").innerText = data.has_api_secret ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
 }
 
 async function saveConfig() {
@@ -254,6 +257,7 @@ async function saveConfig() {
   document.getElementById("api_key").value = "";
   document.getElementById("api_secret").value = "";
   document.getElementById("news_api_key").value = "";
+  if (data.ok) await loadConfig();
 }
 
 async function refreshBalances() {

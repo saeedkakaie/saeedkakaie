@@ -34,7 +34,10 @@ class Config:
 
     @staticmethod
     def load(env_path: str = None) -> "Config":
-        load_dotenv(dotenv_path=env_path)
+        # override=True چون این متد ممکن است چندین بار در طول عمر یک پردازش
+        # طولانی (مثلا سرور Flask) صدا زده شود؛ بدون override، مقادیر بار
+        # اول در os.environ می‌مانند و تغییرات بعدی .env دیده نمی‌شوند.
+        load_dotenv(dotenv_path=env_path, override=True)
 
         api_key = os.getenv("TABDEAL_API_KEY", "")
         api_secret = os.getenv("TABDEAL_API_SECRET", "")
