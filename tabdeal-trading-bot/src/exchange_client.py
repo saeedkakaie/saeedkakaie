@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Optional
 
-from tabdeal.enums import OrderSides, OrderTypes
+from tabdeal.enums import OrderSides, OrderTypes, RequestTypes, SecurityTypes
 from tabdeal.spot import Spot
 
 logger = logging.getLogger("tabdeal_bot")
@@ -70,6 +70,29 @@ class ExchangeClient:
         except Exception:
             return ""
 
+    def _get_account(self) -> dict:
+        """
+        این‌جا عمداً به‌جای self.client.account() از فراخوانی مستقیم
+        request() با یک دیکشنری تازه استفاده می‌کنیم.
+
+        دلیل: امضای متد Spot.account() در SDK رسمی تابع request() را
+        بدون پاس دادن آرگومان data صدا می‌زند، و پارامتر data در تعریف
+        request() یک مقدار پیش‌فرض mutable (dict()) دارد که طبق رفتار
+        شناخته‌شده‌ی پایتون فقط یک‌بار ساخته می‌شود و بین همه‌ی
+        فراخوانی‌ها به اشتراک گذاشته می‌شود. چون این تابع همان دیکشنری
+        مشترک را با timestamp/signature هر بار update می‌کند، از دومین
+        فراخوانی به بعد signature قبلی هنوز داخلش هست و امضای جدید روی
+        یک payload «آلوده» محاسبه می‌شود که هیچ‌وقت با سرور تبدیل مچ
+        نمی‌شود (خطای Invalid Signature، code=1103). با پاس دادن یک
+        دیکشنری کاملا تازه در هر فراخوانی این باگ دور زده می‌شود.
+        """
+        return self.client.request(
+            url="account",
+            method=RequestTypes.GET,
+            security_type=SecurityTypes.TRADE,
+            data={},
+        )
+
     def get_current_price(self, symbol: str) -> float:
         try:
             depth = self.client.depth(symbol=symbol, limit=5)
@@ -89,7 +112,7 @@ class ExchangeClient:
 
     def get_asset_balance(self, asset: str) -> Optional[float]:
         try:
-            account = self.client.account()
+            account = self._get_account()
             for balance in account["balances"]:
                 if balance["asset"] == asset:
                     return float(balance["free"])
@@ -109,7 +132,7 @@ class ExchangeClient:
         در صورت خطا None برمی‌گرداند (مثلا کلید API نامعتبر یا ساختار پاسخ متفاوت).
         """
         try:
-            account = self.client.account()
+            account = self._get_account()
             balances = []
             for balance in account["balances"]:
                 free = float(balance.get("free", 0) or 0)

@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock, patch
 
+from tabdeal.enums import RequestTypes, SecurityTypes
+
 from src.exchange_client import ExchangeClient, _describe_exception
 
 
@@ -62,3 +64,60 @@ def test_clock_skew_hint_empty_when_response_has_no_known_field():
     client = _make_client()
     client.client.time = MagicMock(return_value={"unexpected": 123})
     assert client._clock_skew_hint() == ""
+
+
+def test_get_account_passes_a_fresh_dict_on_every_call():
+    """
+    رگرسیون برای باگ mutable-default-argument در Spot.account() رسمی: هر
+    فراخوانی _get_account باید یک دیکشنری data تازه (بدون کلید باقیمانده
+    از فراخوانی قبلی) به request() پاس بدهد، نه یک آبجکت مشترک.
+    """
+    client = _make_client()
+    client.client.request = MagicMock(return_value={"balances": []})
+
+    client._get_account()
+    client._get_account()
+
+    assert client.client.request.call_count == 2
+    first_call_data = client.client.request.call_args_list[0].kwargs["data"]
+    second_call_data = client.client.request.call_args_list[1].kwargs["data"]
+
+    assert first_call_data == {}
+    assert second_call_data == {}
+    assert first_call_data is not second_call_data
+
+
+def test_get_account_uses_trade_security_and_get_method():
+    client = _make_client()
+    client.client.request = MagicMock(return_value={"balances": []})
+
+    client._get_account()
+
+    _, kwargs = client.client.request.call_args
+    assert kwargs["url"] == "account"
+    assert kwargs["method"] == RequestTypes.GET
+    assert kwargs["security_type"] == SecurityTypes.TRADE
+
+
+def test_official_sdk_account_shares_a_mutated_dict_across_calls():
+    """
+    این تست خودِ باگ را در SDK رسمی نصب‌شده اثبات می‌کند (نه کد ما): چون
+    Spot.account() آرگومان data را صدا نمی‌زند، پارامتر پیش‌فرض mutable
+    تابع request() بین فراخوانی‌ها به اشتراک می‌رود. اگر این تست در
+    نسخه‌ی جدیدتر SDK قرمز شد یعنی باگ رفع شده و _get_account/این تست
+    می‌توانند حذف شوند.
+    """
+    from tabdeal.spot import Spot
+
+    client = Spot(api_key="key", api_secret="secret")
+    client.session.get = MagicMock(return_value=MagicMock(status_code=200, json=lambda: {}))
+
+    client.account()
+    first_params = client.session.get.call_args.kwargs["params"]
+    assert "signature" in first_params
+
+    client.account()
+    second_params = client.session.get.call_args.kwargs["params"]
+
+    # همان آبجکت دیکشنری بین دو فراخوانی به اشتراک رفته است
+    assert first_params is second_params
