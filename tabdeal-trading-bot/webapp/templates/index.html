@@ -77,10 +77,11 @@
           <input type="number" step="0.1" id="STOP_LOSS_PERCENT">
         </div>
         <div>
-          <label>حد سود (%)</label>
+          <label>عرض حد ضرر متحرک (%)</label>
           <input type="number" step="0.1" id="TAKE_PROFIT_PERCENT">
         </div>
       </div>
+      <div class="hint">دیگر «حد سود ثابت» نیست: ربات با رسیدن به این درصد سود بلافاصله نمی‌فروشد، بلکه بالاترین قیمت هر پوزیشن را دنبال می‌کند و فقط وقتی قیمت از آن قله به همین اندازه برگردد می‌فروشد — یعنی در یک پامپ قوی تا جایی که روند ادامه دارد سود را دنبال می‌کند.</div>
 
       <label>سقف ضرر روزانه (%) — مدار قطع خودکار</label>
       <input type="number" step="0.1" id="MAX_DAILY_LOSS_PERCENT">
@@ -185,7 +186,7 @@
 
       <table id="watchlist_table">
         <thead>
-          <tr><th>نماد</th><th>قیمت (تومان)</th><th>سیگنال</th><th>پوزیشن</th><th>هدف فروش / حد ضرر</th><th>سود/زیان</th></tr>
+          <tr><th>نماد</th><th>قیمت (تومان)</th><th>سیگنال</th><th>پوزیشن</th><th>بالاترین دیده‌شده / حد ضرر متحرک / حد ضرر ثابت</th><th>سود/زیان</th></tr>
         </thead>
         <tbody id="watchlist_body"></tbody>
       </table>
@@ -350,7 +351,7 @@ async function refreshStatus() {
     if (signal === "BUY") tr.className = "row-buy";
     if (signal === "SELL") tr.className = "row-sell";
     const targetStop = position
-      ? `هدف: ${fmtToman(position.target_price)}<br>ضرر: ${fmtToman(position.stop_price)}`
+      ? `قله: ${fmtToman(position.highest_price)}<br>متحرک: ${fmtToman(position.trailing_stop_price)}<br>ثابت: ${fmtToman(position.stop_price)}`
       : "-";
     const pnlCell = position && position.pnl_percent !== null && position.pnl_percent !== undefined
       ? `${position.pnl_percent.toFixed(2)}%<br>${fmtToman(position.pnl_amount)}`

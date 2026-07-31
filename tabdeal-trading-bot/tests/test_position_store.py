@@ -20,6 +20,21 @@ def test_save_and_load_round_trip(tmp_path):
     assert loaded["ETH_IRT"].stop_loss_percent == 4
 
 
+def test_save_and_load_round_trip_preserves_highest_price(tmp_path):
+    """
+    رگرسیون برای حد ضرر متحرک: اگر بالاترین قیمت دیده‌شده با هر ری‌استارت
+    به قیمت ورود برگردد، محافظت از سودی که قبلا به‌دست آمده از دست می‌رود.
+    """
+    store = PositionStore(os.path.join(tmp_path, "open_positions.json"))
+    position = Position(entry_price=100, quantity=1, stop_loss_percent=2, take_profit_percent=3)
+    position.update_highest_price(150)
+
+    store.save({"BTC_IRT": position})
+    loaded = store.load()
+
+    assert loaded["BTC_IRT"].highest_price == 150
+
+
 def test_load_returns_empty_dict_when_file_missing(tmp_path):
     store = PositionStore(os.path.join(tmp_path, "missing.json"))
     assert store.load() == {}

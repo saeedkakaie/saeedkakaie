@@ -238,15 +238,19 @@ def test_fee_reduces_realized_pnl_and_records_journal(tmp_path):
     bot._tick()
     assert "A_IRT" in bot.positions
 
-    exchange.prices["A_IRT"] = 110  # +10% gross, well above the 3% take-profit
+    exchange.prices["A_IRT"] = 110  # قله جدید؛ حد ضرر متحرک (عرض ۳٪) هنوز نباید ببندد
+    bot._tick()
+    assert "A_IRT" in bot.positions
+
+    exchange.prices["A_IRT"] = 106  # برگشت بیش از ۳٪ از قله (۱۱۰) -> باید ببندد
     bot._tick()
 
     assert "A_IRT" not in bot.positions
 
     summary = journal.summary()
     assert summary["day"]["trades"] == 1
-    # gross ~10%, fee 0.5% * 2 legs = 1%, so net should be noticeably below gross
-    assert 8.5 < summary["day"]["net_pnl_percent"] < 9.5
+    # gross ~6%, fee 0.5% * 2 legs = 1%, so net should be noticeably below gross
+    assert 4.5 < summary["day"]["net_pnl_percent"] < 5.5
 
 
 def _make_bot_with_store(exchange, watchlist, store):
@@ -300,7 +304,11 @@ def test_closing_a_position_persists_removal(tmp_path):
     bot._tick()
     assert "A_IRT" in bot.positions
 
-    exchange.prices["A_IRT"] = 110  # فراتر از حد سود ۳٪
+    exchange.prices["A_IRT"] = 110  # قله جدید؛ حد ضرر متحرک هنوز نباید ببندد
+    bot._tick()
+    assert "A_IRT" in bot.positions
+
+    exchange.prices["A_IRT"] = 106  # برگشت بیش از ۳٪ از قله -> باید ببندد
     bot._tick()
     assert "A_IRT" not in bot.positions
 

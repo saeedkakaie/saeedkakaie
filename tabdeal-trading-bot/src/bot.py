@@ -277,8 +277,8 @@ class TradingBot:
             self.position_store.save(self.positions)
 
         logger.info(
-            "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، مبلغ=%.2f %s، حد ضرر=%.2f%% (قیمت %.4f)، "
-            "حد سود=%.2f%% (قیمت %.4f)، تعداد پوزیشن‌های باز=%s",
+            "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، مبلغ=%.2f %s، حد ضرر ثابت=%.2f%% (قیمت %.4f)، "
+            "عرض حد ضرر متحرک=%.2f%%، تعداد پوزیشن‌های باز=%s",
             symbol,
             position.entry_price,
             position.quantity,
@@ -287,7 +287,6 @@ class TradingBot:
             stop_loss_percent,
             position.stop_price,
             take_profit_percent,
-            position.target_price,
             len(self.positions),
         )
 

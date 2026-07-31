@@ -54,18 +54,32 @@ class RiskManager:
 
     def should_close_position(self, position: Position, current_price: float) -> bool:
         """
-        حد ضرر/سود مخصوص همین پوزیشن را بررسی می‌کند (که ممکن است در لحظه‌ی
-        باز شدن به‌صورت پویا بر اساس نوسان بازار محاسبه شده باشد، نه
-        مقادیر ثابت تنظیمات).
+        حد ضرر ثابت (از قیمت ورود) و حد ضرر متحرک (trailing stop، از
+        بالاترین قیمتی که این پوزیشن تا الان دیده) را بررسی می‌کند —
+        هردو ممکن است در لحظه‌ی باز شدن به‌صورت پویا بر اساس نوسان بازار
+        محاسبه شده باشند، نه مقادیر ثابت تنظیمات.
+
+        برخلاف حد سود ثابت قبلی، پوزیشن با رسیدن به یک درصد سود مشخص
+        بلافاصله بسته نمی‌شود — تا وقتی قیمت رکورد جدید می‌زند نگه داشته
+        می‌شود و فقط وقتی از بالاترین قیمت دیده‌شده به اندازه‌ی
+        take_profit_percent برگردد بسته می‌شود؛ یعنی در یک پامپ قوی، به‌جای
+        فروش زودهنگام، تا جایی که روند صعودی ادامه دارد سود را دنبال می‌کند.
         """
+        position.update_highest_price(current_price)
         pnl_percent = position.unrealized_pnl_percent(current_price)
 
         if pnl_percent <= -abs(position.stop_loss_percent):
             logger.info("حد ضرر فعال شد: %.2f%% <= -%.2f%%", pnl_percent, position.stop_loss_percent)
             return True
 
-        if pnl_percent >= abs(position.take_profit_percent):
-            logger.info("حد سود فعال شد: %.2f%% >= %.2f%%", pnl_percent, position.take_profit_percent)
+        if current_price <= position.trailing_stop_price:
+            logger.info(
+                "حد ضرر متحرک فعال شد: قیمت %.6f <= %.6f (برگشت %.2f%% از بالاترین قیمت دیده‌شده %.6f)",
+                current_price,
+                position.trailing_stop_price,
+                position.take_profit_percent,
+                position.highest_price,
+            )
             return True
 
         return False

@@ -54,6 +54,7 @@ class PositionStore:
                     "quantity": position.quantity,
                     "stop_loss_percent": position.stop_loss_percent,
                     "take_profit_percent": position.take_profit_percent,
+                    "highest_price": position.highest_price,
                 }
                 for symbol, position in positions.items()
             }

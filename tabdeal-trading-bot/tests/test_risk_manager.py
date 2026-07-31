@@ -20,10 +20,30 @@ def test_stop_loss_triggers_close():
     assert rm.should_close_position(position, current_price=97.9) is True
 
 
-def test_take_profit_triggers_close():
+def test_trailing_stop_triggers_close_after_pullback_from_peak():
     rm = make_risk_manager()
     position = Position(entry_price=100, quantity=1, stop_loss_percent=2, take_profit_percent=3)
-    assert rm.should_close_position(position, current_price=103.5) is True
+
+    assert rm.should_close_position(position, current_price=110) is False
+    assert position.highest_price == 110
+
+    # ۳٪ برگشت از قله (۱۱۰) باید ببندد، حتی با اینکه سود نسبت به ورود مثبته
+    assert rm.should_close_position(position, current_price=110 * 0.97) is True
+
+
+def test_does_not_close_while_price_keeps_making_new_highs():
+    """
+    رگرسیون برای رفتار مطلوب «سود را دنبال کن»: قبل از این تغییر، ربات با
+    رسیدن به یک درصد سود ثابت بلافاصله می‌فروخت و بقیه‌ی یک پامپ قوی را
+    از دست می‌داد. حالا تا وقتی قیمت رکورد جدید می‌زند، پوزیشن باز می‌ماند.
+    """
+    rm = make_risk_manager()
+    position = Position(entry_price=100, quantity=1, stop_loss_percent=2, take_profit_percent=3)
+
+    for price in [102, 105, 110, 120, 130]:
+        assert rm.should_close_position(position, current_price=price) is False
+
+    assert position.highest_price == 130
 
 
 def test_no_close_within_thresholds():
