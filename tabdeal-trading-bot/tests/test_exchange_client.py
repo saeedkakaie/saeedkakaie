@@ -198,6 +198,22 @@ def test_normalize_order_does_not_subtract_commission_on_sell():
     assert result["quantity"] == 3.0
 
 
+def test_normalize_order_floors_quantity_to_precision_after_commission_subtraction():
+    """
+    رگرسیون برای خطای واقعی «دقت اعشار مقدار رعایت نشده»: کسر کارمزد
+    می‌تواند رقم اعشار غیرمنتظره (نویز floating-point) تولید کند؛ نتیجه‌ی
+    نهایی باید همیشه به دقت مجاز نماد گرد شده باشد.
+    """
+    order = {
+        "executedQty": "163.057",
+        "fills": [{"price": "18238.0", "qty": "163.057", "commission": "0.538088", "commissionAsset": "KITE"}],
+    }
+    result = _normalize_order(
+        order, side="خرید", symbol="KITE_IRT", fallback_price=1, fallback_quantity=1, quantity_precision=4
+    )
+    assert result["quantity"] == 162.5189
+
+
 def _make_live_client():
     with patch("src.exchange_client.Spot"):
         return ExchangeClient(api_key="key", api_secret="secret", dry_run=False)
@@ -239,10 +255,30 @@ def test_sell_market_clamps_quantity_to_actual_free_balance_when_lower():
     client._get_account = MagicMock(return_value={"balances": [{"asset": "BTC", "free": "1.9", "locked": "0"}]})
     client.client.new_order = MagicMock(return_value={"executedQty": "1.9", "cummulativeQuoteQty": "190.0"})
 
-    client.sell_market("BTC_IRT", quantity=2.0)
+    client.sell_market("BTC_IRT", quantity=2.0, quantity_precision=8)
 
     _, kwargs = client.client.new_order.call_args
     assert kwargs["quantity"] == str(1.9)
+
+
+def test_sell_market_floors_clamped_quantity_to_symbol_precision():
+    """
+    رگرسیون برای مورد واقعی: بعد از کلمپ به موجودی آزاد واقعی (که ممکن است
+    رقم اعشار بیشتری از دقت مجاز نماد داشته باشد)، صرافی سفارش را با خطای
+    «دقت اعشار مقدار رعایت نشده» رد می‌کرد. باید همیشه به دقت مجاز نماد
+    گرد شود، نه فقط به موجودی خام.
+    """
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client._get_account = MagicMock(
+        return_value={"balances": [{"asset": "BTC", "free": "1.987654321", "locked": "0"}]}
+    )
+    client.client.new_order = MagicMock(return_value={"executedQty": "1.98", "cummulativeQuoteQty": "198.0"})
+
+    client.sell_market("BTC_IRT", quantity=2.0, quantity_precision=2)
+
+    _, kwargs = client.client.new_order.call_args
+    assert kwargs["quantity"] == str(1.98)
 
 
 def test_sell_market_does_not_clamp_when_actual_balance_is_sufficient():
@@ -251,7 +287,7 @@ def test_sell_market_does_not_clamp_when_actual_balance_is_sufficient():
     client._get_account = MagicMock(return_value={"balances": [{"asset": "BTC", "free": "5.0", "locked": "0"}]})
     client.client.new_order = MagicMock(return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0"})
 
-    client.sell_market("BTC_IRT", quantity=2.0)
+    client.sell_market("BTC_IRT", quantity=2.0, quantity_precision=8)
 
     _, kwargs = client.client.new_order.call_args
     assert kwargs["quantity"] == str(2.0)
@@ -263,7 +299,7 @@ def test_sell_market_skips_clamp_when_balance_lookup_fails():
     client._get_account = MagicMock(side_effect=Exception("network down"))
     client.client.new_order = MagicMock(return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0"})
 
-    client.sell_market("BTC_IRT", quantity=2.0)
+    client.sell_market("BTC_IRT", quantity=2.0, quantity_precision=8)
 
     _, kwargs = client.client.new_order.call_args
     assert kwargs["quantity"] == str(2.0)
@@ -276,6 +312,6 @@ def test_sell_market_normalizes_binance_style_live_response():
         return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0", "price": "0"}
     )
 
-    order = client.sell_market("BTC_IRT", quantity=2.0)
+    order = client.sell_market("BTC_IRT", quantity=2.0, quantity_precision=8)
 
     assert order == {"price": 100.0, "quantity": 2.0}

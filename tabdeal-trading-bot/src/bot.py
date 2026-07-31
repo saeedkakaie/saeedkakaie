@@ -303,7 +303,8 @@ class TradingBot:
             )
             return
 
-        order = self.exchange.sell_market(symbol, position.quantity)
+        quantity_precision = self.symbol_precisions.get(symbol, self.default_quantity_precision)
+        order = self.exchange.sell_market(symbol, position.quantity, quantity_precision)
         if not order:
             return
 

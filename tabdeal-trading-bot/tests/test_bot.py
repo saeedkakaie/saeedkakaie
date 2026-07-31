@@ -42,7 +42,7 @@ class FakeExchange:
         self.balance -= quote_amount
         return {"price": price, "quantity": qty}
 
-    def sell_market(self, symbol, quantity):
+    def sell_market(self, symbol, quantity, precision):
         return {"price": self.prices[symbol], "quantity": quantity}
 
 

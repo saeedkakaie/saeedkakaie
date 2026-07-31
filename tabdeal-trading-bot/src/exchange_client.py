@@ -1,4 +1,5 @@
 import logging
+import math
 import time
 from typing import Optional, Tuple
 
@@ -12,6 +13,18 @@ logger = logging.getLogger("tabdeal_bot")
 
 class ExchangeError(Exception):
     pass
+
+
+def _floor_to_precision(value: float, precision: int) -> float:
+    """
+    همیشه به پایین گرد می‌کند (نه نزدیک‌ترین)، چون این تابع فقط برای مقدارهایی
+    استفاده می‌شود که نباید حتی یک واحد کوچک از سقف واقعی (موجودی آزاد یا
+    دقت اعشار مجاز صرافی) عبور کنند؛ گرد کردن معمولی (round) گاهی به بالا
+    گرد می‌کند و همان مشکل «موجودی کافی نیست» / «دقت اعشار رعایت نشده» را
+    دوباره ایجاد می‌کند.
+    """
+    factor = 10**precision
+    return math.floor(value * factor) / factor
 
 
 def _extract_quantity(order: dict) -> Optional[float]:
@@ -100,7 +113,14 @@ def _extract_commission_in_asset(order: dict, asset: str) -> float:
     return total
 
 
-def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float, fallback_quantity: float) -> dict:
+def _normalize_order(
+    order: dict,
+    side: str,
+    symbol: str,
+    fallback_price: float,
+    fallback_quantity: float,
+    quantity_precision: Optional[int] = None,
+) -> dict:
     """
     پاسخ خام new_order() ممکن است کلیدهای متفاوتی از قرارداد داخلی
     {"price", "quantity"} (که فقط در حالت DRY-RUN خودمان می‌سازیم) داشته
@@ -163,6 +183,13 @@ def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float,
                 quantity - commission,
             )
             quantity -= commission
+
+    if quantity_precision is not None:
+        # کسر کارمزد (بالاتر) یا موجودی خام صرافی ممکن است رقم اعشار بیشتری
+        # از حد مجاز نماد داشته باشد؛ صرافی چنین مقداری را با خطای «دقت
+        # اعشار رعایت نشده» رد می‌کند. همیشه به پایین گرد می‌کنیم تا هیچ‌وقت
+        # از مقدار واقعی موجود بیشتر ادعا نکنیم.
+        quantity = _floor_to_precision(quantity, quantity_precision)
 
     return {"price": price, "quantity": quantity}
 
@@ -328,9 +355,16 @@ class ExchangeClient:
             quantity=str(quantity),
         )
         logger.info("سفارش خرید ثبت شد (%s): %s", symbol, order)
-        return _normalize_order(order, side="خرید", symbol=symbol, fallback_price=price, fallback_quantity=quantity)
+        return _normalize_order(
+            order,
+            side="خرید",
+            symbol=symbol,
+            fallback_price=price,
+            fallback_quantity=quantity,
+            quantity_precision=quantity_precision,
+        )
 
-    def sell_market(self, symbol: str, quantity: float) -> Optional[dict]:
+    def sell_market(self, symbol: str, quantity: float, quantity_precision: int) -> Optional[dict]:
         if quantity <= 0:
             raise ExchangeError(f"مقدار برای فروش {symbol} نامعتبر است.")
 
@@ -357,6 +391,14 @@ class ExchangeClient:
             )
             quantity = actual_free
 
+        # چه از موجودی واقعی گرفته شده باشد چه عدد ذخیره‌شده در پوزیشن، هر دو
+        # ممکن است رقم اعشار بیشتری از دقت مجاز این نماد داشته باشند و صرافی
+        # سفارش را با «دقت اعشار رعایت نشده» رد کند؛ همیشه قبل از ارسال به
+        # پایین گرد می‌کنیم.
+        quantity = _floor_to_precision(quantity, quantity_precision)
+        if quantity <= 0:
+            raise ExchangeError(f"مقدار محاسبه‌شده برای فروش {symbol} بعد از گرد کردن صفر یا منفی است.")
+
         order = self.client.new_order(
             symbol=symbol,
             side=OrderSides.SELL,
@@ -364,4 +406,11 @@ class ExchangeClient:
             quantity=str(quantity),
         )
         logger.info("سفارش فروش ثبت شد (%s): %s", symbol, order)
-        return _normalize_order(order, side="فروش", symbol=symbol, fallback_price=price, fallback_quantity=quantity)
+        return _normalize_order(
+            order,
+            side="فروش",
+            symbol=symbol,
+            fallback_price=price,
+            fallback_quantity=quantity,
+            quantity_precision=quantity_precision,
+        )
