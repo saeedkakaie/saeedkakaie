@@ -332,7 +332,12 @@ async function refreshStatus() {
   document.getElementById("s_daily_pnl").innerText = fmt(s.daily_pnl_percent, "%");
   document.getElementById("s_halted").innerText = s.halted ? "فعال (متوقف)" : "غیرفعال";
 
-  const watchlist = s.watchlist && s.watchlist.length ? s.watchlist : Object.keys(positions);
+  // پوزیشن بازی که از لیست خودکار خارج شده (یا اصلا هیچ‌وقت توش نبوده،
+  // مثل پوزیشنی که دستی به ربات شناسانده شده) باید همیشه تو جدول دیده
+  // شود، حتی وقتی watchlist خالی نیست — چون ربات همچنان آن را مدیریت
+  // می‌کند (حد ضرر/سود فعال است)، فقط چون تو watchlist نیست نباید از
+  // دید کاربر هم پنهان بماند.
+  const watchlist = Array.from(new Set([...(s.watchlist || []), ...Object.keys(positions)]));
   const body = document.getElementById("watchlist_body");
   body.innerHTML = "";
 
