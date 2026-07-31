@@ -170,12 +170,15 @@ class TechnicalStrategy(Strategy):
     # این عدد با شبیه‌سازی مونت‌کارلو کالیبره شده: مقادیر پایین‌تر (مثلا
     # ۱.۵٪) عملا با نوسان معمولی بازار (نه یک پامپ واقعی) هم فعال می‌شوند
     # و تعداد سیگنال خرید را حتی از رأی‌گیری معمول هم بیشتر می‌کنند — چون
-    # مسیر پامپ هیچ اندیکاتور دیگری را چک نمی‌کند، هر false positive اینجا
-    # مستقیماً یک خرید واقعی و کارمزد الکی است. اگر برای نمادهایی که
-    # معامله می‌کنید هنوز پامپ واقعی را دیر تشخیص می‌دهد یا برعکس روی
-    # نوسان عادی هم فعال می‌شود، این عدد را متناسب با POLL_INTERVAL_SECONDS
-    # و نوسان معمول آن نمادها تنظیم کنید.
-    PUMP_ROC_THRESHOLD_PERCENT = 5.0
+    # مسیر پامپ هیچ اندیکاتور دیگری را چک نمی‌کند (حتی فیلتر هم‌جهتی با
+    # روند بالا هم شاملش نمی‌شود)، هر false positive اینجا مستقیماً یک خرید
+    # واقعی و کارمزد الکی است. بعد از بررسی داده‌ی واقعی معاملات (نرخ برد
+    # پایین، بدون اطلاع از اینکه چند تا از آن معاملات از همین مسیر آمده‌اند)
+    # این آستانه از ۵٪ به ۷٪ بالا برده شد تا محافظه‌کارانه‌تر باشد. اگر برای
+    # نمادهایی که معامله می‌کنید هنوز پامپ واقعی را دیر تشخیص می‌دهد یا
+    # برعکس روی نوسان عادی هم فعال می‌شود، این عدد را متناسب با
+    # POLL_INTERVAL_SECONDS و نوسان معمول آن نمادها تنظیم کنید.
+    PUMP_ROC_THRESHOLD_PERCENT = 7.0
 
     def __init__(self, symbol: str, news_filter=None):
         self.symbol = symbol
@@ -207,7 +210,7 @@ class TechnicalStrategy(Strategy):
         votes = self._collect_votes(prices)
         confluence = sum(votes.values())
 
-        signal = self._decide(confluence)
+        signal = self._decide(confluence, votes)
         self._prev_confluence = confluence
         self.last_confluence = confluence
         return signal
@@ -285,7 +288,7 @@ class TechnicalStrategy(Strategy):
 
         return votes
 
-    def _decide(self, confluence: int) -> Signal:
+    def _decide(self, confluence: int, votes: dict) -> Signal:
         buy_threshold = self.CONFLUENCE_THRESHOLD
         news_score = None
 
@@ -298,6 +301,22 @@ class TechnicalStrategy(Strategy):
         crossed_down = self._prev_confluence > -self.CONFLUENCE_THRESHOLD >= confluence
 
         if crossed_up:
+            # فیلتر هم‌جهتی با روند: داده‌ی واقعی معاملات (۹ معامله‌ی بسته‌شده،
+            # نرخ برد حدود ۱۱٪) نشان داد بیشتر ضررها دقیقاً روی حد ضرر بسته
+            # شده‌اند، یعنی ورودها احتمالاً برخلاف روند غالب (خرید افت قیمت با
+            # امید بازگشت) بوده‌اند. برای همین علاوه بر عبور از آستانه‌ی
+            # رأی‌گیری، رأی روند (EMA) و ایچیموکو هم نباید منفی باشند؛ در غیر
+            # این صورت یعنی سایر اندیکاتورها برخلاف روند بلندمدت رأی داده‌اند
+            # و این ورود رد می‌شود.
+            trend_aligned = votes.get("trend", 0) >= 0 and votes.get("ichimoku", 0) >= 0
+            if not trend_aligned:
+                logger.info(
+                    "سیگنال خرید %s چون هم‌جهت با روند نبود نادیده گرفته شد (trend=%s, ichimoku=%s).",
+                    self.symbol,
+                    votes.get("trend"),
+                    votes.get("ichimoku"),
+                )
+                return Signal.HOLD
             if self.news_filter and self.news_filter.enabled:
                 if news_score is None:
                     news_score = self.news_filter.sentiment(self.base_asset)

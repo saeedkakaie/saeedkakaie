@@ -12,40 +12,62 @@ class FakeNewsFilter:
         return self._score
 
 
+ALIGNED_VOTES = {"trend": 1, "ichimoku": 1}
+
+
 def test_decide_buy_on_confluence_crossing_up():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
     strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD - 1
-    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.BUY
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD, ALIGNED_VOTES) == Signal.BUY
 
 
 def test_decide_hold_when_no_new_crossing():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
     strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD
-    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD + 1) == Signal.HOLD
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD + 1, ALIGNED_VOTES) == Signal.HOLD
 
 
 def test_decide_sell_on_confluence_crossing_down():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
     strategy._prev_confluence = -1
-    assert strategy._decide(-TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.SELL
+    assert strategy._decide(-TechnicalStrategy.CONFLUENCE_THRESHOLD, ALIGNED_VOTES) == Signal.SELL
 
 
 def test_decide_news_veto_blocks_buy():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=-0.8))
     strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD - 1
-    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.HOLD
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD, ALIGNED_VOTES) == Signal.HOLD
 
 
 def test_decide_news_boost_lowers_threshold():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.8))
     strategy._prev_confluence = TechnicalStrategy.NEWS_BOOSTED_THRESHOLD - 1
-    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD) == Signal.BUY
+    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD, ALIGNED_VOTES) == Signal.BUY
 
 
 def test_decide_mild_positive_news_does_not_lower_threshold():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.1))
     strategy._prev_confluence = TechnicalStrategy.NEWS_BOOSTED_THRESHOLD - 1
-    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD) == Signal.HOLD
+    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD, ALIGNED_VOTES) == Signal.HOLD
+
+
+def test_decide_blocks_buy_when_against_trend():
+    """
+    رگرسیون برای فیلتر هم‌جهتی با روند: حتی اگر رأی‌گیری از آستانه عبور
+    کند، اگر رأی روند یا ایچیموکو منفی باشد (یعنی خرید برخلاف روند غالب
+    است) نباید خرید انجام شود.
+    """
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD - 1
+    votes = {"trend": -1, "ichimoku": 0}
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD, votes) == Signal.HOLD
+
+
+def test_decide_sell_on_confluence_crossing_down_ignores_trend_gate():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    strategy._prev_confluence = -1
+    votes = {"trend": -1, "ichimoku": -1}
+    assert strategy._decide(-TechnicalStrategy.CONFLUENCE_THRESHOLD, votes) == Signal.SELL
 
 
 def test_hold_when_insufficient_price_history():
@@ -92,30 +114,30 @@ def test_detects_pump_and_buys_immediately_bypassing_confluence():
     به آن، بلافاصله سیگنال خرید بدهد.
     """
     strategy = TechnicalStrategy(symbol="BTC_IRT")
-    prices = [100, 100, 100, 100, 100, 107]  # جهش ۷٪ طی ۵ تیک اخیر، بالای آستانه ۵٪
+    prices = [100, 100, 100, 100, 100, 109]  # جهش ۹٪ طی ۵ تیک اخیر، بالای آستانه ۷٪
     signals = [strategy.update(p) for p in prices]
     assert signals[-1] == Signal.BUY
 
 
 def test_pump_signal_blocked_by_negative_news():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=-0.8))
-    prices = [100, 100, 100, 100, 100, 107]
+    prices = [100, 100, 100, 100, 100, 109]
     signals = [strategy.update(p) for p in prices]
     assert signals[-1] == Signal.HOLD
 
 
 def test_confidence_is_maximum_after_pump_detected():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
-    for price in [100, 100, 100, 100, 100, 107]:
+    for price in [100, 100, 100, 100, 100, 109]:
         strategy.update(price)
     assert strategy.confidence() == 1.0
 
 
 def test_detect_pump_requires_new_high_not_just_fast_roc():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
-    # جهش قوی (۵٪، از آستانه عبور کرده) هست ولی قیمت الان دیگر بالاترین
-    # قیمت همان بازه نیست (از ۱۰۸ به ۱۰۵ برگشته)
-    prices = [100, 100, 100, 100, 108, 105]
+    # جهش قوی (۸٪، از آستانه عبور کرده) هست ولی قیمت الان دیگر بالاترین
+    # قیمت همان بازه نیست (از ۱۱۲ به ۱۰۸ برگشته)
+    prices = [100, 100, 100, 100, 112, 108]
     assert strategy._detect_pump(prices) is False
 
 
