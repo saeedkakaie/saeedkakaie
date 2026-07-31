@@ -106,7 +106,6 @@ class BotRunner:
             strategy_factory=strategy_factory,
             risk_manager=risk_manager,
             quote_asset=config.quote_asset,
-            watchlist_refresh_minutes=config.watchlist_refresh_minutes,
             default_quantity_precision=config.quantity_precision,
             poll_interval_seconds=config.poll_interval_seconds,
             fee_percent=config.trading_fee_percent,

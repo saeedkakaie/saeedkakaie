@@ -60,17 +60,9 @@
       <label>API Secret <span id="api_secret_status" class="hint"></span></label>
       <input type="password" id="api_secret" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
 
-      <div class="row2">
-        <div>
-          <label>دارایی مبنا (Quote Asset)</label>
-          <input type="text" id="QUOTE_ASSET">
-        </div>
-        <div>
-          <label>بازه بروزرسانی لیست نماد (دقیقه)</label>
-          <input type="number" id="WATCHLIST_REFRESH_MINUTES">
-        </div>
-      </div>
-      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند (بدون سقف دستی تعداد).</div>
+      <label>دارایی مبنا (Quote Asset)</label>
+      <input type="text" id="QUOTE_ASSET">
+      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند (بدون سقف دستی تعداد) و هر ساعت این لیست را خودش دوباره محاسبه می‌کند.</div>
 
       <label>دقت اعشار مقدار (پیش‌فرض، وقتی برای نمادی پیدا نشود)</label>
       <input type="number" id="QUANTITY_PRECISION">
@@ -207,7 +199,7 @@
 </div>
 
 <script>
-const CONFIG_FIELDS = ["QUOTE_ASSET","WATCHLIST_REFRESH_MINUTES",
+const CONFIG_FIELDS = ["QUOTE_ASSET",
   "QUANTITY_PRECISION","TRADING_FEE_PERCENT","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
   "MAX_DAILY_LOSS_PERCENT","SMA_FAST_PERIOD","SMA_SLOW_PERIOD",
   "NEWS_CACHE_MINUTES","POLL_INTERVAL_SECONDS"];

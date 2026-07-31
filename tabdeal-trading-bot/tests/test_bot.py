@@ -55,7 +55,6 @@ def make_bot(exchange, watchlist, signal=Signal.BUY, confidence=None, position_s
         strategy_factory=lambda symbol: ConstantSignalStrategy(signal, confidence),
         risk_manager=risk_manager,
         quote_asset="IRT",
-        watchlist_refresh_minutes=999999,
         default_quantity_precision=4,
         poll_interval_seconds=1,
         fee_percent=fee_percent,
@@ -116,7 +115,6 @@ def test_splits_balance_proportional_to_signal_confidence():
         strategy_factory=strategy_factory,
         risk_manager=risk_manager,
         quote_asset="IRT",
-        watchlist_refresh_minutes=999999,
         default_quantity_precision=4,
         poll_interval_seconds=1,
     )
@@ -237,7 +235,6 @@ def _make_bot_with_store(exchange, watchlist, store):
         strategy_factory=lambda symbol: ConstantSignalStrategy(Signal.BUY),
         risk_manager=risk_manager,
         quote_asset="IRT",
-        watchlist_refresh_minutes=999999,
         default_quantity_precision=4,
         poll_interval_seconds=1,
         position_store=store,

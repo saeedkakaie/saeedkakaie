@@ -13,7 +13,6 @@ class Config:
     api_key: str
     api_secret: str
     quote_asset: str
-    watchlist_refresh_minutes: int
     quantity_precision: int
     trading_fee_percent: float
     stop_loss_percent: float
@@ -50,7 +49,6 @@ class Config:
                 api_key=api_key,
                 api_secret=api_secret,
                 quote_asset=os.getenv("QUOTE_ASSET", "IRT"),
-                watchlist_refresh_minutes=int(os.getenv("WATCHLIST_REFRESH_MINUTES", "60")),
                 quantity_precision=int(os.getenv("QUANTITY_PRECISION", "6")),
                 trading_fee_percent=float(os.getenv("TRADING_FEE_PERCENT", "0.35")),
                 stop_loss_percent=float(os.getenv("STOP_LOSS_PERCENT", "2")),

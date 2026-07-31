@@ -47,13 +47,17 @@ class TradingBot:
     # rate limit صرافی نیاید.
     PRICE_FETCH_WORKERS = 10
 
+    # هر چند دقیقه یک‌بار لیست نمادهای پرفعالیت دوباره محاسبه شود. این هم
+    # دیگر تنظیم دستی نیست: عددی معقول بین «به‌روز ماندن با بازار» و «فشار
+    # زیاد نیاوردن روی exchange_info با هر بار محاسبه‌ی فعالیت هر نماد».
+    WATCHLIST_REFRESH_MINUTES = 60
+
     def __init__(
         self,
         exchange: ExchangeClient,
         strategy_factory: Callable[[str], Strategy],
         risk_manager: RiskManager,
         quote_asset: str,
-        watchlist_refresh_minutes: int,
         default_quantity_precision: int,
         poll_interval_seconds: int,
         fee_percent: float = 0.0,
@@ -64,7 +68,6 @@ class TradingBot:
         self.strategy_factory = strategy_factory
         self.risk_manager = risk_manager
         self.quote_asset = quote_asset
-        self.watchlist_refresh_minutes = watchlist_refresh_minutes
         self.default_quantity_precision = default_quantity_precision
         self.poll_interval_seconds = poll_interval_seconds
         self.fee_percent = fee_percent
@@ -124,7 +127,7 @@ class TradingBot:
         now = datetime.utcnow()
         if self._last_watchlist_refresh is not None:
             elapsed = now - self._last_watchlist_refresh
-            if elapsed < timedelta(minutes=self.watchlist_refresh_minutes):
+            if elapsed < timedelta(minutes=self.WATCHLIST_REFRESH_MINUTES):
                 return
 
         new_watchlist = discover_watchlist(self.exchange, self.quote_asset)
