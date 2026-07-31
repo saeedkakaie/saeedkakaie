@@ -46,8 +46,16 @@ class FakeExchange:
         return {"price": self.prices[symbol], "quantity": quantity}
 
 
+class FakeTickLogger:
+    def __init__(self):
+        self.logged = []
+
+    def log(self, symbol, price):
+        self.logged.append((symbol, price))
+
+
 def make_bot(exchange, watchlist, signal=Signal.BUY, confidence=None, position_store=None,
-             fee_percent=0.0, trade_journal=None):
+             fee_percent=0.0, trade_journal=None, tick_logger=None):
     risk_manager = RiskManager(
         stop_loss_percent=2,
         take_profit_percent=3,
@@ -63,6 +71,7 @@ def make_bot(exchange, watchlist, signal=Signal.BUY, confidence=None, position_s
         fee_percent=fee_percent,
         trade_journal=trade_journal,
         position_store=position_store,
+        tick_logger=tick_logger,
     )
     bot.watchlist = watchlist
     bot._last_watchlist_refresh = dt.datetime.utcnow()
@@ -314,3 +323,20 @@ def test_closing_a_position_persists_removal(tmp_path):
 
     reloaded = store.load()
     assert reloaded == {}
+
+
+def test_tick_logger_records_every_symbol_price_each_cycle():
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 200}, balance=1_000_000)
+    tick_logger = FakeTickLogger()
+    bot = make_bot(exchange, ["A_IRT", "B_IRT"], signal=Signal.HOLD, tick_logger=tick_logger)
+
+    bot._tick()
+
+    assert set(tick_logger.logged) == {("A_IRT", 100), ("B_IRT", 200)}
+
+
+def test_no_tick_logger_does_not_error():
+    exchange = FakeExchange({"A_IRT": 100}, balance=1_000_000)
+    bot = make_bot(exchange, ["A_IRT"], signal=Signal.HOLD, tick_logger=None)
+
+    bot._tick()  # نباید خطا بدهد وقتی tick_logger تنظیم نشده

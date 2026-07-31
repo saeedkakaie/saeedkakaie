@@ -67,6 +67,7 @@ class TradingBot:
         fee_percent: float = 0.0,
         trade_journal: Optional[TradeJournal] = None,
         position_store: Optional[PositionStore] = None,
+        tick_logger=None,
     ):
         self.exchange = exchange
         self.strategy_factory = strategy_factory
@@ -77,6 +78,7 @@ class TradingBot:
         self.fee_percent = fee_percent
         self.trade_journal = trade_journal
         self.position_store = position_store
+        self.tick_logger = tick_logger
 
         self.watchlist: list = []
         self.strategies: Dict[str, Strategy] = {}
@@ -196,6 +198,9 @@ class TradingBot:
         return prices
 
     def _tick_symbol(self, symbol: str, price: float) -> Optional[Tuple[str, float, float]]:
+        if self.tick_logger:
+            self.tick_logger.log(symbol, price)
+
         strategy = self.strategies.setdefault(symbol, self.strategy_factory(symbol))
         signal = strategy.update(price)
 

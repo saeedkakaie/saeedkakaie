@@ -14,6 +14,7 @@ from src.pnl import net_pnl_percent, pnl_amount
 from src.position_store import PositionStore
 from src.risk_manager import RiskManager
 from src.strategy import TechnicalStrategy
+from src.tick_logger import TickLogger
 from src.trade_journal import TradeJournal
 
 logger = logging.getLogger("tabdeal_bot")
@@ -101,6 +102,7 @@ class BotRunner:
         )
         trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
         position_store = PositionStore(os.path.join("data", "open_positions.json"))
+        tick_logger = TickLogger(os.path.join("data", "price_ticks"))
 
         today = trade_journal.summary()["day"]
         risk_manager.restore_daily_state(today["trades"], today["net_pnl_percent"])
@@ -115,6 +117,7 @@ class BotRunner:
             fee_percent=config.trading_fee_percent,
             trade_journal=trade_journal,
             position_store=position_store,
+            tick_logger=tick_logger,
         )
 
         with self._lock:
