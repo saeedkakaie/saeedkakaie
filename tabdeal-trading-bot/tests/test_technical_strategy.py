@@ -14,38 +14,38 @@ class FakeNewsFilter:
 
 def test_decide_buy_on_confluence_crossing_up():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
-    strategy._prev_confluence = 1
-    assert strategy._decide(3) == Signal.BUY
+    strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD - 1
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.BUY
 
 
 def test_decide_hold_when_no_new_crossing():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
-    strategy._prev_confluence = 3
-    assert strategy._decide(4) == Signal.HOLD
+    strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD + 1) == Signal.HOLD
 
 
 def test_decide_sell_on_confluence_crossing_down():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
     strategy._prev_confluence = -1
-    assert strategy._decide(-3) == Signal.SELL
+    assert strategy._decide(-TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.SELL
 
 
 def test_decide_news_veto_blocks_buy():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=-0.8))
-    strategy._prev_confluence = 1
-    assert strategy._decide(3) == Signal.HOLD
+    strategy._prev_confluence = TechnicalStrategy.CONFLUENCE_THRESHOLD - 1
+    assert strategy._decide(TechnicalStrategy.CONFLUENCE_THRESHOLD) == Signal.HOLD
 
 
 def test_decide_news_boost_lowers_threshold():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.8))
-    strategy._prev_confluence = 1
-    assert strategy._decide(2) == Signal.BUY
+    strategy._prev_confluence = TechnicalStrategy.NEWS_BOOSTED_THRESHOLD - 1
+    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD) == Signal.BUY
 
 
 def test_decide_mild_positive_news_does_not_lower_threshold():
     strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=0.1))
-    strategy._prev_confluence = 1
-    assert strategy._decide(2) == Signal.HOLD
+    strategy._prev_confluence = TechnicalStrategy.NEWS_BOOSTED_THRESHOLD - 1
+    assert strategy._decide(TechnicalStrategy.NEWS_BOOSTED_THRESHOLD) == Signal.HOLD
 
 
 def test_hold_when_insufficient_price_history():
@@ -74,6 +74,14 @@ def test_suggested_risk_levels_bounded_and_consistent_ratio():
     stop_loss, take_profit = levels
     assert TechnicalStrategy.MIN_STOP_LOSS_PERCENT <= stop_loss <= TechnicalStrategy.MAX_STOP_LOSS_PERCENT
     assert take_profit == stop_loss * TechnicalStrategy.RISK_REWARD_RATIO
+
+
+def test_collect_votes_includes_ichimoku_and_momentum_on_sustained_uptrend():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    prices = [100 + i * 0.5 for i in range(80)]
+    votes = strategy._collect_votes(prices)
+    assert votes["ichimoku"] == 1
+    assert votes["momentum"] == 1
 
 
 def test_update_runs_without_error_over_long_series():

@@ -1,7 +1,9 @@
 from src.indicators import (
     bollinger_bands,
     ema,
+    ichimoku,
     macd,
+    rate_of_change,
     rsi,
     stochastic_oscillator,
     volatility_percent,
@@ -70,3 +72,36 @@ def test_volatility_percent_zero_for_constant_prices():
 
 def test_volatility_percent_none_when_insufficient_data():
     assert volatility_percent([1, 2], period=20) is None
+
+
+def test_ichimoku_none_when_insufficient_data():
+    assert ichimoku([1] * 51) == (None, None, None, None)
+
+
+def test_ichimoku_flat_prices_all_lines_equal():
+    prices = [100.0] * 60
+    tenkan, kijun, senkou_a, senkou_b = ichimoku(prices)
+    assert tenkan == kijun == senkou_a == senkou_b == 100.0
+
+
+def test_ichimoku_tenkan_above_kijun_on_sustained_uptrend():
+    prices = [100 + i for i in range(60)]
+    tenkan, kijun, senkou_a, senkou_b = ichimoku(prices)
+    assert tenkan is not None
+    assert tenkan > kijun
+
+
+def test_rate_of_change_none_when_insufficient_data():
+    assert rate_of_change([1, 2, 3], period=10) is None
+
+
+def test_rate_of_change_positive_on_uptrend():
+    prices = [100 + i for i in range(15)]
+    roc = rate_of_change(prices, period=10)
+    assert roc is not None
+    assert roc > 0
+
+
+def test_rate_of_change_zero_for_flat_prices():
+    prices = [100.0] * 15
+    assert rate_of_change(prices, period=10) == 0.0

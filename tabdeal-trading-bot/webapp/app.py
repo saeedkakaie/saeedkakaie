@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -127,6 +128,24 @@ def balances():
     if result is None:
         return jsonify({"error": "دریافت موجودی از تبدیل ممکن نشد. لاگ‌ها را بررسی کنید."}), 502
 
+    # قیمت هر دارایی (غیر از خود quote_asset) یک درخواست شبکه‌ای جداست؛
+    # مثل بقیه‌ی جاهای پروژه هم‌زمان (نه یکی‌یکی) می‌خوانیم تا این endpoint
+    # سریع برگردد و داشبورد وقتی خودکار هر ۲۰ ثانیه صداش می‌زند معطل نماند.
+    non_quote_assets = [b["asset"] for b in result if b["asset"] != config.quote_asset]
+    prices: dict = {}
+    if non_quote_assets:
+        with ThreadPoolExecutor(max_workers=min(10, len(non_quote_assets))) as executor:
+            future_to_asset = {
+                executor.submit(exchange.get_current_price, f"{asset}_{config.quote_asset}"): asset
+                for asset in non_quote_assets
+            }
+            for future in as_completed(future_to_asset):
+                asset = future_to_asset[future]
+                try:
+                    prices[asset] = future.result()
+                except Exception:
+                    prices[asset] = None
+
     total_value = 0.0
     for balance in result:
         asset = balance["asset"]
@@ -135,11 +154,8 @@ def balances():
         if asset == config.quote_asset:
             value = amount
         else:
-            try:
-                price = exchange.get_current_price(f"{asset}_{config.quote_asset}")
-                value = amount * price
-            except Exception:
-                value = None
+            price = prices.get(asset)
+            value = amount * price if price is not None else None
 
         balance["value"] = value
         if value is not None:
@@ -198,4 +214,8 @@ if __name__ == "__main__":
     print("آدرس: http://127.0.0.1:5000")
     print("=" * 70)
     _maybe_auto_start()
-    app.run(host="127.0.0.1", port=5000, debug=False)
+    # threaded=True: تا وقتی داشبورد چند درخواست هم‌زمان می‌زند (وضعیت،
+    # موجودی، لاگ)، منتظر تمام شدن یکی برای شروع بعدی نماند. ربات معاملاتی
+    # خودش از قبل روی یک ترد کاملا جدا اجرا می‌شود، پس این تنظیم فقط روی
+    # واکنش‌گویی خود داشبورد اثر دارد، نه سرعت تصمیم‌گیری/معامله‌ی ربات.
+    app.run(host="127.0.0.1", port=5000, debug=False, threaded=True)

@@ -110,6 +110,57 @@ def stochastic_oscillator(
     return smoothed_k[-1], d
 
 
+def ichimoku(
+    prices: List[float],
+    tenkan_period: int = 9,
+    kijun_period: int = 26,
+    senkou_b_period: int = 52,
+) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float]]:
+    """
+    خطوط اصلی ایچیموکو: Tenkan-sen، Kijun-sen، و ابر کومو (Senkou Span A/B).
+    چون داده High/Low واقعی کندل در دسترس نیست، طبق فرمول استاندارد
+    ایچیموکو (میانگین بالاترین و پایین‌ترین قیمت هر بازه) از همان سری
+    قیمت لحظه‌ای تقریب زده می‌شود — مشابه رویکرد stochastic_oscillator در
+    همین فایل. Senkou Span بدون جابه‌جایی به جلو (displacement) برگردانده
+    می‌شود چون فقط برای مقایسه با قیمت لحظه‌ای فعلی استفاده می‌شود، نه
+    رسم نمودار آینده.
+
+    خروجی: (tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b)
+    """
+    if len(prices) < senkou_b_period:
+        return None, None, None, None
+
+    def _midpoint(period: int) -> float:
+        window = prices[-period:]
+        return (max(window) + min(window)) / 2
+
+    tenkan_sen = _midpoint(tenkan_period)
+    kijun_sen = _midpoint(kijun_period)
+    senkou_span_a = (tenkan_sen + kijun_sen) / 2
+    senkou_span_b = _midpoint(senkou_b_period)
+
+    return tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b
+
+
+def rate_of_change(prices: List[float], period: int = 10) -> Optional[float]:
+    """
+    درصد تغییر قیمت نسبت به `period` تیک قبل (مومنتوم کوتاه‌مدت). برخلاف
+    RSI/MACD که خودشان هموارسازی (EMA/میانگین) دارند و واکنش‌شان به شتاب
+    ناگهانی قیمت با تاخیر است، ROC مستقیم سرعت حرکت اخیر را اندازه
+    می‌گیرد — برای موتور نوسان‌گیری که باید شتاب لحظه‌ای بازار را زود
+    تشخیص دهد مکمل خوبی برای اندیکاتورهای دیگر است.
+    """
+    if len(prices) < period + 1:
+        return None
+
+    past = prices[-(period + 1)]
+    if past == 0:
+        return None
+
+    current = prices[-1]
+    return (current - past) / past * 100
+
+
 def volatility_percent(prices: List[float], period: int = 20) -> Optional[float]:
     """
     انحراف معیار بازده‌های درصدی اخیر، به‌عنوان جایگزین تقریبی ATR

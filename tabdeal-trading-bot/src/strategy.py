@@ -4,7 +4,16 @@ from collections import deque
 from enum import Enum
 from typing import Optional, Tuple
 
-from src.indicators import bollinger_bands, ema, macd, rsi, stochastic_oscillator, volatility_percent
+from src.indicators import (
+    bollinger_bands,
+    ema,
+    ichimoku,
+    macd,
+    rate_of_change,
+    rsi,
+    stochastic_oscillator,
+    volatility_percent,
+)
 
 logger = logging.getLogger("tabdeal_bot")
 
@@ -85,10 +94,12 @@ class SmaCrossoverStrategy(Strategy):
 
 class TechnicalStrategy(Strategy):
     """
-    استراتژی ترکیبی: پنج اندیکاتور (RSI، MACD، باند بولینگر، Stochastic
-    Oscillator، و روند EMA بلندمدت) هرکدام یک رأی ۱-/۰/۱+ می‌دهند. فقط
-    وقتی مجموع رأی‌ها از یک آستانه (پیش‌فرض ۳ از ۵) عبور کند سیگنال صادر
-    می‌شود، و فقط روی همان عبور (نه هر تیک) تا از سیگنال تکراری جلوگیری شود.
+    استراتژی ترکیبی: هفت اندیکاتور (RSI، MACD، باند بولینگر، Stochastic
+    Oscillator، روند EMA بلندمدت، ابر ایچیموکو شامل تقاطع Tenkan-sen/
+    Kijun-sen و موقعیت قیمت نسبت به ابر Kumo، و مومنتوم/Rate of Change
+    کوتاه‌مدت) هرکدام یک رأی ۱-/۰/۱+ می‌دهند. فقط وقتی مجموع رأی‌ها از یک
+    آستانه (پیش‌فرض ۴ از ۷) عبور کند سیگنال صادر می‌شود، و فقط روی همان
+    عبور (نه هر تیک) تا از سیگنال تکراری جلوگیری شود.
 
     اگر فیلتر خبر (NewsFilter) داده شود: خبر بسیار منفی جلوی سیگنال خرید
     را می‌گیرد (safety-first)، و خبر بسیار مثبت آستانه‌ی خرید را کمی
@@ -104,8 +115,8 @@ class TechnicalStrategy(Strategy):
     RSI_PERIOD = 14
     BOLLINGER_PERIOD = 20
     TREND_EMA_PERIOD = 50
-    CONFLUENCE_THRESHOLD = 3
-    NEWS_BOOSTED_THRESHOLD = 2
+    CONFLUENCE_THRESHOLD = 4
+    NEWS_BOOSTED_THRESHOLD = 3
     NEWS_VETO_SCORE = -0.5
     NEWS_BOOST_SCORE = 0.5
     MIN_STOP_LOSS_PERCENT = 1.0
@@ -113,7 +124,17 @@ class TechnicalStrategy(Strategy):
     VOLATILITY_MULTIPLIER = 1.5
     RISK_REWARD_RATIO = 1.5
 
-    MAX_CONFLUENCE = 5  # تعداد اندیکاتورهای رأی‌دهنده: RSI, MACD, Bollinger, Stochastic, trend
+    ROC_PERIOD = 10
+    # آستانه‌ای که تغییر قیمت طی ROC_PERIOD تیک اخیر باید از آن عبور کند
+    # تا «مومنتوم قابل توجه» حساب شود. چون این ربات به‌جای کندل واقعی از
+    # سری قیمت poll‌شده استفاده می‌کند، این عدد ممکن است لازم باشد متناسب
+    # با نوسان معمول نمادهایی که معامله می‌کنید و POLL_INTERVAL_SECONDS
+    # تنظیم شود.
+    ROC_THRESHOLD_PERCENT = 1.0
+
+    # تعداد اندیکاتورهای رأی‌دهنده: RSI, MACD, Bollinger, Stochastic,
+    # trend, ichimoku, momentum (ROC)
+    MAX_CONFLUENCE = 7
 
     def __init__(self, symbol: str, news_filter=None):
         self.symbol = symbol
@@ -165,6 +186,34 @@ class TechnicalStrategy(Strategy):
         else:
             current = prices[-1]
             votes["trend"] = 1 if current > trend_ema else (-1 if current < trend_ema else 0)
+
+        tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b = ichimoku(prices)
+        if tenkan_sen is None:
+            votes["ichimoku"] = 0
+        else:
+            current = prices[-1]
+            cloud_top = max(senkou_span_a, senkou_span_b)
+            cloud_bottom = min(senkou_span_a, senkou_span_b)
+            tenkan_above_kijun = tenkan_sen > kijun_sen
+            # فقط وقتی قیمت نسبت به ابر (Kumo) و تقاطع تنکان‌سن/کیجون‌سن هر
+            # دو هم‌جهت باشند رأی می‌دهد؛ تنها یکی از این دو، سیگنال ضعیف و
+            # مبهم ایچیموکو محسوب می‌شود و رأی خنثی (۰) می‌گیرد.
+            if current > cloud_top and tenkan_above_kijun:
+                votes["ichimoku"] = 1
+            elif current < cloud_bottom and not tenkan_above_kijun:
+                votes["ichimoku"] = -1
+            else:
+                votes["ichimoku"] = 0
+
+        roc_value = rate_of_change(prices, self.ROC_PERIOD)
+        if roc_value is None:
+            votes["momentum"] = 0
+        else:
+            votes["momentum"] = (
+                1
+                if roc_value > self.ROC_THRESHOLD_PERCENT
+                else (-1 if roc_value < -self.ROC_THRESHOLD_PERCENT else 0)
+            )
 
         return votes
 
