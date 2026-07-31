@@ -166,6 +166,38 @@ def test_normalize_order_handles_non_dict_response():
     assert result == {"price": 42.0, "quantity": 7.0}
 
 
+def test_normalize_order_subtracts_commission_paid_in_base_asset_on_buy():
+    """
+    رگرسیون برای مورد واقعی KITE_IRT: وقتی کارمزد از همان دارایی خریداری‌شده
+    کسر می‌شود، quantity ثبت‌شده در پوزیشن باید مقدار واقعا قابل فروش باشد،
+    وگرنه فروش بعدی به همان مقدار خام با «موجودی کافی نیست» رد می‌شود.
+    """
+    order = {
+        "executedQty": "163.057",
+        "fills": [{"price": "18238.0", "qty": "163.057", "commission": "0.538088", "commissionAsset": "KITE"}],
+    }
+    result = _normalize_order(order, side="خرید", symbol="KITE_IRT", fallback_price=1, fallback_quantity=1)
+    assert result["quantity"] == 163.057 - 0.538088
+
+
+def test_normalize_order_ignores_commission_paid_in_a_different_asset():
+    order = {
+        "executedQty": "3.0",
+        "fills": [{"price": "100.0", "qty": "3.0", "commission": "0.01", "commissionAsset": "TBDL"}],
+    }
+    result = _normalize_order(order, side="خرید", symbol="BTC_IRT", fallback_price=1, fallback_quantity=1)
+    assert result["quantity"] == 3.0
+
+
+def test_normalize_order_does_not_subtract_commission_on_sell():
+    order = {
+        "executedQty": "3.0",
+        "fills": [{"price": "100.0", "qty": "3.0", "commission": "0.01", "commissionAsset": "BTC"}],
+    }
+    result = _normalize_order(order, side="فروش", symbol="BTC_IRT", fallback_price=1, fallback_quantity=1)
+    assert result["quantity"] == 3.0
+
+
 def _make_live_client():
     with patch("src.exchange_client.Spot"):
         return ExchangeClient(api_key="key", api_secret="secret", dry_run=False)

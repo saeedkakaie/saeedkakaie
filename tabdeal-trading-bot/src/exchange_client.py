@@ -75,6 +75,31 @@ def _extract_price(order: dict, quantity: Optional[float]) -> Optional[float]:
     return None
 
 
+def _extract_commission_in_asset(order: dict, asset: str) -> float:
+    """
+    اگر کارمزد سفارش مستقیم از همان دارایی خریداری‌شده کسر شده باشد (مثلا
+    commissionAsset برابر با دارایی مبنای نماد باشد)، مجموع آن را از fills
+    برمی‌گرداند. برای این‌که quantity ثبت‌شده در پوزیشن با موجودی واقعا
+    قابل فروش یکی باشد لازم است — وگرنه بعداً یک تلاش برای فروش دقیقاً
+    همان مقدار خام سفارش، به‌خاطر همین چند واحد کارمزد، با خطای «موجودی
+    کافی نیست» رد می‌شود.
+    """
+    fills = order.get("fills")
+    if not isinstance(fills, list):
+        return 0.0
+
+    total = 0.0
+    for fill in fills:
+        if not isinstance(fill, dict) or fill.get("commissionAsset") != asset:
+            continue
+        try:
+            total += float(fill.get("commission", 0) or 0)
+        except (TypeError, ValueError):
+            continue
+
+    return total
+
+
 def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float, fallback_quantity: float) -> dict:
     """
     پاسخ خام new_order() ممکن است کلیدهای متفاوتی از قرارداد داخلی
@@ -121,6 +146,23 @@ def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float,
             f"پوزیشن با تخمین محلی (قیمت≈{price:.4f}، مقدار≈{quantity:.6f}) ثبت شد؛ "
             "حتما موجودی واقعی را در اپ تبدیل بررسی کن.",
         )
+
+    if side == "خرید" and quantity is not None:
+        # اگر کارمزد از همان دارایی خریداری‌شده کسر شده باشد (رایج در سفارش‌های
+        # سبک باینانس)، مقدار ثبت‌شده در پوزیشن باید مقدار واقعا قابل فروش
+        # باشد، نه مقدار خام اجراشده — وگرنه بعداً تلاش برای فروش دقیقاً
+        # همان مقدار خام با «موجودی کافی نیست» رد می‌شود.
+        base_asset = symbol.split("_")[0]
+        commission = _extract_commission_in_asset(order, base_asset)
+        if commission > 0 and quantity - commission > 0:
+            logger.info(
+                "کارمزد %.8f %s از مقدار خرید %s کسر شد (مقدار واقعی قابل فروش: %.8f).",
+                commission,
+                base_asset,
+                symbol,
+                quantity - commission,
+            )
+            quantity -= commission
 
     return {"price": price, "quantity": quantity}
 

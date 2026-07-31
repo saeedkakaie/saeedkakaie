@@ -23,9 +23,10 @@ class ConstantSignalStrategy(Strategy):
 class FakeExchange:
     dry_run = True
 
-    def __init__(self, prices, balance=1_000_000):
+    def __init__(self, prices, balance=1_000_000, fail_buy_for=None):
         self.prices = dict(prices)
         self.balance = balance
+        self.fail_buy_for = fail_buy_for or set()
 
     def get_current_price(self, symbol):
         return self.prices[symbol]
@@ -34,6 +35,8 @@ class FakeExchange:
         return self.balance
 
     def buy_market(self, symbol, quote_amount, precision):
+        if symbol in self.fail_buy_for:
+            raise Exception("Not enough balance")
         price = self.prices[symbol]
         qty = round(quote_amount / price, precision)
         self.balance -= quote_amount
@@ -180,6 +183,24 @@ def test_opens_positions_across_multiple_symbols_independently():
     assert set(bot.positions.keys()) == {"A_IRT", "B_IRT", "C_IRT"}
 
 
+def test_one_failed_buy_does_not_abort_remaining_candidates_in_the_same_tick():
+    """
+    رگرسیون برای رفتار واقعی مشاهده‌شده: اگر خرید یک نماد به‌خاطر نوسان
+    قیمت با «موجودی کافی نیست» رد شود، بقیه‌ی نامزدهای همان چرخه هم نباید
+    به‌خاطرش رد شوند.
+    """
+    exchange = FakeExchange(
+        {"A_IRT": 100, "B_IRT": 100, "C_IRT": 100}, balance=300_000, fail_buy_for={"B_IRT"}
+    )
+    bot = make_bot(exchange, ["A_IRT", "B_IRT", "C_IRT"])
+
+    bot._tick()
+
+    assert "A_IRT" in bot.positions
+    assert "C_IRT" in bot.positions
+    assert "B_IRT" not in bot.positions
+
+
 def test_stop_loss_closes_only_the_affected_symbol():
     exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100}, balance=200_000)
     bot = make_bot(exchange, ["A_IRT", "B_IRT"])
@@ -253,7 +274,7 @@ def test_positions_survive_a_simulated_restart(tmp_path):
     طبیعی کمبود سرمایه محدودش می‌کند) وجود داشت.
     """
     store = PositionStore(os.path.join(tmp_path, "open_positions.json"))
-    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100, "C_IRT": 100}, balance=20_500)
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100, "C_IRT": 100}, balance=25_000)
 
     first_run_bot = _make_bot_with_store(exchange, ["A_IRT", "B_IRT"], store)
     first_run_bot._tick()

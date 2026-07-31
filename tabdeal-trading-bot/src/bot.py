@@ -36,9 +36,13 @@ class TradingBot:
     MIN_ORDER_VALUE = 10_000
 
     # وقتی موجودی بین چند سیگنال هم‌زمان تقسیم می‌شود، کل موجودی آزاد
-    # تخصیص داده نمی‌شود تا اسلیپیج/گرد‌شدن قیمت باعث رد شدن آخرین سفارش
-    # به‌خاطر «موجودی ناکافی» نشود.
-    ALLOCATION_SAFETY_MARGIN = 0.98
+    # تخصیص داده نمی‌شود تا اسلیپیج/گرد‌شدن قیمت باعث رد شدن سفارش به‌خاطر
+    # «موجودی ناکافی» نشود. چون quantity برای سفارش BUY از قیمت لحظه‌ای که
+    # خودمان خوانده‌ایم محاسبه می‌شود (نه quoteOrderQty که صرافی خودش
+    # مدیریتش کند — SDK این را پشتیبانی نمی‌کند)، اگر قیمت واقعی اجرا کمی
+    # بالاتر از تخمین ما باشد، سفارش به مقدار بیشتری از دارایی quote نیاز
+    # دارد؛ ۵٪ حاشیه برای همین نوسان/اسلیپیج در نظر گرفته شده.
+    ALLOCATION_SAFETY_MARGIN = 0.95
 
     # چون قیمت هر نماد یک درخواست شبکه‌ای جداست، اگر متوالی خوانده شود هر
     # چرخه با تعداد نماد زیاد کند می‌شود و ممکن است از POLL_INTERVAL_SECONDS
@@ -240,7 +244,13 @@ class TradingBot:
                     self.MIN_ORDER_VALUE,
                 )
                 continue
-            self._open_position(symbol, share)
+            try:
+                self._open_position(symbol, share)
+            except Exception:
+                # اگر خرید یک نماد شکست بخورد (مثلا «موجودی کافی نیست» به‌خاطر
+                # نوسان قیمت بین محاسبه‌ی سهم و ثبت واقعی سفارش)، نباید باقی
+                # نامزدهای همین چرخه هم به‌خاطرش رد شوند.
+                logger.exception("خرید %s ناموفق بود؛ به سراغ نماد بعدی می‌رویم.", symbol)
 
     def _open_position(self, symbol: str, quote_amount: float) -> None:
         quantity_precision = self.symbol_precisions.get(symbol, self.default_quantity_precision)
