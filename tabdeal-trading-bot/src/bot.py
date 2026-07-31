@@ -2,7 +2,7 @@ import logging
 import threading
 import time
 from datetime import datetime, timedelta
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from src.exchange_client import ExchangeClient, ExchangeError
 from src.market_scanner import discover_watchlist, fetch_quantity_precisions
@@ -18,10 +18,26 @@ logger = logging.getLogger("tabdeal_bot")
 
 class TradingBot:
     """
-    ربات چندنمادی: به‌صورت خودکار پرفعالیت‌ترین نمادهای بازار را کشف می‌کند،
-    هرکدام را جداگانه با یک نمونه استراتژی دنبال می‌کند، و می‌تواند هم‌زمان
-    روی چند نماد پوزیشن باز داشته باشد (تا سقف max_concurrent_positions).
+    ربات چندنمادی و خودمختار: به‌صورت خودکار پرفعالیت‌ترین نمادهای بازار
+    را کشف می‌کند، هرکدام را جداگانه با یک نمونه استراتژی دنبال می‌کند، و
+    برای تخصیص سرمایه هیچ سقف دستی (مبلغ ثابت هر معامله یا تعداد پوزیشن)
+    ندارد — در هر چرخه، موجودی آزاد دارایی quote را متناسب با قدرت سیگنال
+    هرکدام از نمادهایی که هم‌زمان سیگنال خرید داده‌اند تقسیم می‌کند؛ اگر
+    فقط یک نماد سیگنال بدهد، ممکن است کل موجودی آزاد را به آن اختصاص دهد.
+
+    تنها مرزهای باقی‌مانده: حد ضرر/سود پویا روی هر پوزیشن، مدار قطع ضرر
+    روزانه (RiskManager)، و یک حداقل فنی برای رد کردن سفارش‌های ناچیز که
+    کارمزدشان از خودشان بیشتر می‌شود.
     """
+
+    # سفارش‌هایی که ارزششان از این کمتر باشد رد می‌شوند (کارمزد آن‌ها را
+    # بی‌ارزش می‌کند)، نه یک سقف ریسک.
+    MIN_ORDER_VALUE = 10_000
+
+    # وقتی موجودی بین چند سیگنال هم‌زمان تقسیم می‌شود، کل موجودی آزاد
+    # تخصیص داده نمی‌شود تا اسلیپیج/گرد‌شدن قیمت باعث رد شدن آخرین سفارش
+    # به‌خاطر «موجودی ناکافی» نشود.
+    ALLOCATION_SAFETY_MARGIN = 0.98
 
     def __init__(
         self,
@@ -29,11 +45,8 @@ class TradingBot:
         strategy_factory: Callable[[str], Strategy],
         risk_manager: RiskManager,
         quote_asset: str,
-        watchlist_size: int,
         watchlist_refresh_minutes: int,
-        quote_order_amount: float,
         default_quantity_precision: int,
-        max_concurrent_positions: int,
         poll_interval_seconds: int,
         fee_percent: float = 0.0,
         trade_journal: Optional[TradeJournal] = None,
@@ -43,11 +56,8 @@ class TradingBot:
         self.strategy_factory = strategy_factory
         self.risk_manager = risk_manager
         self.quote_asset = quote_asset
-        self.watchlist_size = watchlist_size
         self.watchlist_refresh_minutes = watchlist_refresh_minutes
-        self.quote_order_amount = quote_order_amount
         self.default_quantity_precision = default_quantity_precision
-        self.max_concurrent_positions = max_concurrent_positions
         self.poll_interval_seconds = poll_interval_seconds
         self.fee_percent = fee_percent
         self.trade_journal = trade_journal
@@ -70,9 +80,8 @@ class TradingBot:
     ) -> None:
         mode = "DRY-RUN (شبیه‌سازی)" if self.exchange.dry_run else "LIVE (معاملات واقعی)"
         logger.info(
-            "ربات شروع به کار کرد. quote_asset=%s، سقف پوزیشن هم‌زمان=%s، حالت=%s",
+            "ربات شروع به کار کرد. quote_asset=%s، تخصیص سرمایه کاملا خودکار، حالت=%s",
             self.quote_asset,
-            self.max_concurrent_positions,
             mode,
         )
 
@@ -110,7 +119,7 @@ class TradingBot:
             if elapsed < timedelta(minutes=self.watchlist_refresh_minutes):
                 return
 
-        new_watchlist = discover_watchlist(self.exchange, self.quote_asset, self.watchlist_size)
+        new_watchlist = discover_watchlist(self.exchange, self.quote_asset)
 
         for symbol in new_watchlist:
             if symbol not in self.strategies:
@@ -131,15 +140,22 @@ class TradingBot:
         # خارج شده باشند همچنان دنبال می‌کنیم تا پوزیشن بدون مدیریت نماند.
         symbols_to_check = set(self.watchlist) | set(self.positions.keys())
 
+        buy_candidates: List[Tuple[str, float, float]] = []  # (symbol, price, weight)
+
         for symbol in symbols_to_check:
             try:
-                self._tick_symbol(symbol)
+                candidate = self._tick_symbol(symbol)
+                if candidate:
+                    buy_candidates.append(candidate)
             except ExchangeError as exc:
                 logger.error("خطای صرافی برای %s: %s", symbol, exc)
             except Exception:
                 logger.exception("خطای پیش‌بینی‌نشده برای %s", symbol)
 
-    def _tick_symbol(self, symbol: str) -> None:
+        if buy_candidates:
+            self._allocate_and_open_positions(buy_candidates)
+
+    def _tick_symbol(self, symbol: str) -> Optional[Tuple[str, float, float]]:
         price = self.exchange.get_current_price(symbol)
         strategy = self.strategies.setdefault(symbol, self.strategy_factory(symbol))
         signal = strategy.update(price)
@@ -150,19 +166,50 @@ class TradingBot:
         position = self.positions.get(symbol)
         if position is not None:
             self._manage_open_position(symbol, position, price, signal)
-        elif signal == Signal.BUY:
-            self._try_open_position(symbol, price)
+            return None
 
-    def _try_open_position(self, symbol: str, price: float) -> None:
-        if len(self.positions) >= self.max_concurrent_positions:
-            logger.debug("سقف پوزیشن هم‌زمان (%s) پر است، سیگنال %s نادیده گرفته شد.", self.max_concurrent_positions, symbol)
+        if signal == Signal.BUY and self.risk_manager.can_open_new_position():
+            confidence = strategy.confidence()
+            weight = confidence if confidence is not None else 1.0
+            return (symbol, price, max(weight, 0.0001))
+
+        return None
+
+    def _allocate_and_open_positions(self, candidates: List[Tuple[str, float, float]]) -> None:
+        free_balance = self.exchange.get_asset_balance(self.quote_asset)
+        if not free_balance or free_balance <= 0:
+            logger.debug("موجودی آزاد %s برای خرید در دسترس نیست.", self.quote_asset)
             return
 
-        if not self.risk_manager.can_open_new_position():
+        allocatable = free_balance * self.ALLOCATION_SAFETY_MARGIN
+        total_weight = sum(weight for _, _, weight in candidates)
+        if total_weight <= 0:
             return
 
+        logger.info(
+            "تخصیص سرمایه: موجودی آزاد=%.2f %s بین %s سیگنال خرید (%s) بر اساس قدرت سیگنال تقسیم می‌شود.",
+            free_balance,
+            self.quote_asset,
+            len(candidates),
+            ", ".join(symbol for symbol, _, _ in candidates),
+        )
+
+        for symbol, price, weight in candidates:
+            share = allocatable * (weight / total_weight)
+            if share < self.MIN_ORDER_VALUE:
+                logger.debug(
+                    "سهم محاسبه‌شده برای %s (%.2f %s) کمتر از حداقل سفارش (%s) است، رد شد.",
+                    symbol,
+                    share,
+                    self.quote_asset,
+                    self.MIN_ORDER_VALUE,
+                )
+                continue
+            self._open_position(symbol, share)
+
+    def _open_position(self, symbol: str, quote_amount: float) -> None:
         quantity_precision = self.symbol_precisions.get(symbol, self.default_quantity_precision)
-        order = self.exchange.buy_market(symbol, self.quote_order_amount, quantity_precision)
+        order = self.exchange.buy_market(symbol, quote_amount, quantity_precision)
         if not order:
             return
 
@@ -185,11 +232,13 @@ class TradingBot:
             self.position_store.save(self.positions)
 
         logger.info(
-            "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، حد ضرر=%.2f%% (قیمت %.4f)، "
+            "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، مبلغ=%.2f %s، حد ضرر=%.2f%% (قیمت %.4f)، "
             "حد سود=%.2f%% (قیمت %.4f)، تعداد پوزیشن‌های باز=%s",
             symbol,
             position.entry_price,
             position.quantity,
+            quote_amount,
+            self.quote_asset,
             stop_loss_percent,
             position.stop_price,
             take_profit_percent,

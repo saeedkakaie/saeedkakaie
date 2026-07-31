@@ -7,6 +7,12 @@ logger = logging.getLogger("tabdeal_bot")
 # نماد شناخته‌شده کار می‌کند تا کاملا متوقف نشود.
 FALLBACK_SYMBOLS = ["BTC_IRT", "ETH_IRT", "USDT_IRT"]
 
+# تعداد نماد در watchlist دیگر تنظیم دستی کاربر نیست: چون قیمت هر نماد در
+# هر چرخه به‌صورت متوالی (نه موازی) از API خوانده می‌شود، لیست خیلی بزرگ
+# باعث کند شدن هر چرخه و ریسک برخورد به rate limit تبدیل می‌شود. این عدد
+# مصالحه‌ای بین پوشش بازار و پایداری/سرعت است.
+DEFAULT_WATCHLIST_SIZE = 40
+
 
 def _extract_symbol(entry: dict) -> str:
     return entry.get("tabdealSymbol") or entry.get("symbol") or entry.get("name") or ""
@@ -61,7 +67,7 @@ def _estimate_activity(exchange, symbol: str) -> float:
         return 0.0
 
 
-def discover_watchlist(exchange, quote_asset: str, size: int) -> List[str]:
+def discover_watchlist(exchange, quote_asset: str, size: int = DEFAULT_WATCHLIST_SIZE) -> List[str]:
     """
     لیست نمادهای فعال بازار را از exchange_info می‌خواند، به نمادهایی که
     با quote_asset (مثلا IRT) معامله می‌شوند فیلتر می‌کند، و پرفعالیت‌ترین‌ها

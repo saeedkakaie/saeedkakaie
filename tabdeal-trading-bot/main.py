@@ -53,7 +53,6 @@ def main() -> None:
         stop_loss_percent=config.stop_loss_percent,
         take_profit_percent=config.take_profit_percent,
         max_daily_loss_percent=config.max_daily_loss_percent,
-        max_trades_per_day=config.max_trades_per_day,
     )
 
     trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
@@ -64,11 +63,8 @@ def main() -> None:
         strategy_factory=strategy_factory,
         risk_manager=risk_manager,
         quote_asset=config.quote_asset,
-        watchlist_size=config.watchlist_size,
         watchlist_refresh_minutes=config.watchlist_refresh_minutes,
-        quote_order_amount=config.quote_order_amount,
         default_quantity_precision=config.quantity_precision,
-        max_concurrent_positions=config.max_concurrent_positions,
         poll_interval_seconds=config.poll_interval_seconds,
         fee_percent=config.trading_fee_percent,
         trade_journal=trade_journal,

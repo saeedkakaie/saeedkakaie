@@ -34,6 +34,14 @@ class Strategy(ABC):
         """
         return None
 
+    def confidence(self) -> Optional[float]:
+        """
+        قدرت آخرین سیگنال، عددی بین ۰ تا ۱ (یا None اگر پیاده نشده). برای
+        تقسیم سرمایه‌ی موجود بین چند سیگنال هم‌زمان بر اساس قدرتشان استفاده
+        می‌شود. پیش‌فرض None است یعنی همه‌ی سیگنال‌ها وزن یکسان دارند.
+        """
+        return None
+
 
 class SmaCrossoverStrategy(Strategy):
     """
@@ -105,12 +113,15 @@ class TechnicalStrategy(Strategy):
     VOLATILITY_MULTIPLIER = 1.5
     RISK_REWARD_RATIO = 1.5
 
+    MAX_CONFLUENCE = 5  # تعداد اندیکاتورهای رأی‌دهنده: RSI, MACD, Bollinger, Stochastic, trend
+
     def __init__(self, symbol: str, news_filter=None):
         self.symbol = symbol
         self.base_asset = symbol.split("_")[0]
         self.news_filter = news_filter
         self._prices = deque(maxlen=self.HISTORY_SIZE)
         self._prev_confluence = 0
+        self.last_confluence: Optional[int] = None
 
     def update(self, price: float) -> Signal:
         self._prices.append(price)
@@ -121,7 +132,13 @@ class TechnicalStrategy(Strategy):
 
         signal = self._decide(confluence)
         self._prev_confluence = confluence
+        self.last_confluence = confluence
         return signal
+
+    def confidence(self) -> Optional[float]:
+        if self.last_confluence is None:
+            return None
+        return min(1.0, abs(self.last_confluence) / self.MAX_CONFLUENCE)
 
     def _collect_votes(self, prices) -> dict:
         votes = {}

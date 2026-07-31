@@ -9,49 +9,58 @@ from src.trade_journal import TradeJournal
 
 
 class ConstantSignalStrategy(Strategy):
-    def __init__(self, signal):
+    def __init__(self, signal, confidence=None):
         self._signal = signal
+        self._confidence = confidence
 
     def update(self, price):
         return self._signal
+
+    def confidence(self):
+        return self._confidence
 
 
 class FakeExchange:
     dry_run = True
 
-    def __init__(self, prices):
-        self.prices = prices
+    def __init__(self, prices, balance=1_000_000):
+        self.prices = dict(prices)
+        self.balance = balance
 
     def get_current_price(self, symbol):
         return self.prices[symbol]
 
+    def get_asset_balance(self, asset):
+        return self.balance
+
     def buy_market(self, symbol, quote_amount, precision):
         price = self.prices[symbol]
         qty = round(quote_amount / price, precision)
+        self.balance -= quote_amount
         return {"price": price, "quantity": qty}
 
     def sell_market(self, symbol, quantity):
         return {"price": self.prices[symbol], "quantity": quantity}
 
 
-def make_bot(exchange, watchlist, max_concurrent=2, signal=Signal.BUY):
+def make_bot(exchange, watchlist, signal=Signal.BUY, confidence=None, position_store=None,
+             fee_percent=0.0, trade_journal=None):
     risk_manager = RiskManager(
         stop_loss_percent=2,
         take_profit_percent=3,
         max_daily_loss_percent=5,
-        max_trades_per_day=10,
     )
     bot = TradingBot(
         exchange=exchange,
-        strategy_factory=lambda symbol: ConstantSignalStrategy(signal),
+        strategy_factory=lambda symbol: ConstantSignalStrategy(signal, confidence),
         risk_manager=risk_manager,
         quote_asset="IRT",
-        watchlist_size=10,
         watchlist_refresh_minutes=999999,
-        quote_order_amount=1000,
         default_quantity_precision=4,
-        max_concurrent_positions=max_concurrent,
         poll_interval_seconds=1,
+        fee_percent=fee_percent,
+        trade_journal=trade_journal,
+        position_store=position_store,
     )
     bot.watchlist = watchlist
     bot._last_watchlist_refresh = dt.datetime.utcnow()
@@ -59,36 +68,113 @@ def make_bot(exchange, watchlist, max_concurrent=2, signal=Signal.BUY):
 
 
 def test_uses_per_symbol_precision_when_available():
-    exchange = FakeExchange({"A_IRT": 333})
-    bot = make_bot(exchange, ["A_IRT"], max_concurrent=1)
+    exchange = FakeExchange({"A_IRT": 333}, balance=100_000)
+    bot = make_bot(exchange, ["A_IRT"])
     bot.symbol_precisions = {"A_IRT": 0}
 
     bot._tick()
 
-    assert bot.positions["A_IRT"].quantity == round(1000 / 333, 0)
+    allocatable = 100_000 * TradingBot.ALLOCATION_SAFETY_MARGIN
+    assert bot.positions["A_IRT"].quantity == round(allocatable / 333, 0)
 
 
 def test_falls_back_to_default_precision_when_symbol_unknown():
-    exchange = FakeExchange({"A_IRT": 333})
-    bot = make_bot(exchange, ["A_IRT"], max_concurrent=1)  # symbol_precisions stays empty
+    exchange = FakeExchange({"A_IRT": 333}, balance=100_000)
+    bot = make_bot(exchange, ["A_IRT"])  # symbol_precisions stays empty
 
     bot._tick()
 
-    assert bot.positions["A_IRT"].quantity == round(1000 / 333, 4)
+    allocatable = 100_000 * TradingBot.ALLOCATION_SAFETY_MARGIN
+    assert bot.positions["A_IRT"].quantity == round(allocatable / 333, 4)
 
 
-def test_respects_max_concurrent_positions():
-    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100, "C_IRT": 100})
-    bot = make_bot(exchange, ["A_IRT", "B_IRT", "C_IRT"], max_concurrent=2)
+def test_allocates_full_free_balance_to_a_single_signal():
+    """
+    دیگر مبلغ ثابت هر معامله وجود ندارد: وقتی فقط یک نماد سیگنال خرید
+    می‌دهد، ربات کل موجودی آزاد (منهای حاشیه ایمنی) را به همان یک کوین
+    اختصاص می‌دهد.
+    """
+    exchange = FakeExchange({"A_IRT": 100}, balance=50_000)
+    bot = make_bot(exchange, ["A_IRT"])
 
     bot._tick()
 
-    assert len(bot.positions) == 2
+    allocatable = 50_000 * TradingBot.ALLOCATION_SAFETY_MARGIN
+    assert bot.positions["A_IRT"].quantity == round(allocatable / 100, 4)
+
+
+def test_splits_balance_proportional_to_signal_confidence():
+    weights = {"A_IRT": 1.0, "B_IRT": 0.5}
+
+    def strategy_factory(symbol):
+        return ConstantSignalStrategy(Signal.BUY, confidence=weights[symbol])
+
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100}, balance=300_000)
+    risk_manager = RiskManager(stop_loss_percent=2, take_profit_percent=3, max_daily_loss_percent=5)
+    bot = TradingBot(
+        exchange=exchange,
+        strategy_factory=strategy_factory,
+        risk_manager=risk_manager,
+        quote_asset="IRT",
+        watchlist_refresh_minutes=999999,
+        default_quantity_precision=4,
+        poll_interval_seconds=1,
+    )
+    bot.watchlist = ["A_IRT", "B_IRT"]
+    bot._last_watchlist_refresh = dt.datetime.utcnow()
+
+    bot._tick()
+
+    allocatable = 300_000 * TradingBot.ALLOCATION_SAFETY_MARGIN
+    total_weight = weights["A_IRT"] + weights["B_IRT"]
+    share_a = allocatable * (weights["A_IRT"] / total_weight)
+    share_b = allocatable * (weights["B_IRT"] / total_weight)
+
+    assert bot.positions["A_IRT"].quantity == round(share_a / 100, 4)
+    assert bot.positions["B_IRT"].quantity == round(share_b / 100, 4)
+    assert bot.positions["A_IRT"].quantity > bot.positions["B_IRT"].quantity
+
+
+def test_no_positions_opened_when_balance_is_zero():
+    exchange = FakeExchange({"A_IRT": 100}, balance=0)
+    bot = make_bot(exchange, ["A_IRT"])
+
+    bot._tick()
+
+    assert bot.positions == {}
+
+
+def test_skips_symbols_whose_share_is_below_min_order_value():
+    exchange = FakeExchange({"A_IRT": 100}, balance=5_000)  # below MIN_ORDER_VALUE=10_000
+    bot = make_bot(exchange, ["A_IRT"])
+
+    bot._tick()
+
+    assert bot.positions == {}
+
+
+def test_capital_scarcity_naturally_limits_further_buys():
+    """
+    دیگر سقف دستی تعداد پوزیشن هم‌زمان وجود ندارد؛ به‌جایش، وقتی موجودی
+    آزاد صرف یک پوزیشن می‌شود، همان کمبود سرمایه به‌طور طبیعی مانع باز شدن
+    پوزیشن بعدی می‌شود (نه یک شمارنده‌ی ثابت).
+    """
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100}, balance=20_000)
+    bot = make_bot(exchange, ["A_IRT"])
+
+    bot._tick()
+    assert "A_IRT" in bot.positions
+    assert exchange.balance < 10_000  # تقریبا کل موجودی صرف شد
+
+    bot.watchlist = ["A_IRT", "B_IRT"]
+    bot._tick()
+
+    assert "B_IRT" not in bot.positions
 
 
 def test_opens_positions_across_multiple_symbols_independently():
-    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 200, "C_IRT": 300})
-    bot = make_bot(exchange, ["A_IRT", "B_IRT", "C_IRT"], max_concurrent=3)
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 200, "C_IRT": 300}, balance=300_000)
+    bot = make_bot(exchange, ["A_IRT", "B_IRT", "C_IRT"])
 
     bot._tick()
 
@@ -97,8 +183,8 @@ def test_opens_positions_across_multiple_symbols_independently():
 
 
 def test_stop_loss_closes_only_the_affected_symbol():
-    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100})
-    bot = make_bot(exchange, ["A_IRT", "B_IRT"], max_concurrent=2)
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100}, balance=200_000)
+    bot = make_bot(exchange, ["A_IRT", "B_IRT"])
 
     bot._tick()
     assert len(bot.positions) == 2
@@ -111,8 +197,8 @@ def test_stop_loss_closes_only_the_affected_symbol():
 
 
 def test_dropped_watchlist_symbol_still_managed_until_closed():
-    exchange = FakeExchange({"A_IRT": 100})
-    bot = make_bot(exchange, ["A_IRT"], max_concurrent=2)
+    exchange = FakeExchange({"A_IRT": 100}, balance=100_000)
+    bot = make_bot(exchange, ["A_IRT"])
 
     bot._tick()
     assert "A_IRT" in bot.positions
@@ -126,27 +212,9 @@ def test_dropped_watchlist_symbol_still_managed_until_closed():
 
 
 def test_fee_reduces_realized_pnl_and_records_journal(tmp_path):
-    exchange = FakeExchange({"A_IRT": 100})
+    exchange = FakeExchange({"A_IRT": 100}, balance=100_000)
     journal = TradeJournal(os.path.join(tmp_path, "trades.jsonl"))
-    risk_manager = RiskManager(
-        stop_loss_percent=2, take_profit_percent=3, max_daily_loss_percent=5, max_trades_per_day=10
-    )
-    bot = TradingBot(
-        exchange=exchange,
-        strategy_factory=lambda symbol: ConstantSignalStrategy(Signal.BUY),
-        risk_manager=risk_manager,
-        quote_asset="IRT",
-        watchlist_size=10,
-        watchlist_refresh_minutes=999999,
-        quote_order_amount=1000,
-        default_quantity_precision=4,
-        max_concurrent_positions=1,
-        poll_interval_seconds=1,
-        fee_percent=0.5,
-        trade_journal=journal,
-    )
-    bot.watchlist = ["A_IRT"]
-    bot._last_watchlist_refresh = dt.datetime.utcnow()
+    bot = make_bot(exchange, ["A_IRT"], fee_percent=0.5, trade_journal=journal)
 
     bot._tick()
     assert "A_IRT" in bot.positions
@@ -162,20 +230,15 @@ def test_fee_reduces_realized_pnl_and_records_journal(tmp_path):
     assert 8.5 < summary["day"]["net_pnl_percent"] < 9.5
 
 
-def _make_bot_with_store(exchange, watchlist, store, max_concurrent=2, signal=Signal.BUY):
-    risk_manager = RiskManager(
-        stop_loss_percent=2, take_profit_percent=3, max_daily_loss_percent=5, max_trades_per_day=10
-    )
+def _make_bot_with_store(exchange, watchlist, store):
+    risk_manager = RiskManager(stop_loss_percent=2, take_profit_percent=3, max_daily_loss_percent=5)
     bot = TradingBot(
         exchange=exchange,
-        strategy_factory=lambda symbol: ConstantSignalStrategy(signal),
+        strategy_factory=lambda symbol: ConstantSignalStrategy(Signal.BUY),
         risk_manager=risk_manager,
         quote_asset="IRT",
-        watchlist_size=10,
         watchlist_refresh_minutes=999999,
-        quote_order_amount=1000,
         default_quantity_precision=4,
-        max_concurrent_positions=max_concurrent,
         poll_interval_seconds=1,
         position_store=store,
     )
@@ -188,24 +251,24 @@ def test_positions_survive_a_simulated_restart(tmp_path):
     """
     رگرسیون برای باگ واقعی: قبل از این، پوزیشن‌های باز فقط در حافظه بودند
     و با هر ری‌استارت پردازش (که در عمل زیاد اتفاق می‌افتد) کاملا فراموش
-    می‌شدند؛ یعنی هم حد ضرر/سودشان دیگر چک نمی‌شد، هم MAX_CONCURRENT_POSITIONS
-    اجازه می‌داد باز هم بیشتر از سقف مجاز پوزیشن باز شود.
+    می‌شدند؛ یعنی حد ضرر/سودشان دیگر چک نمی‌شد و بدون هیچ محدودیتی امکان
+    باز شدن پوزیشن‌های تکراری روی همان دارایی محدود (که این‌بار به‌طور
+    طبیعی کمبود سرمایه محدودش می‌کند) وجود داشت.
     """
     store = PositionStore(os.path.join(tmp_path, "open_positions.json"))
-    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100})
+    exchange = FakeExchange({"A_IRT": 100, "B_IRT": 100, "C_IRT": 100}, balance=20_500)
 
-    first_run_bot = _make_bot_with_store(exchange, ["A_IRT", "B_IRT"], store, max_concurrent=2)
+    first_run_bot = _make_bot_with_store(exchange, ["A_IRT", "B_IRT"], store)
     first_run_bot._tick()
     assert len(first_run_bot.positions) == 2
 
     # شبیه‌سازی ری‌استارت پردازش: یک نمونه‌ی کاملا جدید از TradingBot با همان store
-    second_run_bot = _make_bot_with_store(exchange, ["A_IRT", "B_IRT", "C_IRT"], store, max_concurrent=2)
+    second_run_bot = _make_bot_with_store(exchange, ["A_IRT", "B_IRT", "C_IRT"], store)
 
     assert len(second_run_bot.positions) == 2
     assert set(second_run_bot.positions.keys()) == {"A_IRT", "B_IRT"}
 
-    # چون سقف پوزیشن هم‌زمان (۲) با همون ۲ پوزیشن قدیمی پر شده، نباید C_IRT جدید باز کند
-    exchange.prices["C_IRT"] = 100
+    # موجودی آزاد تقریبا تمام شده، پس C_IRT جدید باز نمی‌شود
     second_run_bot._tick()
     assert "C_IRT" not in second_run_bot.positions
     assert len(second_run_bot.positions) == 2
@@ -213,9 +276,9 @@ def test_positions_survive_a_simulated_restart(tmp_path):
 
 def test_closing_a_position_persists_removal(tmp_path):
     store = PositionStore(os.path.join(tmp_path, "open_positions.json"))
-    exchange = FakeExchange({"A_IRT": 100})
+    exchange = FakeExchange({"A_IRT": 100}, balance=100_000)
 
-    bot = _make_bot_with_store(exchange, ["A_IRT"], store, max_concurrent=1)
+    bot = _make_bot_with_store(exchange, ["A_IRT"], store)
     bot._tick()
     assert "A_IRT" in bot.positions
 

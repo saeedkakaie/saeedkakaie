@@ -7,7 +7,6 @@ def make_risk_manager(**overrides):
         stop_loss_percent=2,
         take_profit_percent=3,
         max_daily_loss_percent=5,
-        max_trades_per_day=10,
     )
     defaults.update(overrides)
     return RiskManager(**defaults)
@@ -37,13 +36,6 @@ def test_uses_positions_own_thresholds_not_risk_manager_defaults():
     position = Position(entry_price=100, quantity=1, stop_loss_percent=5, take_profit_percent=8)
     assert rm.should_close_position(position, current_price=97) is False
     assert rm.should_close_position(position, current_price=94.9) is True
-
-
-def test_max_trades_per_day_blocks_new_position():
-    rm = make_risk_manager(max_trades_per_day=1)
-    assert rm.can_open_new_position() is True
-    rm.register_closed_trade(pnl_percent=1)
-    assert rm.can_open_new_position() is False
 
 
 def test_daily_loss_circuit_breaker_halts_bot():

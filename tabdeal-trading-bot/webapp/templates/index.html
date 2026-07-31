@@ -66,33 +66,14 @@
           <input type="text" id="QUOTE_ASSET">
         </div>
         <div>
-          <label>تعداد نماد زیر نظر</label>
-          <input type="number" id="WATCHLIST_SIZE">
-        </div>
-      </div>
-      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند.</div>
-
-      <div class="row2">
-        <div>
-          <label>بازه بروزرسانی لیست (دقیقه)</label>
+          <label>بازه بروزرسانی لیست نماد (دقیقه)</label>
           <input type="number" id="WATCHLIST_REFRESH_MINUTES">
         </div>
-        <div>
-          <label>سقف پوزیشن هم‌زمان</label>
-          <input type="number" id="MAX_CONCURRENT_POSITIONS">
-        </div>
       </div>
+      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند (بدون سقف دستی تعداد).</div>
 
-      <div class="row2">
-        <div>
-          <label>مبلغ هر معامله (Quote)</label>
-          <input type="number" id="QUOTE_ORDER_AMOUNT">
-        </div>
-        <div>
-          <label>دقت اعشار مقدار</label>
-          <input type="number" id="QUANTITY_PRECISION">
-        </div>
-      </div>
+      <label>دقت اعشار مقدار (پیش‌فرض، وقتی برای نمادی پیدا نشود)</label>
+      <input type="number" id="QUANTITY_PRECISION">
 
       <label>کارمزد هر پای معامله (%)</label>
       <input type="number" step="0.01" id="TRADING_FEE_PERCENT">
@@ -109,15 +90,13 @@
         </div>
       </div>
 
-      <div class="row2">
-        <div>
-          <label>سقف ضرر روزانه (%)</label>
-          <input type="number" step="0.1" id="MAX_DAILY_LOSS_PERCENT">
-        </div>
-        <div>
-          <label>سقف معامله در روز</label>
-          <input type="number" id="MAX_TRADES_PER_DAY">
-        </div>
+      <label>سقف ضرر روزانه (%) — مدار قطع خودکار</label>
+      <input type="number" step="0.1" id="MAX_DAILY_LOSS_PERCENT">
+      <div class="hint">
+        مبلغ هر معامله، تعداد پوزیشن هم‌زمان و تعداد معامله در روز دیگر سقف دستی ندارند: ربات با اختیار
+        کامل، موجودی آزاد را متناسب با قدرت سیگنال بین نمادهایی که هم‌زمان سیگنال خرید می‌دهند تقسیم
+        می‌کند و ممکن است در شرایط قوی کل موجودی را روی یک کوین بگذارد. تنها مرزهای ایمنی باقی‌مانده
+        حد ضرر/سود روی هر پوزیشن و همین مدار قطع ضرر روزانه هستند.
       </div>
 
       <div class="hint" style="margin-top:14px">استراتژی پیش‌فرض ترکیبی (RSI+MACD+باند بولینگر+Stochastic+روند) است. دو فیلد زیر فقط برای استراتژی ساده‌ی جایگزین (SMA) کاربرد دارند.</div>
@@ -166,6 +145,7 @@
   <div>
     <div class="card">
       <h2>موجودی حساب</h2>
+      <div class="hint">هر ۲۰ ثانیه خودکار به‌روزرسانی می‌شود؛ برای دریافت فوری هم می‌توانید دکمه را بزنید.</div>
       <button class="btn-start" onclick="refreshBalances()">بروزرسانی موجودی</button>
       <div class="msg" id="balances_msg"></div>
       <table id="balances_table">
@@ -221,9 +201,9 @@
 </div>
 
 <script>
-const CONFIG_FIELDS = ["QUOTE_ASSET","WATCHLIST_SIZE","WATCHLIST_REFRESH_MINUTES","MAX_CONCURRENT_POSITIONS",
-  "QUOTE_ORDER_AMOUNT","QUANTITY_PRECISION","TRADING_FEE_PERCENT","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
-  "MAX_DAILY_LOSS_PERCENT","MAX_TRADES_PER_DAY","SMA_FAST_PERIOD","SMA_SLOW_PERIOD",
+const CONFIG_FIELDS = ["QUOTE_ASSET","WATCHLIST_REFRESH_MINUTES",
+  "QUANTITY_PRECISION","TRADING_FEE_PERCENT","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
+  "MAX_DAILY_LOSS_PERCENT","SMA_FAST_PERIOD","SMA_SLOW_PERIOD",
   "NEWS_CACHE_MINUTES","POLL_INTERVAL_SECONDS"];
 
 async function loadConfig() {
@@ -400,9 +380,11 @@ loadConfig();
 refreshStatus();
 refreshLogs();
 refreshPerformance();
+refreshBalances();
 setInterval(refreshStatus, 3000);
 setInterval(refreshLogs, 4000);
 setInterval(refreshPerformance, 15000);
+setInterval(refreshBalances, 20000);
 </script>
 </body>
 </html>

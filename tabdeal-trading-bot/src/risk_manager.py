@@ -10,8 +10,12 @@ class RiskManager:
     """
     مسئول جلوگیری از ضررهای بزرگ:
     - حد ضرر خودکار (stop-loss) و حد سود (take-profit) روی هر پوزیشن
-    - محدودیت تعداد معامله در روز
     - مدار قطع (circuit breaker) روی حداکثر ضرر مجاز روزانه
+
+    تعداد و مبلغ معاملات دیگر سقف دستی ندارند؛ ربات با اختیار کامل بر
+    اساس سیگنال و موجودی آزاد تصمیم می‌گیرد. تنها مرز باقی‌مانده مدار قطع
+    ضرر روزانه است: اگر مجموع ضرر تجمعی امروز از max_daily_loss_percent
+    عبور کند، ربات تا فردا پوزیشن جدید باز نمی‌کند.
     """
 
     def __init__(
@@ -19,12 +23,10 @@ class RiskManager:
         stop_loss_percent: float,
         take_profit_percent: float,
         max_daily_loss_percent: float,
-        max_trades_per_day: int,
     ):
         self.stop_loss_percent = stop_loss_percent
         self.take_profit_percent = take_profit_percent
         self.max_daily_loss_percent = max_daily_loss_percent
-        self.max_trades_per_day = max_trades_per_day
 
         self._trades_today = 0
         self._daily_pnl_percent = 0.0
@@ -45,10 +47,6 @@ class RiskManager:
 
         if self._halted:
             logger.warning("ربات متوقف است: حد ضرر روزانه فعال شده.")
-            return False
-
-        if self._trades_today >= self.max_trades_per_day:
-            logger.warning("سقف تعداد معامله در روز (%s) پر شده.", self.max_trades_per_day)
             return False
 
         return True

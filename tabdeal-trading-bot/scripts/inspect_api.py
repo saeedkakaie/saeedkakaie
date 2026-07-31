@@ -17,7 +17,12 @@ sys.path.insert(0, ".")
 
 from src.config import Config, ConfigError  # noqa: E402
 from src.exchange_client import ExchangeClient  # noqa: E402
-from src.market_scanner import discover_watchlist, fetch_quantity_precisions, _extract_entries  # noqa: E402
+from src.market_scanner import (  # noqa: E402
+    DEFAULT_WATCHLIST_SIZE,
+    discover_watchlist,
+    fetch_quantity_precisions,
+    _extract_entries,
+)
 
 
 def pretty(label: str, data) -> None:
@@ -49,8 +54,8 @@ def main() -> None:
         "لطفا آن فایل را متناسب با پاسخ واقعی اصلاح کنید."
     )
 
-    print(f"\n=== کشف خودکار watchlist (quote_asset={config.quote_asset}, size={config.watchlist_size}) ===")
-    watchlist = discover_watchlist(exchange, config.quote_asset, config.watchlist_size)
+    print(f"\n=== کشف خودکار watchlist (quote_asset={config.quote_asset}, size={DEFAULT_WATCHLIST_SIZE}) ===")
+    watchlist = discover_watchlist(exchange, config.quote_asset)
     print(watchlist)
 
     print(f"\n=== دقت اعشار مقدار (quantity) هر نماد، پیش‌فرض={config.quantity_precision} ===")
