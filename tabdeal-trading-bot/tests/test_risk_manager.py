@@ -61,3 +61,28 @@ def test_daily_loss_circuit_breaker_notifies_exactly_once():
         # پوزیشن‌های بعدی که در همان روز بسته می‌شوند نباید دوباره اعلان بدهند
         rm.register_closed_trade(pnl_percent=-1)
         mock_notify.assert_called_once()
+
+
+def test_restore_daily_state_reflects_persisted_trades():
+    rm = make_risk_manager()
+    rm.restore_daily_state(trades_today=3, daily_pnl_percent=1.5)
+    assert rm.trades_today == 3
+    assert rm.daily_pnl_percent == 1.5
+    assert rm.is_halted is False
+
+
+def test_restore_daily_state_re_halts_bot_after_a_restart():
+    """
+    رگرسیون برای یک شکاف امنیتی واقعی: قبل از این متد، هر ری‌استارت پردازش
+    (مثلا برای گرفتن آپدیت) یک RiskManager کاملا تازه می‌ساخت و مدار قطع
+    ضرر روزانه‌ای که قبل از ری‌استارت فعال شده بود را بی‌سروصدا خاموش
+    می‌کرد — یعنی ربات دقیقا همان روزی که نباید، دوباره اجازه‌ی معامله
+    پیدا می‌کرد.
+    """
+    rm = make_risk_manager(max_daily_loss_percent=5)
+    with patch("src.risk_manager.notify") as mock_notify:
+        rm.restore_daily_state(trades_today=2, daily_pnl_percent=-6.0)
+
+        assert rm.is_halted is True
+        assert rm.can_open_new_position() is False
+        mock_notify.assert_called_once()

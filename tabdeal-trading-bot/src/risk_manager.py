@@ -89,6 +89,35 @@ class RiskManager:
                 "عبور کرد. ربات تا فردا پوزیشن جدید باز نمی‌کند.",
             )
 
+    def restore_daily_state(self, trades_today: int, daily_pnl_percent: float) -> None:
+        """
+        بعد از هر ری‌استارت پردازش (آپدیت کد، کشته‌شدن Termux، کرش)، یک
+        RiskManager کاملا تازه با شمارنده‌های صفر ساخته می‌شود. بدون این
+        متد، اگر مدار قطع ضرر روزانه قبل از ری‌استارت فعال شده باشد، صرف
+        همان ری‌استارت بی‌سروصدا خاموشش می‌کند و ربات دوباره اجازه‌ی باز
+        کردن پوزیشن جدید پیدا می‌کند — درست همان روزی که نباید. با فراخوانی
+        این متد بلافاصله بعد از ساخت (با اعداد واقعی امروز از TradeJournal
+        که روی دیسک ذخیره شده، نه یک شمارنده‌ی فقط-حافظه‌ای)، وضعیت درست
+        بازسازی می‌شود.
+        """
+        self._reset_if_new_day()
+        self._trades_today = trades_today
+        self._daily_pnl_percent = daily_pnl_percent
+
+        if not self._halted and self._daily_pnl_percent <= -abs(self.max_daily_loss_percent):
+            self._halted = True
+            logger.error(
+                "بعد از بازسازی وضعیت روزانه، مدار قطع همچنان فعال است! ضرر تجمعی امروز "
+                "%.2f%% از حد مجاز %.2f%% عبور کرده. ربات تا فردا معامله جدید باز نمی‌کند.",
+                self._daily_pnl_percent,
+                self.max_daily_loss_percent,
+            )
+            notify(
+                "🛑 مدار قطع ضرر روزانه (بعد از ری‌استارت) فعال است",
+                f"ضرر تجمعی امروز {self._daily_pnl_percent:.2f}% از حد مجاز "
+                f"{self.max_daily_loss_percent:.2f}% عبور کرده. ربات تا فردا پوزیشن جدید باز نمی‌کند.",
+            )
+
     @property
     def is_halted(self) -> bool:
         return self._halted

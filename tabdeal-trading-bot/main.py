@@ -58,6 +58,9 @@ def main() -> None:
     trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
     position_store = PositionStore(os.path.join("data", "open_positions.json"))
 
+    today = trade_journal.summary()["day"]
+    risk_manager.restore_daily_state(today["trades"], today["net_pnl_percent"])
+
     bot = TradingBot(
         exchange=exchange,
         strategy_factory=strategy_factory,
