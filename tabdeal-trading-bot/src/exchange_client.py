@@ -340,6 +340,23 @@ class ExchangeClient:
             logger.info("[DRY-RUN] SELL %s %s با قیمت تقریبی %s", quantity, symbol, price)
             return {"dry_run": True, "side": "SELL", "quantity": quantity, "price": price}
 
+        # مقدار ثبت‌شده در پوزیشن ممکن است کمی از موجودی آزاد واقعی بیشتر
+        # باشد (مثلا چون کارمزد خرید از همان دارایی کسر شده ولی موقع ثبت
+        # پوزیشن هنوز لحاظ نشده بود). به‌جای اینکه صرافی با «موجودی کافی
+        # نیست» سفارش را رد کند، همیشه موجودی واقعی را مرجع می‌گیریم —
+        # هیچ‌وقت بیشتر از چیزی که واقعا داریم نمی‌فروشیم.
+        base_asset = symbol.split("_")[0]
+        actual_free = self.get_asset_balance(base_asset)
+        if actual_free is not None and 0 < actual_free < quantity:
+            logger.warning(
+                "مقدار ثبت‌شده برای فروش %s (%.8f) از موجودی آزاد واقعی (%.8f) بیشتر است؛ "
+                "به‌جای آن موجودی واقعی فروخته می‌شود.",
+                symbol,
+                quantity,
+                actual_free,
+            )
+            quantity = actual_free
+
         order = self.client.new_order(
             symbol=symbol,
             side=OrderSides.SELL,

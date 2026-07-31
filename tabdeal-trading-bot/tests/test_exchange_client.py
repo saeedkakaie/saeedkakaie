@@ -227,6 +227,48 @@ def test_buy_market_never_loses_position_data_on_unknown_response_shape():
     assert order["price"] == 100.0
 
 
+def test_sell_market_clamps_quantity_to_actual_free_balance_when_lower():
+    """
+    رگرسیون برای مورد واقعی: پوزیشنی که قبل از فیکس کارمزد ثبت شده بود
+    (مثلا CHZ_IRT) مقدار ثبت‌شده‌اش کمی از موجودی آزاد واقعی بیشتر بود و هر
+    تلاش برای فروش با «موجودی کافی نیست» رد می‌شد. حالا باید همیشه موجودی
+    واقعی مرجع باشد، نه عدد ذخیره‌شده در پوزیشن.
+    """
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client._get_account = MagicMock(return_value={"balances": [{"asset": "BTC", "free": "1.9", "locked": "0"}]})
+    client.client.new_order = MagicMock(return_value={"executedQty": "1.9", "cummulativeQuoteQty": "190.0"})
+
+    client.sell_market("BTC_IRT", quantity=2.0)
+
+    _, kwargs = client.client.new_order.call_args
+    assert kwargs["quantity"] == str(1.9)
+
+
+def test_sell_market_does_not_clamp_when_actual_balance_is_sufficient():
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client._get_account = MagicMock(return_value={"balances": [{"asset": "BTC", "free": "5.0", "locked": "0"}]})
+    client.client.new_order = MagicMock(return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0"})
+
+    client.sell_market("BTC_IRT", quantity=2.0)
+
+    _, kwargs = client.client.new_order.call_args
+    assert kwargs["quantity"] == str(2.0)
+
+
+def test_sell_market_skips_clamp_when_balance_lookup_fails():
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client._get_account = MagicMock(side_effect=Exception("network down"))
+    client.client.new_order = MagicMock(return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0"})
+
+    client.sell_market("BTC_IRT", quantity=2.0)
+
+    _, kwargs = client.client.new_order.call_args
+    assert kwargs["quantity"] == str(2.0)
+
+
 def test_sell_market_normalizes_binance_style_live_response():
     client = _make_live_client()
     client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
