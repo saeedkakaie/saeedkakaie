@@ -9,6 +9,7 @@ from src.bot import TradingBot
 from src.config import Config
 from src.exchange_client import ExchangeClient
 from src.news_filter import NewsFilter
+from src.notifier import notify
 from src.pnl import net_pnl_percent, pnl_amount
 from src.position_store import PositionStore
 from src.risk_manager import RiskManager
@@ -130,6 +131,10 @@ class BotRunner:
                     )
                     with self._lock:
                         self._status.error = str(exc)
+                    notify(
+                        "⚠️ ربات تبدیل متوقف شد",
+                        f"خطای غیرمنتظره: {exc}\nتا {RESTART_DELAY_SECONDS} ثانیه دیگر خودش دوباره شروع می‌کند.",
+                    )
 
                     if stop_event.is_set():
                         return

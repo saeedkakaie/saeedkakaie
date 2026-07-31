@@ -1,6 +1,7 @@
 import logging
 from datetime import date
 
+from src.notifier import notify
 from src.position import Position
 
 logger = logging.getLogger("tabdeal_bot")
@@ -74,13 +75,18 @@ class RiskManager:
         self._trades_today += 1
         self._daily_pnl_percent += pnl_percent
 
-        if self._daily_pnl_percent <= -abs(self.max_daily_loss_percent):
+        if not self._halted and self._daily_pnl_percent <= -abs(self.max_daily_loss_percent):
             self._halted = True
             logger.error(
                 "مدار قطع فعال شد! ضرر تجمعی امروز %.2f%% از حد مجاز %.2f%% عبور کرد. "
                 "ربات تا فردا معامله جدید باز نمی‌کند.",
                 self._daily_pnl_percent,
                 self.max_daily_loss_percent,
+            )
+            notify(
+                "🛑 مدار قطع ضرر روزانه فعال شد",
+                f"ضرر تجمعی امروز {self._daily_pnl_percent:.2f}% از حد مجاز {self.max_daily_loss_percent:.2f}% "
+                "عبور کرد. ربات تا فردا پوزیشن جدید باز نمی‌کند.",
             )
 
     @property

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from src.position import Position
 from src.risk_manager import RiskManager
 
@@ -45,3 +47,17 @@ def test_daily_loss_circuit_breaker_halts_bot():
     rm.register_closed_trade(pnl_percent=-3)
     assert rm.is_halted is True
     assert rm.can_open_new_position() is False
+
+
+def test_daily_loss_circuit_breaker_notifies_exactly_once():
+    rm = make_risk_manager(max_daily_loss_percent=5)
+    with patch("src.risk_manager.notify") as mock_notify:
+        rm.register_closed_trade(pnl_percent=-3)
+        mock_notify.assert_not_called()
+
+        rm.register_closed_trade(pnl_percent=-3)
+        mock_notify.assert_called_once()
+
+        # پوزیشن‌های بعدی که در همان روز بسته می‌شوند نباید دوباره اعلان بدهند
+        rm.register_closed_trade(pnl_percent=-1)
+        mock_notify.assert_called_once()

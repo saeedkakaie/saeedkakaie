@@ -5,6 +5,8 @@ from typing import Optional, Tuple
 from tabdeal.enums import OrderSides, OrderTypes, RequestTypes, SecurityTypes
 from tabdeal.spot import Spot
 
+from src.notifier import notify
+
 logger = logging.getLogger("tabdeal_bot")
 
 
@@ -113,6 +115,11 @@ def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float,
             quantity,
             order,
             symbol,
+        )
+        notify(
+            f"⚠️ سفارش {side} {symbol} با ساختار ناشناخته",
+            f"پوزیشن با تخمین محلی (قیمت≈{price:.4f}، مقدار≈{quantity:.6f}) ثبت شد؛ "
+            "حتما موجودی واقعی را در اپ تبدیل بررسی کن.",
         )
 
     return {"price": price, "quantity": quantity}
