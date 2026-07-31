@@ -6,6 +6,7 @@ from src.config import Config, ConfigError
 from src.exchange_client import ExchangeClient
 from src.logger_setup import setup_logger
 from src.news_filter import NewsFilter
+from src.position_store import PositionStore
 from src.risk_manager import RiskManager
 from src.strategy import TechnicalStrategy
 from src.trade_journal import TradeJournal
@@ -56,6 +57,7 @@ def main() -> None:
     )
 
     trade_journal = TradeJournal(os.path.join("data", "trade_history.jsonl"))
+    position_store = PositionStore(os.path.join("data", "open_positions.json"))
 
     bot = TradingBot(
         exchange=exchange,
@@ -70,6 +72,7 @@ def main() -> None:
         poll_interval_seconds=config.poll_interval_seconds,
         fee_percent=config.trading_fee_percent,
         trade_journal=trade_journal,
+        position_store=position_store,
     )
 
     try:

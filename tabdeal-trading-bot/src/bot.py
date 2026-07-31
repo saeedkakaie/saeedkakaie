@@ -8,6 +8,7 @@ from src.exchange_client import ExchangeClient, ExchangeError
 from src.market_scanner import discover_watchlist, fetch_quantity_precisions
 from src.pnl import net_pnl_percent, pnl_amount
 from src.position import Position
+from src.position_store import PositionStore
 from src.risk_manager import RiskManager
 from src.strategy import Signal, Strategy
 from src.trade_journal import ClosedTrade, TradeJournal
@@ -36,6 +37,7 @@ class TradingBot:
         poll_interval_seconds: int,
         fee_percent: float = 0.0,
         trade_journal: Optional[TradeJournal] = None,
+        position_store: Optional[PositionStore] = None,
     ):
         self.exchange = exchange
         self.strategy_factory = strategy_factory
@@ -49,10 +51,13 @@ class TradingBot:
         self.poll_interval_seconds = poll_interval_seconds
         self.fee_percent = fee_percent
         self.trade_journal = trade_journal
+        self.position_store = position_store
 
         self.watchlist: list = []
         self.strategies: Dict[str, Strategy] = {}
-        self.positions: Dict[str, Position] = {}
+        self.positions: Dict[str, Position] = (
+            self.position_store.load() if self.position_store else {}
+        )
         self.last_price: Dict[str, float] = {}
         self.last_signal: Dict[str, Signal] = {}
         self.symbol_precisions: Dict[str, int] = {}
@@ -176,6 +181,8 @@ class TradingBot:
             take_profit_percent=take_profit_percent,
         )
         self.positions[symbol] = position
+        if self.position_store:
+            self.position_store.save(self.positions)
 
         logger.info(
             "پوزیشن باز شد (%s): ورود=%s، مقدار=%s، حد ضرر=%.2f%% (قیمت %.4f)، "
@@ -238,3 +245,5 @@ class TradingBot:
             )
 
         del self.positions[symbol]
+        if self.position_store:
+            self.position_store.save(self.positions)
