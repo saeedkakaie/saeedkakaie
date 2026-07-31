@@ -111,10 +111,24 @@ class TechnicalStrategy(Strategy):
     توصیه‌ی مالی و نه تضمین سود؛ حتما قبل از استفاده‌ی واقعی بک‌تست کنید.
     """
 
+    # دوره‌ی همه‌ی اندیکاتورها عمداً کوتاه‌تر از مقادیر «کتابی» رایج
+    # (که برای کندل روزانه طراحی شده‌اند) انتخاب شده تا با سری قیمت
+    # poll‌شده‌ی این ربات، به نوسانات کوچیک‌تر و سریع‌تر هم واکنش نشان
+    # دهد — چون هدف نوسان‌گیری کوتاه‌مدت است، نه سرمایه‌گذاری بلندمدت.
     HISTORY_SIZE = 150
-    RSI_PERIOD = 14
-    BOLLINGER_PERIOD = 20
-    TREND_EMA_PERIOD = 50
+    RSI_PERIOD = 7
+    BOLLINGER_PERIOD = 10
+    TREND_EMA_PERIOD = 21
+    MACD_FAST_PERIOD = 6
+    MACD_SLOW_PERIOD = 13
+    MACD_SIGNAL_PERIOD = 5
+    STOCHASTIC_PERIOD = 7
+    STOCHASTIC_SMOOTH_K = 3
+    STOCHASTIC_SMOOTH_D = 3
+    ICHIMOKU_TENKAN_PERIOD = 5
+    ICHIMOKU_KIJUN_PERIOD = 13
+    ICHIMOKU_SENKOU_B_PERIOD = 26
+
     CONFLUENCE_THRESHOLD = 4
     NEWS_BOOSTED_THRESHOLD = 3
     NEWS_VETO_SCORE = -0.5
@@ -124,13 +138,13 @@ class TechnicalStrategy(Strategy):
     VOLATILITY_MULTIPLIER = 1.5
     RISK_REWARD_RATIO = 1.5
 
-    ROC_PERIOD = 10
+    ROC_PERIOD = 5
     # آستانه‌ای که تغییر قیمت طی ROC_PERIOD تیک اخیر باید از آن عبور کند
     # تا «مومنتوم قابل توجه» حساب شود. چون این ربات به‌جای کندل واقعی از
     # سری قیمت poll‌شده استفاده می‌کند، این عدد ممکن است لازم باشد متناسب
     # با نوسان معمول نمادهایی که معامله می‌کنید و POLL_INTERVAL_SECONDS
     # تنظیم شود.
-    ROC_THRESHOLD_PERCENT = 1.0
+    ROC_THRESHOLD_PERCENT = 0.6
 
     # تعداد اندیکاتورهای رأی‌دهنده: RSI, MACD, Bollinger, Stochastic,
     # trend, ichimoku, momentum (ROC)
@@ -167,7 +181,7 @@ class TechnicalStrategy(Strategy):
         rsi_value = rsi(prices, self.RSI_PERIOD)
         votes["rsi"] = 0 if rsi_value is None else (1 if rsi_value < 30 else (-1 if rsi_value > 70 else 0))
 
-        _, _, hist = macd(prices)
+        _, _, hist = macd(prices, self.MACD_FAST_PERIOD, self.MACD_SLOW_PERIOD, self.MACD_SIGNAL_PERIOD)
         votes["macd"] = 0 if hist is None else (1 if hist > 0 else (-1 if hist < 0 else 0))
 
         lower, _, upper = bollinger_bands(prices, self.BOLLINGER_PERIOD)
@@ -177,7 +191,9 @@ class TechnicalStrategy(Strategy):
             current = prices[-1]
             votes["bollinger"] = 1 if current <= lower else (-1 if current >= upper else 0)
 
-        k, _ = stochastic_oscillator(prices)
+        k, _ = stochastic_oscillator(
+            prices, self.STOCHASTIC_PERIOD, self.STOCHASTIC_SMOOTH_K, self.STOCHASTIC_SMOOTH_D
+        )
         votes["stochastic"] = 0 if k is None else (1 if k < 20 else (-1 if k > 80 else 0))
 
         trend_ema = ema(prices, self.TREND_EMA_PERIOD)
@@ -187,7 +203,9 @@ class TechnicalStrategy(Strategy):
             current = prices[-1]
             votes["trend"] = 1 if current > trend_ema else (-1 if current < trend_ema else 0)
 
-        tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b = ichimoku(prices)
+        tenkan_sen, kijun_sen, senkou_span_a, senkou_span_b = ichimoku(
+            prices, self.ICHIMOKU_TENKAN_PERIOD, self.ICHIMOKU_KIJUN_PERIOD, self.ICHIMOKU_SENKOU_B_PERIOD
+        )
         if tenkan_sen is None:
             votes["ichimoku"] = 0
         else:
