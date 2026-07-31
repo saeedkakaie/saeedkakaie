@@ -1,6 +1,7 @@
 import logging
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from typing import Callable, Dict, List, Optional, Tuple
 
@@ -38,6 +39,13 @@ class TradingBot:
     # تخصیص داده نمی‌شود تا اسلیپیج/گرد‌شدن قیمت باعث رد شدن آخرین سفارش
     # به‌خاطر «موجودی ناکافی» نشود.
     ALLOCATION_SAFETY_MARGIN = 0.98
+
+    # چون قیمت هر نماد یک درخواست شبکه‌ای جداست، اگر متوالی خوانده شود هر
+    # چرخه با تعداد نماد زیاد کند می‌شود و ممکن است از POLL_INTERVAL_SECONDS
+    # بیشتر طول بکشد. به‌جای آن، قیمت همه‌ی نمادهای هر چرخه را هم‌زمان (با
+    # چند ترد) می‌خوانیم؛ عدد پایین برای این است که فشار زیادی هم روی
+    # rate limit صرافی نیاید.
+    PRICE_FETCH_WORKERS = 10
 
     def __init__(
         self,
@@ -140,23 +148,47 @@ class TradingBot:
         # خارج شده باشند همچنان دنبال می‌کنیم تا پوزیشن بدون مدیریت نماند.
         symbols_to_check = set(self.watchlist) | set(self.positions.keys())
 
+        prices = self._fetch_prices(symbols_to_check)
+
         buy_candidates: List[Tuple[str, float, float]] = []  # (symbol, price, weight)
 
-        for symbol in symbols_to_check:
+        for symbol, price in prices.items():
             try:
-                candidate = self._tick_symbol(symbol)
+                candidate = self._tick_symbol(symbol, price)
                 if candidate:
                     buy_candidates.append(candidate)
-            except ExchangeError as exc:
-                logger.error("خطای صرافی برای %s: %s", symbol, exc)
             except Exception:
                 logger.exception("خطای پیش‌بینی‌نشده برای %s", symbol)
 
         if buy_candidates:
             self._allocate_and_open_positions(buy_candidates)
 
-    def _tick_symbol(self, symbol: str) -> Optional[Tuple[str, float, float]]:
-        price = self.exchange.get_current_price(symbol)
+    def _fetch_prices(self, symbols) -> Dict[str, float]:
+        """
+        قیمت همه‌ی نمادهای داده‌شده را هم‌زمان (با چند ترد، نه یکی‌یکی)
+        می‌خواند تا هر چرخه با تعداد نماد زیاد کند نشود.
+        """
+        prices: Dict[str, float] = {}
+        symbols = list(symbols)
+        if not symbols:
+            return prices
+
+        with ThreadPoolExecutor(max_workers=min(self.PRICE_FETCH_WORKERS, len(symbols))) as executor:
+            future_to_symbol = {
+                executor.submit(self.exchange.get_current_price, symbol): symbol for symbol in symbols
+            }
+            for future in as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    prices[symbol] = future.result()
+                except ExchangeError as exc:
+                    logger.error("خطای صرافی برای %s: %s", symbol, exc)
+                except Exception:
+                    logger.exception("خطای پیش‌بینی‌نشده در دریافت قیمت %s", symbol)
+
+        return prices
+
+    def _tick_symbol(self, symbol: str, price: float) -> Optional[Tuple[str, float, float]]:
         strategy = self.strategies.setdefault(symbol, self.strategy_factory(symbol))
         signal = strategy.update(price)
 

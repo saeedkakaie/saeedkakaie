@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 
@@ -11,6 +12,8 @@ from src.logger_setup import setup_logger  # noqa: E402
 from src.trade_journal import TradeJournal  # noqa: E402
 from webapp.bot_runner import BotRunner  # noqa: E402
 from webapp.env_writer import read_env_file, update_env_file  # noqa: E402
+
+logger = logging.getLogger("tabdeal_bot")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ENV_PATH = os.path.join(BASE_DIR, ".env")
@@ -41,6 +44,7 @@ FORM_FIELDS = [
     "NEWS_CACHE_MINUTES",
     "POLL_INTERVAL_SECONDS",
     "DRY_RUN",
+    "AUTO_START",
 ]
 
 
@@ -70,7 +74,7 @@ def save_config():
     for field in FORM_FIELDS:
         if field in payload and payload[field] != "":
             value = payload[field]
-            if field in ("DRY_RUN", "NEWS_ENABLED"):
+            if field in ("DRY_RUN", "NEWS_ENABLED", "AUTO_START"):
                 value = "true" if str(value).lower() in ("true", "1", "on") else "false"
             updates[field] = value
 
@@ -162,10 +166,37 @@ def logs():
     return jsonify({"lines": lines[-200:]})
 
 
+def _maybe_auto_start() -> None:
+    """
+    اگر AUTO_START=true باشد، همین لحظه که سرور بالا می‌آید (مثلا با
+    run.sh موقع بوت گوشی از طریق Termux:Boot) ربات را بدون نیاز به کلیک
+    دستی روی دکمه «شروع» در داشبورد راه می‌اندازد. خطاها فقط لاگ می‌شوند
+    تا خود سرور وب هیچ‌وقت به‌خاطر این قابلیت بالا نیاید.
+    """
+    try:
+        config = Config.load(ENV_PATH)
+    except ConfigError as exc:
+        logger.warning("AUTO_START رد شد: تنظیمات نامعتبر (%s)", exc)
+        return
+
+    if not config.auto_start:
+        return
+
+    try:
+        runner.start(config)
+        logger.info(
+            "AUTO_START فعال بود: ربات بدون نیاز به کلیک دستی خودش شروع به کار کرد (حالت=%s).",
+            "DRY-RUN" if config.dry_run else "LIVE",
+        )
+    except RuntimeError:
+        pass
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("داشبورد فقط روی 127.0.0.1 (لوکال) در دسترس است.")
     print("هرگز این پورت را روی 0.0.0.0 یا اینترنت باز نکنید مگر احراز هویت اضافه کنید.")
     print("آدرس: http://127.0.0.1:5000")
     print("=" * 70)
+    _maybe_auto_start()
     app.run(host="127.0.0.1", port=5000, debug=False)

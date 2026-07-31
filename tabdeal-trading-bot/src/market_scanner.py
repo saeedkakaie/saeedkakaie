@@ -1,7 +1,14 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Dict, List
 
 logger = logging.getLogger("tabdeal_bot")
+
+# چون rank کردن نمادها بر اساس فعالیت یک درخواست شبکه‌ای جدا برای هر نماد
+# است (client.trades)، این را با چند ترد هم‌زمان انجام می‌دهیم تا برای
+# بازارهایی با تعداد نماد زیاد، بروزرسانی watchlist طول نکشد؛ عدد پایین
+# برای این است که فشار زیادی هم روی rate limit صرافی نیاید.
+ACTIVITY_FETCH_WORKERS = 10
 
 # اگر دریافت لیست نمادها از API به هر دلیل شکست بخورد، ربات با همین چند
 # نماد شناخته‌شده کار می‌کند تا کاملا متوقف نشود.
@@ -67,6 +74,22 @@ def _estimate_activity(exchange, symbol: str) -> float:
         return 0.0
 
 
+def _score_candidates(exchange, candidates: List[str]) -> List[tuple]:
+    if not candidates:
+        return []
+
+    results = []
+    with ThreadPoolExecutor(max_workers=min(ACTIVITY_FETCH_WORKERS, len(candidates))) as executor:
+        future_to_symbol = {
+            executor.submit(_estimate_activity, exchange, symbol): symbol for symbol in candidates
+        }
+        for future in as_completed(future_to_symbol):
+            symbol = future_to_symbol[future]
+            results.append((future.result(), symbol))
+
+    return results
+
+
 def discover_watchlist(exchange, quote_asset: str, size: int = DEFAULT_WATCHLIST_SIZE) -> List[str]:
     """
     لیست نمادهای فعال بازار را از exchange_info می‌خواند، به نمادهایی که
@@ -104,7 +127,7 @@ def discover_watchlist(exchange, quote_asset: str, size: int = DEFAULT_WATCHLIST
         )
         return list(FALLBACK_SYMBOLS)
 
-    scored = [(_estimate_activity(exchange, symbol), symbol) for symbol in candidates]
+    scored = _score_candidates(exchange, candidates)
     scored.sort(key=lambda pair: pair[0], reverse=True)
     watchlist = [symbol for _, symbol in scored[:size]]
 

@@ -119,6 +119,12 @@
         <label style="margin:0">حالت شبیه‌سازی (DRY RUN) — پیشنهاد می‌شود روشن بماند</label>
       </div>
 
+      <div class="checkbox-row">
+        <input type="checkbox" id="AUTO_START">
+        <label style="margin:0">شروع کاملا خودکار (بدون کلیک دستی روی «شروع»)</label>
+      </div>
+      <div class="hint">هر بار که خود سرور بالا بیاید (مثلا با run.sh یا موقع بوت گوشی) ربات را خودش شروع می‌کند؛ فقط وقتی فعال کنید که مطمئنید تنظیمات ریسک/DRY_RUN درست‌اند. راهنمای شروع خودکار موقع روشن شدن گوشی در README (بخش «شروع کاملا خودکار»).</div>
+
       <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
       <div class="msg" id="config_msg"></div>
     </div>
@@ -214,6 +220,7 @@ async function loadConfig() {
   }
   document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
   document.getElementById("NEWS_ENABLED").checked = (data.NEWS_ENABLED === "true");
+  document.getElementById("AUTO_START").checked = (data.AUTO_START === "true");
 
   document.getElementById("api_key_status").innerText = data.has_api_key ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
   document.getElementById("api_secret_status").innerText = data.has_api_secret ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
@@ -226,6 +233,7 @@ async function saveConfig() {
   }
   payload.DRY_RUN = document.getElementById("DRY_RUN").checked;
   payload.NEWS_ENABLED = document.getElementById("NEWS_ENABLED").checked;
+  payload.AUTO_START = document.getElementById("AUTO_START").checked;
   payload.TABDEAL_API_KEY = document.getElementById("api_key").value;
   payload.TABDEAL_API_SECRET = document.getElementById("api_secret").value;
   payload.NEWS_API_KEY = document.getElementById("news_api_key").value;

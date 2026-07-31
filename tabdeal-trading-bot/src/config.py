@@ -26,6 +26,7 @@ class Config:
     news_cache_minutes: int
     poll_interval_seconds: int
     dry_run: bool
+    auto_start: bool
     log_level: str
 
     @staticmethod
@@ -62,6 +63,7 @@ class Config:
                 news_cache_minutes=int(os.getenv("NEWS_CACHE_MINUTES", "30")),
                 poll_interval_seconds=int(os.getenv("POLL_INTERVAL_SECONDS", "30")),
                 dry_run=dry_run,
+                auto_start=os.getenv("AUTO_START", "false").strip().lower() == "true",
                 log_level=os.getenv("LOG_LEVEL", "INFO"),
             )
         except ValueError as exc:

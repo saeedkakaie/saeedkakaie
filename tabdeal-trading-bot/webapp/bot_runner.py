@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Dict, List, Optional
 
@@ -15,6 +16,22 @@ from src.strategy import TechnicalStrategy
 from src.trade_journal import TradeJournal
 
 logger = logging.getLogger("tabdeal_bot")
+
+# TradingBot.run_forever خودش تمام خطاهای هر چرخه را داخلی می‌گیرد و لاگ
+# می‌کند و ادامه می‌دهد؛ پس فقط یک خطای واقعا غیرمنتظره (باگ نادر خارج از
+# آن حلقه) می‌تواند به اینجا برسد. به‌جای اینکه ربات کاملا متوقف بماند و
+# منتظر کلیک دستی کاربر روی «شروع» شود، همین ترد پس‌زمینه بعد از یک مکث
+# کوتاه خودش دوباره تلاش می‌کند — همان bot (با همان پوزیشن‌ها و watchlist)
+# را ادامه می‌دهد، نه یک نمونه‌ی تازه.
+RESTART_DELAY_SECONDS = 30
+
+
+def _interruptible_sleep(stop_event: threading.Event, seconds: int) -> None:
+    remaining = seconds
+    while remaining > 0 and not stop_event.is_set():
+        step = min(1, remaining)
+        time.sleep(step)
+        remaining -= step
 
 
 @dataclass
@@ -103,13 +120,26 @@ class BotRunner:
             stop_event = self._stop_event
 
         def _run():
-            try:
-                bot.run_forever(stop_event=stop_event, on_tick=self._on_tick)
-            except Exception as exc:
-                logger.exception("ربات با خطا متوقف شد.")
-                with self._lock:
-                    self._status.error = str(exc)
-                    self._status.running = False
+            while True:
+                try:
+                    bot.run_forever(stop_event=stop_event, on_tick=self._on_tick)
+                    return  # run_forever فقط وقتی برمی‌گردد که stop_event عمدا set شده باشد
+                except Exception as exc:
+                    logger.exception(
+                        "ربات با خطای غیرمنتظره متوقف شد؛ اگر توقف عمدی نبود، %s ثانیه دیگر خودش دوباره شروع می‌کند.",
+                        RESTART_DELAY_SECONDS,
+                    )
+                    with self._lock:
+                        self._status.error = str(exc)
+
+                    if stop_event.is_set():
+                        return
+
+                    _interruptible_sleep(stop_event, RESTART_DELAY_SECONDS)
+                    if stop_event.is_set():
+                        return
+
+                    logger.info("تلاش خودکار برای شروع دوباره‌ی ربات پس از خطا.")
 
         self._thread = threading.Thread(target=_run, daemon=True)
         self._thread.start()
