@@ -2,6 +2,7 @@ import logging
 import os
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -30,6 +31,21 @@ setup_logger("INFO")
 
 app = Flask(__name__)
 runner = BotRunner()
+
+# بعضی دارایی‌ها (مثلا توکن خود صرافی) ممکن است جفت‌ارز مستقیم با
+# quote_asset نداشته باشند و قیمت‌شان همیشه شکست بخورد. بدون این کش،
+# چون هر بار /api/balances یک ExchangeClient تازه می‌سازد، این دارایی‌ها
+# با هر بروزرسانی خودکار (هر ۲۰ ثانیه) دوباره امتحان و دوباره در لاگ ثبت
+# می‌شدند؛ اینجا بعد از یک شکست، تا مدتی از تلاش دوباره صرف‌نظر می‌کنیم.
+PRICE_LOOKUP_RETRY_COOLDOWN_MINUTES = 60
+_unpriceable_assets: dict = {}
+
+
+def _should_skip_price_lookup(asset: str) -> bool:
+    last_failed = _unpriceable_assets.get(asset)
+    if last_failed is None:
+        return False
+    return datetime.utcnow() - last_failed < timedelta(minutes=PRICE_LOOKUP_RETRY_COOLDOWN_MINUTES)
 
 FORM_FIELDS = [
     "QUOTE_ASSET",
@@ -132,19 +148,22 @@ def balances():
     # مثل بقیه‌ی جاهای پروژه هم‌زمان (نه یکی‌یکی) می‌خوانیم تا این endpoint
     # سریع برگردد و داشبورد وقتی خودکار هر ۲۰ ثانیه صداش می‌زند معطل نماند.
     non_quote_assets = [b["asset"] for b in result if b["asset"] != config.quote_asset]
+    to_fetch = [asset for asset in non_quote_assets if not _should_skip_price_lookup(asset)]
     prices: dict = {}
-    if non_quote_assets:
-        with ThreadPoolExecutor(max_workers=min(10, len(non_quote_assets))) as executor:
+    if to_fetch:
+        with ThreadPoolExecutor(max_workers=min(10, len(to_fetch))) as executor:
             future_to_asset = {
                 executor.submit(exchange.get_current_price, f"{asset}_{config.quote_asset}"): asset
-                for asset in non_quote_assets
+                for asset in to_fetch
             }
             for future in as_completed(future_to_asset):
                 asset = future_to_asset[future]
                 try:
                     prices[asset] = future.result()
+                    _unpriceable_assets.pop(asset, None)
                 except Exception:
                     prices[asset] = None
+                    _unpriceable_assets[asset] = datetime.utcnow()
 
     total_value = 0.0
     for balance in result:
