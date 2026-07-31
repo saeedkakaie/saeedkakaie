@@ -84,6 +84,41 @@ def test_collect_votes_includes_ichimoku_and_momentum_on_sustained_uptrend():
     assert votes["momentum"] == 1
 
 
+def test_detects_pump_and_buys_immediately_bypassing_confluence():
+    """
+    رگرسیون برای رفتار مطلوب: در یک پامپ واقعی، RSI/Bollinger/Stochastic
+    (contrarian) وارد اشباع خرید می‌شوند و رأی منفی می‌دهند، پس رأی‌گیری
+    معمول ممکن است هیچ‌وقت به آستانه نرسد. مسیر تشخیص پامپ باید بدون توجه
+    به آن، بلافاصله سیگنال خرید بدهد.
+    """
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    prices = [100, 100, 100, 100, 100, 107]  # جهش ۷٪ طی ۵ تیک اخیر، بالای آستانه ۵٪
+    signals = [strategy.update(p) for p in prices]
+    assert signals[-1] == Signal.BUY
+
+
+def test_pump_signal_blocked_by_negative_news():
+    strategy = TechnicalStrategy(symbol="BTC_IRT", news_filter=FakeNewsFilter(score=-0.8))
+    prices = [100, 100, 100, 100, 100, 107]
+    signals = [strategy.update(p) for p in prices]
+    assert signals[-1] == Signal.HOLD
+
+
+def test_confidence_is_maximum_after_pump_detected():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    for price in [100, 100, 100, 100, 100, 107]:
+        strategy.update(price)
+    assert strategy.confidence() == 1.0
+
+
+def test_detect_pump_requires_new_high_not_just_fast_roc():
+    strategy = TechnicalStrategy(symbol="BTC_IRT")
+    # جهش قوی (۵٪، از آستانه عبور کرده) هست ولی قیمت الان دیگر بالاترین
+    # قیمت همان بازه نیست (از ۱۰۸ به ۱۰۵ برگشته)
+    prices = [100, 100, 100, 100, 108, 105]
+    assert strategy._detect_pump(prices) is False
+
+
 def test_update_runs_without_error_over_long_series():
     strategy = TechnicalStrategy(symbol="BTC_IRT")
     random.seed(1)

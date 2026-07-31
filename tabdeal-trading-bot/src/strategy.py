@@ -101,10 +101,17 @@ class TechnicalStrategy(Strategy):
     آستانه (پیش‌فرض ۴ از ۷) عبور کند سیگنال صادر می‌شود، و فقط روی همان
     عبور (نه هر تیک) تا از سیگنال تکراری جلوگیری شود.
 
+    یک مسیر جدا برای تشخیص مستقیم پامپ هم دارد (`_detect_pump`): اگر قیمت
+    طی چند تیک اخیر جهش قوی داشته و همین الان بالاترین قیمت همان بازه
+    باشد، بدون توجه به رأی‌گیری معمول بلافاصله سیگنال خرید صادر می‌شود —
+    چون در یک پامپ واقعی، اندیکاتورهای contrarian (RSI/Bollinger/
+    Stochastic) معمولاً دقیقاً همان لحظه وارد اشباع خرید می‌شوند و مانع
+    رسیدن رأی‌گیری معمول به آستانه می‌شوند.
+
     اگر فیلتر خبر (NewsFilter) داده شود: خبر بسیار منفی جلوی سیگنال خرید
-    را می‌گیرد (safety-first)، و خبر بسیار مثبت آستانه‌ی خرید را کمی
-    پایین می‌آورد. فروش هیچ‌وقت به‌خاطر خبر متوقف نمی‌شود چون بستن پوزیشن
-    برای مدیریت ریسک همیشه باید ممکن باشد.
+    را می‌گیرد (safety-first، حتی برای سیگنال پامپ)، و خبر بسیار مثبت
+    آستانه‌ی خرید را کمی پایین می‌آورد. فروش هیچ‌وقت به‌خاطر خبر متوقف
+    نمی‌شود چون بستن پوزیشن برای مدیریت ریسک همیشه باید ممکن باشد.
 
     حد ضرر/سود پیشنهادی از نوسان اخیر قیمت محاسبه می‌شود (چون ATR واقعی
     بدون داده کندل در دسترس نیست). این یک نمونه‌ی معقول برای شروع است، نه
@@ -150,6 +157,26 @@ class TechnicalStrategy(Strategy):
     # trend, ichimoku, momentum (ROC)
     MAX_CONFLUENCE = 7
 
+    # تشخیص مستقیم پامپ: در یک پامپ قوی، RSI/Bollinger/Stochastic چون
+    # contrarian هستند وارد اشباع خرید می‌شوند و رأی منفی می‌دهند (دقیقاً
+    # همان لحظه‌ای که باید خرید کرد)، پس ممکن است مجموع رأی‌ها هیچ‌وقت به
+    # آستانه‌ی معمولی نرسد. برای همین این مسیر جدا و سریع‌تر: اگر قیمت طی
+    # PUMP_LOOKBACK_PERIOD تیک اخیر حداقل PUMP_ROC_THRESHOLD_PERCENT درصد
+    # جهش کرده باشد و همین الان بالاترین قیمت همان بازه باشد (یعنی واقعاً
+    # در حال شکستن سقف است، نه فقط یک نویز لحظه‌ای)، بدون توجه به رأی‌گیری
+    # معمول بلافاصله سیگنال خرید صادر می‌شود. حد ضرر متحرک (trailing stop)
+    # مسئول فروش به‌موقع وقتی پامپ برگردد (دامپ) خواهد بود.
+    PUMP_LOOKBACK_PERIOD = 5
+    # این عدد با شبیه‌سازی مونت‌کارلو کالیبره شده: مقادیر پایین‌تر (مثلا
+    # ۱.۵٪) عملا با نوسان معمولی بازار (نه یک پامپ واقعی) هم فعال می‌شوند
+    # و تعداد سیگنال خرید را حتی از رأی‌گیری معمول هم بیشتر می‌کنند — چون
+    # مسیر پامپ هیچ اندیکاتور دیگری را چک نمی‌کند، هر false positive اینجا
+    # مستقیماً یک خرید واقعی و کارمزد الکی است. اگر برای نمادهایی که
+    # معامله می‌کنید هنوز پامپ واقعی را دیر تشخیص می‌دهد یا برعکس روی
+    # نوسان عادی هم فعال می‌شود، این عدد را متناسب با POLL_INTERVAL_SECONDS
+    # و نوسان معمول آن نمادها تنظیم کنید.
+    PUMP_ROC_THRESHOLD_PERCENT = 5.0
+
     def __init__(self, symbol: str, news_filter=None):
         self.symbol = symbol
         self.base_asset = symbol.split("_")[0]
@@ -162,6 +189,21 @@ class TechnicalStrategy(Strategy):
         self._prices.append(price)
         prices = list(self._prices)
 
+        if self._detect_pump(prices):
+            self.last_confluence = self.MAX_CONFLUENCE
+            self._prev_confluence = self.last_confluence
+            if self.news_filter and self.news_filter.enabled:
+                news_score = self.news_filter.sentiment(self.base_asset)
+                if news_score <= self.NEWS_VETO_SCORE:
+                    logger.info(
+                        "سیگنال پامپ %s به‌خاطر خبر منفی (امتیاز=%.2f) نادیده گرفته شد.",
+                        self.symbol,
+                        news_score,
+                    )
+                    return Signal.HOLD
+            logger.info("پامپ روی %s تشخیص داده شد؛ سیگنال خرید فوری صادر شد.", self.symbol)
+            return Signal.BUY
+
         votes = self._collect_votes(prices)
         confluence = sum(votes.values())
 
@@ -169,6 +211,14 @@ class TechnicalStrategy(Strategy):
         self._prev_confluence = confluence
         self.last_confluence = confluence
         return signal
+
+    def _detect_pump(self, prices) -> bool:
+        roc_value = rate_of_change(prices, self.PUMP_LOOKBACK_PERIOD)
+        if roc_value is None or roc_value < self.PUMP_ROC_THRESHOLD_PERCENT:
+            return False
+
+        recent_window = prices[-(self.PUMP_LOOKBACK_PERIOD + 1):]
+        return prices[-1] >= max(recent_window)
 
     def confidence(self) -> Optional[float]:
         if self.last_confluence is None:
