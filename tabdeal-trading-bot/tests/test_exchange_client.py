@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 from tabdeal.enums import RequestTypes, SecurityTypes
 
-from src.exchange_client import ExchangeClient, _describe_exception
+from src.exchange_client import ExchangeClient, _describe_exception, _normalize_order
 
 
 class FakeClientException(Exception):
@@ -121,3 +121,87 @@ def test_official_sdk_account_shares_a_mutated_dict_across_calls():
 
     # همان آبجکت دیکشنری بین دو فراخوانی به اشتراک رفته است
     assert first_params is second_params
+
+
+def test_normalize_order_reads_own_price_quantity_keys():
+    order = {"price": "123.45", "quantity": "2.5"}
+    result = _normalize_order(order, side="خرید", symbol="BTC_IRT", fallback_price=1, fallback_quantity=1)
+    assert result == {"price": 123.45, "quantity": 2.5}
+
+
+def test_normalize_order_reads_binance_style_executed_qty_and_price():
+    order = {"executedQty": "3.0", "price": "0.00000000", "cummulativeQuoteQty": "300.0"}
+    result = _normalize_order(order, side="خرید", symbol="BTC_IRT", fallback_price=1, fallback_quantity=1)
+    # MARKET orders often report price=0; cummulativeQuoteQty/executedQty gives the real average
+    assert result["quantity"] == 3.0
+    assert result["price"] == 100.0
+
+
+def test_normalize_order_reads_average_price_from_fills():
+    order = {
+        "executedQty": "3.0",
+        "fills": [
+            {"price": "100.0", "qty": "1.0"},
+            {"price": "110.0", "qty": "2.0"},
+        ],
+    }
+    result = _normalize_order(order, side="خرید", symbol="BTC_IRT", fallback_price=1, fallback_quantity=1)
+    assert result["quantity"] == 3.0
+    assert result["price"] == (100.0 * 1.0 + 110.0 * 2.0) / 3.0
+
+
+def test_normalize_order_falls_back_to_local_estimate_on_unknown_shape():
+    """
+    رگرسیون برای باگ واقعی: پاسخ new_order() با ساختار ناشناخته دیگر نباید
+    KeyError بیندازد و پوزیشن واقعی را کاملا بدون ردیابی رها کند؛ باید از
+    قیمت/مقدار محلی محاسبه‌شده قبل از ثبت سفارش استفاده کند.
+    """
+    order = {"orderId": 123, "status": "FILLED"}
+    result = _normalize_order(order, side="خرید", symbol="TT_IRT", fallback_price=42.0, fallback_quantity=7.0)
+    assert result == {"price": 42.0, "quantity": 7.0}
+
+
+def test_normalize_order_handles_non_dict_response():
+    result = _normalize_order(None, side="خرید", symbol="TT_IRT", fallback_price=42.0, fallback_quantity=7.0)
+    assert result == {"price": 42.0, "quantity": 7.0}
+
+
+def _make_live_client():
+    with patch("src.exchange_client.Spot"):
+        return ExchangeClient(api_key="key", api_secret="secret", dry_run=False)
+
+
+def test_buy_market_normalizes_binance_style_live_response():
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client.client.new_order = MagicMock(
+        return_value={"executedQty": "1.0", "cummulativeQuoteQty": "100.0", "price": "0"}
+    )
+
+    order = client.buy_market("BTC_IRT", quote_amount=100.0, quantity_precision=4)
+
+    assert order == {"price": 100.0, "quantity": 1.0}
+
+
+def test_buy_market_never_loses_position_data_on_unknown_response_shape():
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client.client.new_order = MagicMock(return_value={"orderId": 1, "status": "FILLED"})
+
+    order = client.buy_market("BTC_IRT", quote_amount=100.0, quantity_precision=4)
+
+    assert order is not None
+    assert order["quantity"] == round(100.0 / 100.0, 4)
+    assert order["price"] == 100.0
+
+
+def test_sell_market_normalizes_binance_style_live_response():
+    client = _make_live_client()
+    client.client.depth = MagicMock(return_value={"bids": [["99", "1"]], "asks": [["101", "1"]]})
+    client.client.new_order = MagicMock(
+        return_value={"executedQty": "2.0", "cummulativeQuoteQty": "200.0", "price": "0"}
+    )
+
+    order = client.sell_market("BTC_IRT", quantity=2.0)
+
+    assert order == {"price": 100.0, "quantity": 2.0}

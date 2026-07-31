@@ -1,6 +1,6 @@
 import logging
 import time
-from typing import Optional
+from typing import Optional, Tuple
 
 from tabdeal.enums import OrderSides, OrderTypes, RequestTypes, SecurityTypes
 from tabdeal.spot import Spot
@@ -10,6 +10,112 @@ logger = logging.getLogger("tabdeal_bot")
 
 class ExchangeError(Exception):
     pass
+
+
+def _extract_quantity(order: dict) -> Optional[float]:
+    for key in ("quantity", "executedQty", "executed_qty", "origQty", "orig_qty", "filledQty", "filled_qty"):
+        if key in order and order[key] not in (None, ""):
+            try:
+                value = float(order[key])
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+    return None
+
+
+def _extract_price_from_fills(order: dict) -> Optional[Tuple[float, float]]:
+    """
+    اگر پاسخ سفارش شامل ریز معاملات اجراشده (fills) باشد، دقیق‌ترین قیمت
+    واقعی میانگین وزنی اجرا را از همان‌جا محاسبه می‌کند. خروجی:
+    (میانگین قیمت, مجموع مقدار) یا None.
+    """
+    fills = order.get("fills")
+    if not isinstance(fills, list) or not fills:
+        return None
+
+    try:
+        total_qty = sum(float(f["qty"]) for f in fills)
+        total_quote = sum(float(f["qty"]) * float(f["price"]) for f in fills)
+    except (TypeError, ValueError, KeyError):
+        return None
+
+    if total_qty <= 0:
+        return None
+
+    return total_quote / total_qty, total_qty
+
+
+def _extract_price(order: dict, quantity: Optional[float]) -> Optional[float]:
+    from_fills = _extract_price_from_fills(order)
+    if from_fills is not None:
+        return from_fills[0]
+
+    if quantity:
+        for key in ("cummulativeQuoteQty", "cumulativeQuoteQty", "cummulative_quote_qty"):
+            if key in order and order[key] not in (None, ""):
+                try:
+                    cumulative_quote = float(order[key])
+                except (TypeError, ValueError):
+                    continue
+                if cumulative_quote > 0:
+                    return cumulative_quote / quantity
+
+    for key in ("price", "avgPrice", "avg_price"):
+        if key in order and order[key] not in (None, ""):
+            try:
+                value = float(order[key])
+            except (TypeError, ValueError):
+                continue
+            if value > 0:
+                return value
+
+    return None
+
+
+def _normalize_order(order: dict, side: str, symbol: str, fallback_price: float, fallback_quantity: float) -> dict:
+    """
+    پاسخ خام new_order() ممکن است کلیدهای متفاوتی از قرارداد داخلی
+    {"price", "quantity"} (که فقط در حالت DRY-RUN خودمان می‌سازیم) داشته
+    باشد — چون ساختار دقیق پاسخ تبدیل مستند نیست (docs.tabdeal.org پشت
+    لاگین است)، این تابع چند نام رایج سبک باینانس (executedQty/origQty/
+    fills/cummulativeQuoteQty) را امتحان می‌کند.
+
+    نکته‌ی حیاتی: چون این تابع همیشه *بعد از* ثبت واقعی سفارش فراخوانی
+    می‌شود، اگر هیچ‌کدام از فیلدهای شناخته‌شده پیدا نشوند، به‌جای بالا
+    بردن خطا (که باعث می‌شد پوزیشن اصلا ثبت نشود و پوزیشن واقعی روی
+    صرافی کاملا بدون حد ضرر/سود و ردیابی بماند) از مقادیر تخمینی محلی
+    (قیمت لحظه‌ای و مقداری که قبل از ثبت سفارش محاسبه شده) استفاده
+    می‌کند و با لاگ هشدار بلند این را اعلام می‌کند تا کاربر دستی با
+    موجودی واقعی صرافی مقایسه کند.
+    """
+    if not isinstance(order, dict):
+        order = {}
+
+    quantity = _extract_quantity(order)
+    price = _extract_price(order, quantity)
+
+    used_fallback = quantity is None or price is None
+
+    if quantity is None:
+        quantity = fallback_quantity
+    if price is None:
+        price = fallback_price
+
+    if used_fallback:
+        logger.warning(
+            "ساختار پاسخ سفارش %s برای %s با فیلدهای شناخته‌شده مطابقت نداشت؛ "
+            "به‌جای مقدار/قیمت واقعی از تخمین محلی (قیمت=%.6f، مقدار=%.6f) استفاده شد. "
+            "پاسخ خام صرافی: %s — حتما موجودی واقعی %s را در اپ تبدیل با پوزیشن ثبت‌شده مقایسه کنید.",
+            side,
+            symbol,
+            price,
+            quantity,
+            order,
+            symbol,
+        )
+
+    return {"price": price, "quantity": quantity}
 
 
 def _describe_exception(exc: Exception) -> str:
@@ -173,14 +279,15 @@ class ExchangeClient:
             quantity=str(quantity),
         )
         logger.info("سفارش خرید ثبت شد (%s): %s", symbol, order)
-        return order
+        return _normalize_order(order, side="خرید", symbol=symbol, fallback_price=price, fallback_quantity=quantity)
 
     def sell_market(self, symbol: str, quantity: float) -> Optional[dict]:
         if quantity <= 0:
             raise ExchangeError(f"مقدار برای فروش {symbol} نامعتبر است.")
 
+        price = self.get_current_price(symbol)
+
         if self.dry_run:
-            price = self.get_current_price(symbol)
             logger.info("[DRY-RUN] SELL %s %s با قیمت تقریبی %s", quantity, symbol, price)
             return {"dry_run": True, "side": "SELL", "quantity": quantity, "price": price}
 
@@ -191,4 +298,4 @@ class ExchangeClient:
             quantity=str(quantity),
         )
         logger.info("سفارش فروش ثبت شد (%s): %s", symbol, order)
-        return order
+        return _normalize_order(order, side="فروش", symbol=symbol, fallback_price=price, fallback_quantity=quantity)
