@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>داشبورد ربات تبدیل</title>
+<style>
+  body { font-family: Tahoma, sans-serif; background: #10131a; color: #e8e8e8; margin: 0; padding: 20px; }
+  h1 { font-size: 20px; }
+  .banner { background: #4a1d1d; border: 1px solid #a33; padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 13px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: #1b202b; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 8px; }
+  label { display: block; font-size: 12px; color: #aaa; margin-top: 10px; margin-bottom: 3px; }
+  input[type=text], input[type=password], input[type=number] {
+    width: 100%; box-sizing: border-box; padding: 7px; border-radius: 6px; border: 1px solid #333;
+    background: #10131a; color: #eee;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 9px 16px; font-size: 13px; margin-top: 14px; margin-left: 6px; }
+  .btn-save { background: #2b5; color: #fff; }
+  .btn-start { background: #2a7; color: #fff; }
+  .btn-stop { background: #c33; color: #fff; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+  .status-grid div span { color: #888; }
+  .pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; }
+  .pill-on { background: #163; }
+  .pill-off { background: #444; }
+  .pill-dry { background: #a70; }
+  .pill-live { background: #a11; }
+  .pill-buy { background: #1a7a3a; color: #eafff0; font-weight: bold; }
+  .pill-sell { background: #a4222a; color: #fff0ef; font-weight: bold; }
+  .pill-hold { background: #3a3f4a; color: #ccc; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 10px; }
+  th, td { text-align: right; padding: 6px 4px; border-bottom: 1px solid #2a2f3a; }
+  tr.row-buy { background: rgba(26, 122, 58, 0.14); }
+  tr.row-sell { background: rgba(164, 34, 42, 0.14); }
+  th { color: #888; font-weight: normal; }
+  #logs { background: #05070a; border-radius: 8px; padding: 10px; height: 260px; overflow-y: auto;
+    font-family: monospace; font-size: 11px; white-space: pre-wrap; }
+  .msg { font-size: 12px; margin-top: 8px; color: #f88; }
+  .hint { font-size: 11px; color: #777; margin-top: 3px; }
+</style>
+</head>
+<body>
+
+<h1>داشبورد ربات معامله‌گر صرافی تبدیل</h1>
+<div class="banner">
+  ⚠️ این صفحه فقط روی سیستم خودتان (127.0.0.1) در دسترس است و نباید روی شبکه/اینترنت باز شود.
+  کلید API فقط سمت سرور محلی ذخیره می‌شود. این ابزار توصیه مالی نیست؛ همیشه اول با DRY_RUN تست کنید.
+</div>
+
+<div class="grid">
+  <div>
+    <div class="card">
+      <h2>تنظیمات</h2>
+      <label>API Key <span id="api_key_status" class="hint"></span></label>
+      <input type="password" id="api_key" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+      <label>API Secret <span id="api_secret_status" class="hint"></span></label>
+      <input type="password" id="api_secret" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+
+      <label>دارایی مبنا (Quote Asset)</label>
+      <input type="text" id="QUOTE_ASSET">
+      <div class="hint">ربات خودش پرفعالیت‌ترین نمادهای بازار با این دارایی مبنا را پیدا و دنبال می‌کند (بدون سقف دستی تعداد) و هر ساعت این لیست را خودش دوباره محاسبه می‌کند.</div>
+
+      <label>دقت اعشار مقدار (پیش‌فرض، وقتی برای نمادی پیدا نشود)</label>
+      <input type="number" id="QUANTITY_PRECISION">
+
+      <label>کارمزد هر پای معامله (%)</label>
+      <input type="number" step="0.01" id="TRADING_FEE_PERCENT">
+      <div class="hint">نرخ واقعی کارمزد حساب خودتان را از تبدیل بگیرید؛ در محاسبه سود/زیان دو برابر این عدد (خرید+فروش) کم می‌شود.</div>
+
+      <div class="row2">
+        <div>
+          <label>حد ضرر (%)</label>
+          <input type="number" step="0.1" id="STOP_LOSS_PERCENT">
+        </div>
+        <div>
+          <label>عرض حد ضرر متحرک (%)</label>
+          <input type="number" step="0.1" id="TAKE_PROFIT_PERCENT">
+        </div>
+      </div>
+      <div class="hint">دیگر «حد سود ثابت» نیست: ربات با رسیدن به این درصد سود بلافاصله نمی‌فروشد، بلکه بالاترین قیمت هر پوزیشن را دنبال می‌کند و فقط وقتی قیمت از آن قله به همین اندازه برگردد می‌فروشد — یعنی در یک پامپ قوی تا جایی که روند ادامه دارد سود را دنبال می‌کند.</div>
+
+      <label>سقف ضرر روزانه (%) — مدار قطع خودکار</label>
+      <input type="number" step="0.1" id="MAX_DAILY_LOSS_PERCENT">
+      <div class="hint">
+        مبلغ هر معامله، تعداد پوزیشن هم‌زمان و تعداد معامله در روز دیگر سقف دستی ندارند: ربات با اختیار
+        کامل، موجودی آزاد را متناسب با قدرت سیگنال بین نمادهایی که هم‌زمان سیگنال خرید می‌دهند تقسیم
+        می‌کند و ممکن است در شرایط قوی کل موجودی را روی یک کوین بگذارد. تنها مرزهای ایمنی باقی‌مانده
+        حد ضرر/سود روی هر پوزیشن و همین مدار قطع ضرر روزانه هستند.
+      </div>
+
+      <div class="hint" style="margin-top:14px">استراتژی پیش‌فرض ترکیبی (RSI+MACD+باند بولینگر+Stochastic+روند) است. دو فیلد زیر فقط برای استراتژی ساده‌ی جایگزین (SMA) کاربرد دارند.</div>
+      <div class="row2">
+        <div>
+          <label>SMA سریع</label>
+          <input type="number" id="SMA_FAST_PERIOD">
+        </div>
+        <div>
+          <label>SMA کند</label>
+          <input type="number" id="SMA_SLOW_PERIOD">
+        </div>
+      </div>
+
+      <label>فاصله هر چرخه (ثانیه)</label>
+      <input type="number" id="POLL_INTERVAL_SECONDS">
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="DRY_RUN">
+        <label style="margin:0">حالت شبیه‌سازی (DRY RUN) — پیشنهاد می‌شود روشن بماند</label>
+      </div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="AUTO_START">
+        <label style="margin:0">شروع کاملا خودکار (بدون کلیک دستی روی «شروع»)</label>
+      </div>
+      <div class="hint">هر بار که خود سرور بالا بیاید (مثلا با run.sh یا موقع بوت گوشی) ربات را خودش شروع می‌کند؛ فقط وقتی فعال کنید که مطمئنید تنظیمات ریسک/DRY_RUN درست‌اند. راهنمای شروع خودکار موقع روشن شدن گوشی در README (بخش «شروع کاملا خودکار»).</div>
+
+      <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
+      <div class="msg" id="config_msg"></div>
+    </div>
+
+    <div class="card">
+      <h2>فیلتر خبر (اختیاری)</h2>
+      <div class="hint">با سرویس رایگان و بدون ثبت‌نام CryptoCompare، ربات قبل از خرید عنوان اخبار اخیر هر کوین را چک می‌کند و روی خبر بد قوی از خرید صرف‌نظر می‌کند. کلید زیر کاملا اختیاریه (فقط برای محدودیت نرخ بالاتر).</div>
+
+      <div class="checkbox-row">
+        <input type="checkbox" id="NEWS_ENABLED">
+        <label style="margin:0">فعال‌سازی فیلتر خبر</label>
+      </div>
+
+      <label>News API Key (اختیاری)</label>
+      <input type="password" id="news_api_key" placeholder="خالی بگذارید اگر نمی‌خواهید تغییر دهید">
+
+      <label>مدت کش خبر هر کوین (دقیقه)</label>
+      <input type="number" id="NEWS_CACHE_MINUTES">
+
+      <button class="btn-save" onclick="saveConfig()">ذخیره تنظیمات</button>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>موجودی حساب</h2>
+      <div class="hint">هر ۲۰ ثانیه خودکار به‌روزرسانی می‌شود؛ برای دریافت فوری هم می‌توانید دکمه را بزنید.</div>
+      <button class="btn-start" onclick="refreshBalances()">بروزرسانی موجودی</button>
+      <div class="msg" id="balances_msg"></div>
+      <table id="balances_table">
+        <thead><tr><th>دارایی</th><th>موجودی آزاد</th><th>در سفارش</th><th>ارزش (تومان)</th></tr></thead>
+        <tbody id="balances_body"></tbody>
+        <tfoot><tr><td colspan="3"><b>جمع کل</b></td><td id="balances_total"><b>-</b></td></tr></tfoot>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>عملکرد معاملات (پس از کارمزد)</h2>
+      <div class="hint">درصد هر دوره، مجموع درصد سود/زیان معاملات بسته‌شده‌ی همان دوره است، نه بازده مرکب پرتفوی.</div>
+      <table>
+        <thead><tr><th>دوره</th><th>تعداد معامله</th><th>درصد</th><th>مبلغ</th></tr></thead>
+        <tbody>
+          <tr><td>امروز</td><td id="perf_day_trades">-</td><td id="perf_day_pct">-</td><td id="perf_day_amount">-</td></tr>
+          <tr><td>این ماه</td><td id="perf_month_trades">-</td><td id="perf_month_pct">-</td><td id="perf_month_amount">-</td></tr>
+          <tr><td>امسال</td><td id="perf_year_trades">-</td><td id="perf_year_pct">-</td><td id="perf_year_amount">-</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>وضعیت ربات</h2>
+      <button class="btn-start" onclick="startBot()">شروع</button>
+      <button class="btn-stop" onclick="stopBot()">توقف</button>
+      <div class="msg" id="control_msg"></div>
+
+      <div class="status-grid" style="margin-top:14px">
+        <div><span>وضعیت: </span><span id="s_running" class="pill pill-off">متوقف</span></div>
+        <div><span>حالت: </span><span id="s_mode" class="pill pill-dry">DRY-RUN</span></div>
+        <div><span>پوزیشن‌های باز: </span><span id="s_open_count">-</span></div>
+        <div><span>معاملات امروز: </span><span id="s_trades">-</span></div>
+        <div><span>سود/زیان روزانه: </span><span id="s_daily_pnl">-</span></div>
+        <div><span>مدار قطع ضرر: </span><span id="s_halted">-</span></div>
+      </div>
+
+      <table id="watchlist_table">
+        <thead>
+          <tr><th>نماد</th><th>قیمت (تومان)</th><th>سیگنال</th><th>پوزیشن</th><th>بالاترین دیده‌شده / حد ضرر متحرک / حد ضرر ثابت</th><th>سود/زیان</th></tr>
+        </thead>
+        <tbody id="watchlist_body"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h2>لاگ‌ها</h2>
+      <div id="logs"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const CONFIG_FIELDS = ["QUOTE_ASSET",
+  "QUANTITY_PRECISION","TRADING_FEE_PERCENT","STOP_LOSS_PERCENT","TAKE_PROFIT_PERCENT",
+  "MAX_DAILY_LOSS_PERCENT","SMA_FAST_PERIOD","SMA_SLOW_PERIOD",
+  "NEWS_CACHE_MINUTES","POLL_INTERVAL_SECONDS"];
+
+async function loadConfig() {
+  const res = await fetch('/api/config');
+  const data = await res.json();
+  for (const key of CONFIG_FIELDS) {
+    document.getElementById(key).value = data[key] ?? "";
+  }
+  document.getElementById("DRY_RUN").checked = (data.DRY_RUN !== "false");
+  document.getElementById("NEWS_ENABLED").checked = (data.NEWS_ENABLED === "true");
+  document.getElementById("AUTO_START").checked = (data.AUTO_START === "true");
+
+  document.getElementById("api_key_status").innerText = data.has_api_key ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
+  document.getElementById("api_secret_status").innerText = data.has_api_secret ? "(✓ ذخیره شده)" : "(ذخیره نشده)";
+}
+
+async function saveConfig() {
+  const payload = {};
+  for (const key of CONFIG_FIELDS) {
+    payload[key] = document.getElementById(key).value;
+  }
+  payload.DRY_RUN = document.getElementById("DRY_RUN").checked;
+  payload.NEWS_ENABLED = document.getElementById("NEWS_ENABLED").checked;
+  payload.AUTO_START = document.getElementById("AUTO_START").checked;
+  payload.TABDEAL_API_KEY = document.getElementById("api_key").value;
+  payload.TABDEAL_API_SECRET = document.getElementById("api_secret").value;
+  payload.NEWS_API_KEY = document.getElementById("news_api_key").value;
+
+  const res = await fetch('/api/config', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+  document.getElementById("config_msg").innerText = data.ok ? "ذخیره شد." : (data.error || "خطا");
+  document.getElementById("api_key").value = "";
+  document.getElementById("api_secret").value = "";
+  document.getElementById("news_api_key").value = "";
+  if (data.ok) await loadConfig();
+}
+
+async function refreshBalances() {
+  const msgEl = document.getElementById("balances_msg");
+  msgEl.innerText = "در حال دریافت...";
+  const res = await fetch('/api/balances');
+  const data = await res.json();
+  const body = document.getElementById("balances_body");
+  body.innerHTML = "";
+
+  if (data.error) {
+    msgEl.innerText = data.error;
+    return;
+  }
+  msgEl.innerText = "";
+
+  for (const b of (data.balances || [])) {
+    const tr = document.createElement("tr");
+    const isQuote = b.asset === data.quote_asset;
+    const freeText = isQuote ? fmtToman(b.free) : Number(b.free).toLocaleString('en-US', {maximumFractionDigits: 8});
+    const lockedText = isQuote ? fmtToman(b.locked) : Number(b.locked).toLocaleString('en-US', {maximumFractionDigits: 8});
+    const valueText = fmtToman(b.value);
+    tr.innerHTML = `<td>${b.asset}</td><td>${freeText}</td><td>${lockedText}</td><td>${valueText}</td>`;
+    body.appendChild(tr);
+  }
+
+  document.getElementById("balances_total").innerHTML = `<b>${fmtToman(data.total_value)}</b>`;
+
+  if (!data.balances || data.balances.length === 0) {
+    msgEl.innerText = "موجودی غیرصفری یافت نشد.";
+  }
+}
+
+function fmtPct(v) {
+  return (v === null || v === undefined) ? "-" : v.toFixed(2) + "%";
+}
+
+async function refreshPerformance() {
+  const res = await fetch('/api/performance');
+  const data = await res.json();
+
+  for (const [key, period] of [["day", "day"], ["month", "month"], ["year", "year"]]) {
+    const p = data[period];
+    if (!p) continue;
+    document.getElementById(`perf_${key}_trades`).innerText = p.trades;
+    document.getElementById(`perf_${key}_pct`).innerText = fmtPct(p.net_pnl_percent);
+    document.getElementById(`perf_${key}_amount`).innerText = fmtToman(p.net_pnl_amount);
+  }
+}
+
+async function startBot() {
+  const res = await fetch('/api/start', {method: 'POST'});
+  const data = await res.json();
+  document.getElementById("control_msg").innerText = data.ok ? "" : (data.error || "خطا");
+}
+
+async function stopBot() {
+  await fetch('/api/stop', {method: 'POST'});
+}
+
+function fmt(v, suffix) {
+  return (v === null || v === undefined) ? "-" : v + (suffix || "");
+}
+
+function fmtToman(v) {
+  if (v === null || v === undefined) return "-";
+  return Number(v).toLocaleString('en-US', {maximumFractionDigits: 2}) + " تومان";
+}
+
+function signalClass(sig) {
+  if (sig === "BUY") return "pill pill-buy";
+  if (sig === "SELL") return "pill pill-sell";
+  return "pill pill-hold";
+}
+
+async function refreshStatus() {
+  const res = await fetch('/api/status');
+  const s = await res.json();
+
+  const runEl = document.getElementById("s_running");
+  runEl.innerText = s.running ? "در حال اجرا" : "متوقف";
+  runEl.className = "pill " + (s.running ? "pill-on" : "pill-off");
+
+  const modeEl = document.getElementById("s_mode");
+  modeEl.innerText = s.dry_run ? "DRY-RUN" : "LIVE";
+  modeEl.className = "pill " + (s.dry_run ? "pill-dry" : "pill-live");
+
+  const positions = s.positions || {};
+  document.getElementById("s_open_count").innerText = Object.keys(positions).length;
+  document.getElementById("s_trades").innerText = fmt(s.trades_today);
+  document.getElementById("s_daily_pnl").innerText = fmt(s.daily_pnl_percent, "%");
+  document.getElementById("s_halted").innerText = s.halted ? "فعال (متوقف)" : "غیرفعال";
+
+  // پوزیشن بازی که از لیست خودکار خارج شده (یا اصلا هیچ‌وقت توش نبوده،
+  // مثل پوزیشنی که دستی به ربات شناسانده شده) باید همیشه تو جدول دیده
+  // شود، حتی وقتی watchlist خالی نیست — چون ربات همچنان آن را مدیریت
+  // می‌کند (حد ضرر/سود فعال است)، فقط چون تو watchlist نیست نباید از
+  // دید کاربر هم پنهان بماند.
+  const watchlist = Array.from(new Set([...(s.watchlist || []), ...Object.keys(positions)]));
+  const body = document.getElementById("watchlist_body");
+  body.innerHTML = "";
+
+  for (const symbol of watchlist) {
+    const price = (s.prices || {})[symbol];
+    const signal = (s.signals || {})[symbol];
+    const position = positions[symbol];
+
+    const tr = document.createElement("tr");
+    if (signal === "BUY") tr.className = "row-buy";
+    if (signal === "SELL") tr.className = "row-sell";
+    const targetStop = position
+      ? `قله: ${fmtToman(position.highest_price)}<br>متحرک: ${fmtToman(position.trailing_stop_price)}<br>ثابت: ${fmtToman(position.stop_price)}`
+      : "-";
+    const pnlCell = position && position.pnl_percent !== null && position.pnl_percent !== undefined
+      ? `${position.pnl_percent.toFixed(2)}%<br>${fmtToman(position.pnl_amount)}`
+      : "-";
+
+    tr.innerHTML = `
+      <td>${symbol}</td>
+      <td>${fmtToman(price)}</td>
+      <td><span class="${signalClass(signal)}">${signal || "-"}</span></td>
+      <td>${position ? (position.quantity + " @ " + fmtToman(position.entry_price)) : "-"}</td>
+      <td>${targetStop}</td>
+      <td>${pnlCell}</td>
+    `;
+    body.appendChild(tr);
+  }
+
+  if (s.error) {
+    document.getElementById("control_msg").innerText = "خطا: " + s.error;
+  }
+}
+
+async function refreshLogs() {
+  const res = await fetch('/api/logs');
+  const data = await res.json();
+  const el = document.getElementById("logs");
+  const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 20;
+  el.innerText = data.lines.join("");
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+loadConfig();
+refreshStatus();
+refreshLogs();
+refreshPerformance();
+refreshBalances();
+setInterval(refreshStatus, 3000);
+setInterval(refreshLogs, 4000);
+setInterval(refreshPerformance, 15000);
+setInterval(refreshBalances, 20000);
+</script>
+</body>
+</html>
