@@ -3,63 +3,12 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>دستیار صوتی فن بیان</title>
+<title>استودیوی فن‌بیان — برنامه فشرده ۱۴ روزه</title>
+<meta name="description" content="دوره‌ی صوتی و گام‌به‌گام فن بیان: تنفس، تلفظ، سرعت کلام، ساختار سخنرانی، بلاغت و مدیریت اضطراب." />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="app">
-    <header class="app-header">
-      <h1>🎙️ دستیار صوتی فن بیان</h1>
-      <p class="subtitle">تمرین سخنرانی، رفع مکث‌های زائد و کنترل سرعت کلام — مستقیم در مرورگر</p>
-    </header>
-
-    <main class="layout">
-      <section class="lessons-panel">
-        <h2>تمرین‌ها</h2>
-        <ul id="lesson-list" class="lesson-list"></ul>
-      </section>
-
-      <section class="workspace">
-        <div id="lesson-title" class="lesson-title">یک تمرین را از فهرست انتخاب کنید</div>
-        <div id="lesson-instructions" class="lesson-instructions"></div>
-
-        <div class="controls">
-          <button id="btn-speak-instructions" class="btn secondary" disabled>🔊 شنیدن راهنما</button>
-          <button id="btn-start" class="btn primary" disabled>شروع تمرین</button>
-          <button id="btn-stop" class="btn danger" disabled>پایان و دریافت گزارش</button>
-        </div>
-
-        <div class="live-panel">
-          <div class="meter-row">
-            <span class="meter-label">میزان صدا</span>
-            <div class="meter"><div id="volume-bar" class="meter-fill"></div></div>
-          </div>
-          <div class="timer-row">
-            <span id="timer">۰۰:۰۰</span>
-            <span id="status-dot" class="status-dot"></span>
-            <span id="status-text">آماده</span>
-          </div>
-        </div>
-
-        <div class="transcript-box">
-          <h3>متن پیاده‌شده از گفتار شما</h3>
-          <div id="transcript" class="transcript"></div>
-        </div>
-
-        <div id="report" class="report hidden">
-          <h3>گزارش عملکرد</h3>
-          <div id="report-body" class="report-body"></div>
-        </div>
-      </section>
-    </main>
-
-    <footer class="app-footer">
-      <p id="browser-warning" class="warning hidden">
-        مرورگر شما از تشخیص گفتار پشتیبانی نمی‌کند. لطفاً از آخرین نسخه Chrome یا Edge استفاده کنید.
-      </p>
-    </footer>
-  </div>
-
+  <div id="app" class="shell" dir="rtl"></div>
   <script src="app.js"></script>
 </body>
 </html>
