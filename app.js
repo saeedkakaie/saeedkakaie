@@ -295,6 +295,20 @@ function speak(text) {
 const SpeechRecognitionImpl = window.SpeechRecognition || window.webkitSpeechRecognition;
 const speechSupported = !!SpeechRecognitionImpl;
 
+function describeMicError(err) {
+  const name = err && err.name;
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "دسترسی به میکروفون رد شد. روی نماد قفل یا دوربین کنار آدرس صفحه کلیک کنید، دسترسی میکروفون را برای این صفحه فعال کنید و دوباره تلاش کنید.";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "میکروفونی روی این دستگاه پیدا نشد.";
+  }
+  if (name === "NotReadableError") {
+    return "میکروفون در حال حاضر در اختیار برنامه‌ی دیگری است.";
+  }
+  return "دسترسی به میکروفون ممکن نشد. اگر این صفحه داخل یک پیش‌نمایش یا iframe باز شده (مثلاً پیش‌نمایش کلود)، فایل را دانلود کرده و مستقیماً در یک تب Chrome باز کنید، یا آن را روی GitHub Pages میزبانی کنید.";
+}
+
 /* ---------------------------- موتور ضبط صدا ---------------------------- */
 
 const Capture = {
@@ -357,29 +371,45 @@ const Capture = {
     this.ui.transcriptEl.innerHTML = "";
     this.active = true;
     this.ui.dotEl.classList.add("on");
-    this.ui.statusEl.textContent = "در حال ضبط…";
+    this.ui.statusEl.textContent = "در حال درخواست دسترسی به میکروفون…";
 
-    if (speechSupported) {
-      this.recognition = new SpeechRecognitionImpl();
-      this.recognition.lang = "fa-IR";
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      this.recognition.onresult = (event) => {
-        this.interimTranscript = "";
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const part = event.results[i][0].transcript;
-          if (event.results[i].isFinal) this.finalTranscript += part + " ";
-          else this.interimTranscript += part;
-        }
-        this.resultTimestamps.push(Date.now());
-        this.renderTranscript();
-      };
-      this.recognition.onerror = () => {};
-      this.recognition.onend = () => { if (this.active) { try { this.recognition.start(); } catch {} } };
-      this.recognition.start();
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new DOMException("این مرورگر به میکروفون دسترسی نمی‌دهد (شاید در یک iframe محدودشده باز شده).", "NotSupportedError");
+      }
+      this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      this.active = false;
+      this.ui.dotEl.classList.remove("on");
+      this.ui.statusEl.textContent = "خطا در دسترسی به میکروفون";
+      throw err;
     }
 
-    this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (speechSupported) {
+      try {
+        this.recognition = new SpeechRecognitionImpl();
+        this.recognition.lang = "fa-IR";
+        this.recognition.continuous = true;
+        this.recognition.interimResults = true;
+        this.recognition.onresult = (event) => {
+          this.interimTranscript = "";
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            const part = event.results[i][0].transcript;
+            if (event.results[i].isFinal) this.finalTranscript += part + " ";
+            else this.interimTranscript += part;
+          }
+          this.resultTimestamps.push(Date.now());
+          this.renderTranscript();
+        };
+        this.recognition.onerror = () => {};
+        this.recognition.onend = () => { if (this.active) { try { this.recognition.start(); } catch {} } };
+        this.recognition.start();
+      } catch {
+        this.recognition = null;
+      }
+    }
+
+    this.ui.statusEl.textContent = "در حال ضبط…";
     this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = this.audioCtx.createMediaStreamSource(this.micStream);
     this.analyser = this.audioCtx.createAnalyser();
@@ -772,10 +802,20 @@ function transportHtml() {
       </div>
     </div>
     <div class="transcript-box"><h4>متن پیاده‌شده</h4><div class="transcript" id="transcript"></div></div>
+    <div class="warning hidden" id="capture-error"></div>
     <div class="report hidden" id="report"><h3>گزارش عملکرد</h3><div id="report-body"></div>
       <div class="transport" style="margin-top:14px;"><button class="btn ghost" id="btn-again">تمرین دوباره</button><button class="btn" id="btn-return">بازگشت به داشبورد</button></div>
     </div>
   `;
+}
+
+function showCaptureError(area, err) {
+  const box = area.querySelector("#capture-error");
+  if (box) { box.textContent = describeMicError(err); box.classList.remove("hidden"); }
+  const startBtn = area.querySelector("#btn-start");
+  const stopBtn = area.querySelector("#btn-stop");
+  if (startBtn) startBtn.disabled = false;
+  if (stopBtn) stopBtn.disabled = true;
 }
 
 function readableInstructions(lesson) {
@@ -826,8 +866,16 @@ function renderSingleExercise(area, lesson) {
       if (myToken !== sessionToken) return;
     }
 
+    document.getElementById("capture-error").classList.add("hidden");
     document.getElementById("btn-stop").disabled = false;
-    const metrics = await Capture.start({});
+    let metrics;
+    try {
+      metrics = await Capture.start({});
+    } catch (err) {
+      if (myToken !== sessionToken) return;
+      showCaptureError(area, err);
+      return;
+    }
     if (myToken !== sessionToken) return;
     const result = evaluateSingle(lesson, metrics);
     document.getElementById("report-body").innerHTML = reportHtml(result);
@@ -855,6 +903,7 @@ async function renderMultiExercise(area, lesson) {
       <div class="timer-row"><span class="rec-dot" id="rec-dot"></span><span id="timer" class="tabular">00:00</span><span id="status-text">آماده</span></div>
     </div>
     <div class="transcript-box"><h4>متن پیاده‌شده</h4><div class="transcript" id="transcript"></div></div>
+    <div class="warning hidden" id="capture-error"></div>
     <div class="report hidden" id="report"><h3>گزارش عملکرد</h3><div id="report-body"></div>
       <div class="transport" style="margin-top:14px;"><button class="btn ghost" id="btn-again">تمرین دوباره</button><button class="btn" id="btn-return">بازگشت به داشبورد</button></div>
     </div>
@@ -870,13 +919,21 @@ async function renderMultiExercise(area, lesson) {
   document.getElementById("btn-start").addEventListener("click", async () => {
     const myToken = sessionToken;
     document.getElementById("btn-start").disabled = true;
+    document.getElementById("capture-error").classList.add("hidden");
     const segments = [];
     for (const prompt of lesson.multiPrompts) {
       document.getElementById("status-text").textContent = prompt.label;
       speak(prompt.instruction);
       await new Promise((r) => setTimeout(r, 1800));
       if (myToken !== sessionToken) return;
-      const metrics = await Capture.start({ autoMs: prompt.ms });
+      let metrics;
+      try {
+        metrics = await Capture.start({ autoMs: prompt.ms });
+      } catch (err) {
+        if (myToken !== sessionToken) return;
+        showCaptureError(area, err);
+        return;
+      }
       if (myToken !== sessionToken) return;
       segments.push(metrics);
     }
