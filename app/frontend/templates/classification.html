@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}مدیریت طبقه‌بندی — حاکمیت داده{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>مدیریت طبقه‌بندی (ویژه‌ی حاکمیت داده)</h1>
+    <div class="subtitle">۱۸ گروه اصلی قفل هستند و توسط کاربر عادی قابل افزودن نیستند. نوع کالا / ویژگی / مقدار از همین‌جا توسعه می‌یابند.</div>
+  </div>
+</div>
+
+{% if open_requests %}
+<div class="card">
+  <h3>🔔 درخواست‌های باز افزودن مقدار جدید ({{ open_requests|length }})</h3>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>نوع کالا</th><th>ویژگی</th><th>درخواست‌دهنده</th><th>یادداشت</th><th>تاریخ</th><th></th></tr></thead>
+      <tbody>
+        {% for req in open_requests %}
+        <tr id="req-row-{{ req.id }}">
+          <td>{{ req.item_type.name }}</td>
+          <td>{{ req.attribute.name }}</td>
+          <td>{{ req.requested_by }}</td>
+          <td>{{ req.note }}</td>
+          <td>{{ req.created_at.strftime('%Y-%m-%d') }}</td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <input type="text" class="new-value-inp" data-attr-id="{{ req.attribute.id }}" placeholder="مقدار جدید" style="width:140px;">
+              <button class="btn sm primary add-value-btn" data-attr-id="{{ req.attribute.id }}" data-req-id="{{ req.id }}">افزودن و رفع</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3>➕ افزودن نوع کالای جدید به یک گروه</h3>
+  <form id="add-itemtype-form" class="grid cols-3">
+    <div class="field">
+      <label>گروه</label>
+      <select name="group_id" required>{% for g in groups_full %}<option value="{{ g.id }}">{{ g.name }}</option>{% endfor %}</select>
+    </div>
+    <div class="field">
+      <label>نام نوع کالا</label>
+      <input type="text" name="name" required placeholder="مثلا شیر یکطرفه">
+    </div>
+    <div class="field">
+      <label>واحد پیش‌فرض</label>
+      <select name="default_unit_id">{% for u in units %}<option value="{{ u.id }}">{{ u.name_fa }}</option>{% endfor %}</select>
+    </div>
+    <button class="btn primary" type="submit" style="grid-column:1/-1;">افزودن نوع کالا</button>
+  </form>
+</div>
+
+<div class="card">
+  <h3>📚 مرور کامل طبقه‌بندی</h3>
+  {% for g in groups_full %}
+  <details style="margin-bottom:10px; border:1px solid var(--border); border-radius:10px; padding:10px 14px;">
+    <summary style="cursor:pointer; font-weight:700;">{{ g.number_range_prefix }} — {{ g.name }} <span class="badge gray">{{ g.item_types|length }} نوع کالا</span></summary>
+    <div style="margin-top:10px;">
+      {% for it in g.item_types %}
+      <div class="card" style="background:var(--bg); box-shadow:none;">
+        <div class="flex-between">
+          <strong>{{ it.name }}</strong>
+          <span class="text-sm text-muted">{{ it.attributes|length }} ویژگی</span>
+        </div>
+        {% for a in it.attributes %}
+        <div style="margin-top:8px; padding-inline-start:12px; border-inline-start:2px solid var(--border);">
+          <div class="text-sm"><strong>{{ a.name }}</strong> {% if a.is_required %}<span class="badge amber">الزامی</span>{% endif %}</div>
+          <div class="tag-list" style="margin-top:6px;">
+            {% for v in a.values %}<span class="badge {{ 'red' if v.value.startswith('سایر') else 'gray' }}">{{ v.value }}</span>{% endfor %}
+          </div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <input type="text" class="new-value-inp2" data-attr-id="{{ a.id }}" placeholder="افزودن مقدار جدید به این ویژگی">
+            <button class="btn sm add-value-btn2" data-attr-id="{{ a.id }}">افزودن</button>
+          </div>
+        </div>
+        {% endfor %}
+        <div style="margin-top:10px;">
+          <button class="btn sm ghost add-attr-btn" data-item-type-id="{{ it.id }}">+ افزودن ویژگی جدید به این نوع کالا</button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </details>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('add-itemtype-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  await fetch('/api/classification/item-types', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({group_id: parseInt(fd.get('group_id')), name: fd.get('name'), default_unit_id: parseInt(fd.get('default_unit_id'))})
+  });
+  window.location.reload();
+});
+
+document.querySelectorAll('.add-value-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const attrId = btn.dataset.attrId, reqId = btn.dataset.reqId;
+    const val = document.querySelector(`.new-value-inp[data-attr-id="${attrId}"]`).value.trim();
+    if(!val) return alert('مقدار را وارد کنید');
+    const res = await fetch('/api/classification/attribute-values', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({attribute_id: parseInt(attrId), value: val})
+    });
+    if(res.ok){
+      await fetch(`/api/missing-value-requests/${reqId}/resolve`, {method:'POST'});
+      window.location.reload();
+    } else { const e = await res.json(); alert(e.detail || 'خطا'); }
+  });
+});
+
+document.querySelectorAll('.add-value-btn2').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const attrId = btn.dataset.attrId;
+    const val = document.querySelector(`.new-value-inp2[data-attr-id="${attrId}"]`).value.trim();
+    if(!val) return;
+    const res = await fetch('/api/classification/attribute-values', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({attribute_id: parseInt(attrId), value: val})
+    });
+    if(res.ok){ window.location.reload(); } else { const e = await res.json(); alert(e.detail || 'خطا'); }
+  });
+});
+
+document.querySelectorAll('.add-attr-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const itemTypeId = btn.dataset.itemTypeId;
+    const name = prompt('نام ویژگی جدید:');
+    if(!name) return;
+    await fetch('/api/classification/attributes', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({item_type_id: parseInt(itemTypeId), name, order_index: 99, is_required: true})
+    });
+    window.location.reload();
+  });
+});
+</script>
+{% endblock %}

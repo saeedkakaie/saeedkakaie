@@ -1,0 +1,291 @@
+{% extends "base.html" %}
+{% block title %}ثبت کالای جدید — بدون تایپ{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>ثبت درخواست کالای جدید</h1>
+    <div class="subtitle">همه‌چیز از فهرست انتخاب می‌شود — شرح کالا به‌صورت خودکار و استاندارد ساخته می‌شود؛ کد فقط بعد از تایید نهایی صادر می‌شود.</div>
+  </div>
+</div>
+
+<div class="steps">
+  <div class="step active" data-step="1"><span class="n">۱</span> طبقه‌بندی</div>
+  <div class="step" data-step="2"><span class="n">۲</span> ویژگی‌ها</div>
+  <div class="step" data-step="3"><span class="n">۳</span> واحد و پلنت‌ها</div>
+  <div class="step" data-step="4"><span class="n">۴</span> گیت تکرار و ثبت</div>
+</div>
+
+<div class="grid" style="grid-template-columns: 2fr 1fr; gap:18px;" >
+<div>
+
+  <div class="card">
+    <h3>۱) طبقه‌بندی کالا</h3>
+    <div class="grid cols-2">
+      <div class="field">
+        <label>گروه اصلی (۱۸ گروه استاندارد)</label>
+        <select id="sel-group">
+          <option value="">— انتخاب کنید —</option>
+          {% for g in groups %}
+          <option value="{{ g.id }}">{{ g.number_range_prefix }} — {{ g.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>نوع کالا</label>
+        <select id="sel-item-type" disabled><option value="">ابتدا گروه را انتخاب کنید</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="attrs-card" style="display:none;">
+    <h3>۲) ویژگی‌های استاندارد (قالب ثابت این نوع کالا)</h3>
+    <div id="attrs-container" class="grid cols-2"></div>
+    <p class="hint text-sm">اگر مقدار مناسبی در فهرست نبود، «سایر» را انتخاب و درخواست افزودن برای واحد حاکمیت داده ثبت کنید — نیازی به تایپ نیست.</p>
+  </div>
+
+  <div class="card" id="unit-plant-card" style="display:none;">
+    <h3>۳) واحد اندازه‌گیری و پلنت‌های مصرف‌کننده</h3>
+    <div class="grid cols-2">
+      <div class="field">
+        <label>واحد اندازه‌گیری</label>
+        <select id="sel-unit">
+          {% for u in units %}<option value="{{ u.id }}">{{ u.name_fa }} ({{ u.symbol }})</option>{% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>درخواست‌دهنده</label>
+        <select id="sel-requester">
+          {% for s in submitters %}<option value="{{ s.id }}">{{ s.full_name }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>پلنت‌های مصرف‌کننده (چندانتخابی)</label>
+      <div class="tag-list">
+        {% for p in plants %}
+        <label class="checkbox-row" style="background:var(--bg); padding:6px 12px; border-radius:8px; border:1px solid var(--border);">
+          <input type="checkbox" class="plant-chk" value="{{ p.code }}"> {{ p.name }}
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div>
+  <div class="card" style="position:sticky; top:80px;">
+    <h3>پیش‌نمایش شرح خودکار</h3>
+    <div id="desc-preview" class="desc-preview" style="display:none;">
+      <span id="desc-full"></span>
+      <span class="short" id="desc-short"></span>
+    </div>
+    <div id="desc-empty" class="empty-state" style="padding:24px 10px;">
+      <div class="icon">📝</div>
+      <p class="text-sm">با تکمیل ویژگی‌ها، شرح استاندارد اینجا ساخته می‌شود.</p>
+    </div>
+
+    <div id="gate-result"></div>
+
+    <div class="field checkbox-row" id="ack-row" style="display:none;">
+      <input type="checkbox" id="ack-warning">
+      <label style="margin:0;" for="ack-warning">موارد مشابه را بررسی کردم و مطمئنم کالای جدیدی است</label>
+    </div>
+
+    <button class="btn primary" id="btn-submit" style="width:100%; justify-content:center;" disabled>ثبت درخواست (ورود به گردش تایید)</button>
+    <p class="hint text-sm" id="submit-msg"></p>
+  </div>
+</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const groupSel = document.getElementById('sel-group');
+const itemTypeSel = document.getElementById('sel-item-type');
+const attrsCard = document.getElementById('attrs-card');
+const attrsContainer = document.getElementById('attrs-container');
+const unitPlantCard = document.getElementById('unit-plant-card');
+const descPreview = document.getElementById('desc-preview');
+const descEmpty = document.getElementById('desc-empty');
+const descFull = document.getElementById('desc-full');
+const descShort = document.getElementById('desc-short');
+const gateResult = document.getElementById('gate-result');
+const ackRow = document.getElementById('ack-row');
+const ackCheckbox = document.getElementById('ack-warning');
+const btnSubmit = document.getElementById('btn-submit');
+const submitMsg = document.getElementById('submit-msg');
+
+let currentItemType = null;
+let currentAttributes = [];
+let lastGateVerdict = null;
+
+function setStep(n){
+  document.querySelectorAll('.step').forEach(s=>{
+    const sn = parseInt(s.dataset.step);
+    s.classList.toggle('active', sn===n);
+    s.classList.toggle('done', sn<n);
+  });
+}
+
+groupSel.addEventListener('change', async () => {
+  attrsCard.style.display='none'; unitPlantCard.style.display='none';
+  resetPreview();
+  if(!groupSel.value){ itemTypeSel.disabled=true; itemTypeSel.innerHTML='<option value="">ابتدا گروه را انتخاب کنید</option>'; return; }
+  const res = await fetch(`/api/groups/${groupSel.value}/item-types`);
+  const items = await res.json();
+  itemTypeSel.innerHTML = '<option value="">— انتخاب کنید —</option>' + items.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+  itemTypeSel.disabled = false;
+  setStep(1);
+});
+
+itemTypeSel.addEventListener('change', async () => {
+  resetPreview();
+  if(!itemTypeSel.value){ attrsCard.style.display='none'; unitPlantCard.style.display='none'; return; }
+  const res = await fetch(`/api/item-types/${itemTypeSel.value}/attributes`);
+  const data = await res.json();
+  currentItemType = data.item_type;
+  currentAttributes = data.attributes;
+  renderAttributes();
+  attrsCard.style.display='block';
+  unitPlantCard.style.display='block';
+  if(currentItemType.default_unit_id){
+    document.getElementById('sel-unit').value = currentItemType.default_unit_id;
+  }
+  setStep(2);
+});
+
+function renderAttributes(){
+  attrsContainer.innerHTML = currentAttributes.map(a => `
+    <div class="field">
+      <label>${a.name}${a.is_required ? ' *' : ''}</label>
+      <select class="attr-select" data-attr-id="${a.id}">
+        <option value="">— انتخاب کنید —</option>
+        ${a.values.map(v=>`<option value="${v.id}" data-other="${v.is_other}">${v.value}</option>`).join('')}
+      </select>
+      <div class="hint other-hint" data-attr-id="${a.id}" style="display:none; color:var(--amber);">
+        مقدار مناسبی نیست؟ <button type="button" class="btn sm" onclick="requestMissingValue(${a.id})">درخواست افزودن برای حاکمیت داده</button>
+      </div>
+    </div>
+  `).join('');
+  document.querySelectorAll('.attr-select').forEach(sel => {
+    sel.addEventListener('change', onSelectionChange);
+  });
+}
+
+async function requestMissingValue(attrId){
+  const requesterId = document.getElementById('sel-requester').value;
+  await fetch('/api/missing-value-request', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({item_type_id: currentItemType.id, attribute_id: attrId, requested_by_id: parseInt(requesterId), note: 'ثبت‌شده از ویزارد کالای جدید'})
+  });
+  alert('درخواست برای واحد حاکمیت داده ثبت شد. لطفاً بعد از تعریف مقدار جدید، دوباره تلاش کنید.');
+}
+
+function getSelections(){
+  const selects = document.querySelectorAll('.attr-select');
+  const selections = [];
+  let hasOther = false;
+  selects.forEach(sel => {
+    const attrId = parseInt(sel.dataset.attrId);
+    const opt = sel.selectedOptions[0];
+    document.querySelector(`.other-hint[data-attr-id="${attrId}"]`).style.display = 'none';
+    if(sel.value){
+      selections.push({attribute_id: attrId, attribute_value_id: parseInt(sel.value)});
+      if(opt.dataset.other === 'true'){
+        hasOther = true;
+        document.querySelector(`.other-hint[data-attr-id="${attrId}"]`).style.display = 'block';
+      }
+    }
+  });
+  return {selections, hasOther, complete: selections.length === currentAttributes.filter(a=>a.is_required).length};
+}
+
+function resetPreview(){
+  descPreview.style.display='none'; descEmpty.style.display='block';
+  gateResult.innerHTML=''; ackRow.style.display='none'; btnSubmit.disabled=true;
+  lastGateVerdict = null; submitMsg.textContent='';
+}
+
+async function onSelectionChange(){
+  const {selections, hasOther, complete} = getSelections();
+  if(!complete || !currentItemType){ resetPreview(); return; }
+  if(hasOther){
+    descPreview.style.display='none'; descEmpty.style.display='block';
+    descEmpty.querySelector('p').textContent = 'برای ویژگی‌های «سایر»، ابتدا درخواست افزودن مقدار را ثبت و سپس مقدار واقعی را انتخاب کنید.';
+    gateResult.innerHTML=''; btnSubmit.disabled=true;
+    return;
+  }
+  setStep(3);
+  const res = await fetch('/api/materials/preview', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({item_type_id: currentItemType.id, selections})
+  });
+  const data = await res.json();
+  if(data.blocked_reason){ return; }
+  descFull.textContent = data.description;
+  descShort.textContent = `شرح کوتاه SAP (≤۴۰ نویسه): ${data.description_short}`;
+  descPreview.style.display='block'; descEmpty.style.display='none';
+  renderGate(data.gate);
+  setStep(4);
+}
+
+function renderGate(gate){
+  lastGateVerdict = gate.verdict;
+  let cls = gate.verdict === 'block' ? 'block' : (gate.verdict === 'warn' ? 'warn' : 'pass');
+  let title = gate.verdict === 'block' ? '⛔ احتمال بسیار بالای تکرار — ثبت مسدود است'
+    : gate.verdict === 'warn' ? '⚠️ موارد مشابه یافت شد — بررسی کنید'
+    : '✅ موردی مشابه در بانک کالا یافت نشد';
+  let html = `<div class="gate-box ${cls}"><strong>${title}</strong>`;
+  if(gate.candidates.length){
+    html += '<ul>' + gate.candidates.map(c=>`<li>${c.label} <span class="badge gray">${c.code}</span> — شباهت ${c.score}٪ (${c.source})</li>`).join('') + '</ul>';
+  }
+  html += '</div>';
+  gateResult.innerHTML = html;
+  ackCheckbox.checked = false;
+  if(gate.verdict === 'block'){
+    ackRow.style.display='none'; btnSubmit.disabled=true;
+    submitMsg.textContent = 'برای ادامه، کالای موجود را در بانک کالا بررسی کنید یا ویژگی‌های متمایزکننده را دقیق‌تر انتخاب کنید.';
+  } else if(gate.verdict === 'warn'){
+    ackRow.style.display='flex'; btnSubmit.disabled=true;
+    submitMsg.textContent='';
+  } else {
+    ackRow.style.display='none'; btnSubmit.disabled=false;
+    submitMsg.textContent='';
+  }
+}
+
+ackCheckbox.addEventListener('change', () => {
+  btnSubmit.disabled = !ackCheckbox.checked;
+});
+
+btnSubmit.addEventListener('click', async () => {
+  const {selections} = getSelections();
+  const plantCodes = Array.from(document.querySelectorAll('.plant-chk:checked')).map(c=>c.value);
+  if(!plantCodes.length){ submitMsg.textContent = 'حداقل یک پلنت مصرف‌کننده را انتخاب کنید.'; submitMsg.style.color='var(--red)'; return; }
+  btnSubmit.disabled = true; btnSubmit.textContent = 'در حال ثبت...';
+  const res = await fetch('/api/materials', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({
+      item_type_id: currentItemType.id,
+      unit_id: parseInt(document.getElementById('sel-unit').value),
+      plant_codes: plantCodes,
+      selections,
+      requested_by_id: parseInt(document.getElementById('sel-requester').value),
+      acknowledge_warning: ackCheckbox.checked,
+    })
+  });
+  if(res.ok){
+    const data = await res.json();
+    window.location.href = `/materials/${data.id}`;
+  } else {
+    const err = await res.json();
+    submitMsg.style.color='var(--red)';
+    submitMsg.textContent = (err.detail && err.detail.message) ? err.detail.message : (err.detail || 'خطا در ثبت');
+    btnSubmit.disabled = false; btnSubmit.textContent = 'ثبت درخواست (ورود به گردش تایید)';
+  }
+});
+</script>
+{% endblock %}

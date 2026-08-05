@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block title %}پاکسازی بانک کالای فعلی{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>عارضه‌یابی و پاکسازی بانک کالای فعلی</h1>
+    <div class="subtitle">فایل اکسل خروجی سیستم فعلی را بارگذاری کنید تا کدهای تکراری، ناسازگار با استاندارد جدید، و ناهماهنگی‌ها شناسایی شوند.</div>
+  </div>
+</div>
+
+<div class="grid cols-2">
+  <div class="card">
+    <h3>📤 بارگذاری بانک کالا</h3>
+    {% if error %}<div class="gate-box block">{{ error }}</div>{% endif %}
+    <form action="/legacy/upload" method="post" enctype="multipart/form-data">
+      <div class="field">
+        <label>فایل اکسل (ستون‌های الزامی: پلنت، Material Group، کد کالا، شرح کالا، واحد)</label>
+        <input type="file" name="file" accept=".xlsx,.xls" required>
+      </div>
+      <button class="btn primary" type="submit">شروع تحلیل</button>
+    </form>
+    <div class="divider"></div>
+    <p class="text-sm text-muted">فایل نمونه ندارید؟ یک بانک دمو (مصنوعی، غیرواقعی) بارگذاری کنید تا عملکرد موتور تحلیل را ببینید:</p>
+    <form action="/legacy/sample-data" method="post">
+      <button class="btn" type="submit">بارگذاری داده‌ی نمونه برای دمو</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>⚙️ الگوریتم‌های اجراشده</h3>
+    <ul class="text-sm">
+      <li>نرمال‌سازی حروف عربی/فارسی و ارقام (ي/ك/ة → ی/ک/ه، ارقام فارسی → لاتین)</li>
+      <li>تشخیص خرابی نقل‌قول و کاما‌ی اعشاری اشتباه</li>
+      <li>تشخیص تکرار دقیق (شرح یکسان پس از پاکسازی) و انتخاب «کد طلایی»</li>
+      <li>تشخیص تکرار «نرم/فرمتی» با حفظ نقطه‌ی اعشاری معنادار (۱.۱kw ≠ ۱۱kw)</li>
+      <li>نگاشت ۶۸ گروه خام به ۱۸ گروه استاندارد + شناسایی ناهماهنگی گروه در خوشه‌ها</li>
+      <li>شناسایی ناهماهنگی واحد اندازه‌گیری بین پلنت‌ها برای یک کد</li>
+      <li>بررسی تطابق هر ردیف با ۱۰ قاعده‌ی نگارش استاندارد جدید</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>🗂️ سابقه‌ی بارگذاری‌ها</h3>
+  {% if batches %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>فایل</th><th>تاریخ</th><th>تعداد ردیف</th><th>خوشه تکرار</th><th>ناسازگار با استاندارد جدید</th><th></th></tr></thead>
+      <tbody>
+        {% for b in batches %}
+        <tr>
+          <td>{{ b.filename }}</td>
+          <td>{{ b.imported_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td>{{ b.row_count }}</td>
+          <td>{{ (b.kpi_json.get('خوشه تکرار دقیق', 0)) + (b.kpi_json.get('خوشه تکرار نرم (فرمتی)', 0)) }}</td>
+          <td>{{ b.kpi_json.get('ردیف ناسازگار با استاندارد نگارش جدید', 0) }}</td>
+          <td><a class="btn sm primary" href="/legacy/{{ b.id }}">مشاهده</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="icon">🗂️</div><p>هنوز فایلی بارگذاری نشده است.</p></div>
+  {% endif %}
+</div>
+
+{% endblock %}

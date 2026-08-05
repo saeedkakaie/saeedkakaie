@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}{{ mat.description }} — جزئیات کالا{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1 class="mono" style="direction:ltr; display:inline-block;">{{ mat.code or mat.draft_no }}</h1>
+    <div class="subtitle">{{ mat.description }}</div>
+  </div>
+  <span class="badge {{ 'brand' if mat.status=='active' else ('red' if mat.status=='rejected' else 'amber') }}" style="font-size:13px; padding:8px 16px;">{{ status_labels[mat.status] }}</span>
+</div>
+
+<div class="grid" style="grid-template-columns:1.3fr 1fr; gap:18px;">
+<div>
+
+  <div class="card">
+    <h3>مشخصات کالا</h3>
+    <div class="grid cols-2 text-sm">
+      <div><span class="text-muted">گروه:</span> {{ mat.item_type.group.name }}</div>
+      <div><span class="text-muted">نوع کالا:</span> {{ mat.item_type.name }}</div>
+      <div><span class="text-muted">واحد:</span> {{ mat.unit.name_fa }}</div>
+      <div><span class="text-muted">شرح کوتاه SAP:</span> {{ mat.description_short }}</div>
+      <div><span class="text-muted">درخواست‌دهنده:</span> {{ mat.requested_by }}</div>
+      <div><span class="text-muted">تاریخ ثبت:</span> {{ mat.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+      <div style="grid-column:1/-1;"><span class="text-muted">پلنت‌های مصرف‌کننده:</span>
+        {% for p in mat.plants %}<span class="badge blue">{{ p }}</span>{% endfor %}
+      </div>
+    </div>
+    <div class="divider"></div>
+    <h3 style="font-size:13px;">ویژگی‌های انتخاب‌شده (منبع تولید شرح خودکار)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ویژگی</th><th>مقدار</th></tr></thead>
+        <tbody>
+          {% for av in mat.attribute_values %}
+          <tr><td>{{ av.attribute.name }}</td><td>{{ av.attribute_value.value }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if mat.duplicate_candidates_json %}
+    <div class="divider"></div>
+    <h3 style="font-size:13px;">نتیجه‌ی گیت تکرار در لحظه‌ی ثبت</h3>
+    <ul class="text-sm">
+      {% for c in mat.duplicate_candidates_json %}
+      <li>{{ c.label }} — <span class="badge gray">{{ c.code }}</span> شباهت {{ c.score }}٪ ({{ c.source }})</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>🔄 گردش تایید</h3>
+    <div class="timeline">
+      {% for step in mat.approval_steps %}
+      <div class="tl-item">
+        <div class="tl-dot {{ step.status }}">{{ '✓' if step.status=='approved' else ('✕' if step.status=='rejected' else '…') }}</div>
+        <div class="tl-body">
+          <div class="tl-title">{{ step.step_label }}</div>
+          {% if step.status != 'pending' %}
+            <div class="tl-meta">{{ step.actor }} — {{ step.acted_at.strftime('%Y-%m-%d %H:%M') if step.acted_at else '' }}</div>
+            {% if step.comment %}<div class="tl-comment">{{ step.comment }}</div>{% endif %}
+          {% else %}
+            <div class="tl-meta">در انتظار اقدام</div>
+            {% if mat.status != 'rejected' and step.step_key == (mat.status.replace('pending_','')) %}
+            <form class="approve-form" data-step="{{ step.step_key }}" style="margin-top:8px; display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap;">
+              <div class="field" style="margin:0; min-width:160px;">
+                <label>تاییدکننده</label>
+                <select class="actor-sel">
+                  {% for u in users %}{% if u.role == step.step_key or (step.step_key=='mrp' and u.role=='mrp') %}<option value="{{ u.id }}">{{ u.full_name }}</option>{% endif %}{% endfor %}
+                </select>
+              </div>
+              <div class="field" style="margin:0; flex:1; min-width:180px;">
+                <label>توضیح (اختیاری)</label>
+                <input type="text" class="comment-inp" placeholder="یادداشت تایید/رد">
+              </div>
+              <button type="button" class="btn sm primary act-btn" data-decision="approve">تایید</button>
+              <button type="button" class="btn sm danger act-btn" data-decision="reject">رد</button>
+            </form>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<div>
+
+  <div class="card">
+    <h3>📋 دیتاشیت خرید</h3>
+    <form id="datasheet-form">
+      <div class="grid cols-2">
+        <div class="field"><label>سازنده</label><input type="text" name="manufacturer" value="{{ mat.datasheet.manufacturer if mat.datasheet else '' }}"></div>
+        <div class="field"><label>برند</label><input type="text" name="brand" value="{{ mat.datasheet.brand if mat.datasheet else '' }}"></div>
+      </div>
+      <div class="field"><label>مدل/کد کاتالوگ (عیناً طبق سازنده)</label><input type="text" name="catalog_model_no" value="{{ mat.datasheet.catalog_model_no if mat.datasheet else '' }}"></div>
+      <div class="grid cols-2">
+        <div class="field">
+          <label>مبدا تامین</label>
+          <select name="origin">{% for o in ORIGIN_OPTIONS %}<option {{ 'selected' if mat.datasheet and mat.datasheet.origin==o else '' }}>{{ o }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label>Incoterm</label>
+          <select name="incoterm"><option value="">—</option>{% for i in INCOTERMS %}<option {{ 'selected' if mat.datasheet and mat.datasheet.incoterm==i else '' }}>{{ i }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label>بازه‌ی زمان تحویل</label>
+          <select name="lead_time_band"><option value="">—</option>{% for l in LEAD_TIME_BANDS %}<option {{ 'selected' if mat.datasheet and mat.datasheet.lead_time_band==l else '' }}>{{ l }}</option>{% endfor %}</select>
+        </div>
+        <div class="field">
+          <label>بازه‌ی قیمت</label>
+          <select name="price_band"><option value="">—</option>{% for pb in PRICE_BANDS %}<option {{ 'selected' if mat.datasheet and mat.datasheet.price_band==pb else '' }}>{{ pb }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      <div class="grid cols-2">
+        <div class="field"><label>حداقل سفارش (MOQ)</label><input type="text" name="moq" value="{{ mat.datasheet.moq if mat.datasheet else '' }}"></div>
+        <div class="field"><label>کد HS</label><input type="text" name="hs_code" value="{{ mat.datasheet.hs_code if mat.datasheet else '' }}"></div>
+      </div>
+      <div class="field"><label>شرایط نگهداری</label><input type="text" name="storage_condition" value="{{ mat.datasheet.storage_condition if mat.datasheet else '' }}"></div>
+      <div class="field"><label>تامین‌کنندگان پیشنهادی</label>
+        <div class="tag-list">
+          {% for s in suppliers %}
+          <label class="checkbox-row" style="background:var(--bg); padding:5px 10px; border-radius:8px; border:1px solid var(--border); font-size:12px;">
+            <input type="checkbox" class="supplier-chk" value="{{ s.id }}" {{ 'checked' if mat.datasheet and s.id in (mat.datasheet.preferred_supplier_ids or []) else '' }}> {{ s.name }} <span class="text-muted">({{ s.origin }})</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="field"><label>یادداشت</label><textarea name="notes" rows="2">{{ mat.datasheet.notes if mat.datasheet else '' }}</textarea></div>
+      <button type="button" class="btn primary" id="save-datasheet" style="width:100%; justify-content:center;">ذخیره دیتاشیت</button>
+      <p class="text-sm hint" id="ds-msg"></p>
+    </form>
+  </div>
+
+  <div class="card">
+    <h3>🧭 ماتریس کرالجیک</h3>
+    <div class="grid cols-2">
+      <div class="field">
+        <label>ریسک تامین (۱=کم … ۵=زیاد)</label>
+        <select id="kr-supply-risk">{% for i in range(1,6) %}<option value="{{ i }}" {{ 'selected' if mat.kraljic and mat.kraljic.supply_risk_score==i else '' }}>{{ i }}</option>{% endfor %}</select>
+      </div>
+      <div class="field">
+        <label>تاثیر بر هزینه/سود (۱=کم … ۵=زیاد)</label>
+        <select id="kr-profit-impact">{% for i in range(1,6) %}<option value="{{ i }}" {{ 'selected' if mat.kraljic and mat.kraljic.profit_impact_score==i else '' }}>{{ i }}</option>{% endfor %}</select>
+      </div>
+    </div>
+    <button type="button" class="btn primary" id="save-kraljic" style="width:100%; justify-content:center;">ثبت ارزیابی</button>
+    <div id="kraljic-result" style="margin-top:12px;">
+      {% if mat.kraljic %}
+      <div class="gate-box pass"><strong>{{ mat.kraljic.quadrant }}</strong><p style="margin-top:6px;">{{ mat.kraljic.strategy_note }}</p></div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.approve-form').forEach(form => {
+  form.querySelectorAll('.act-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const decision = btn.dataset.decision;
+      const stepKey = form.dataset.step;
+      const actorId = form.querySelector('.actor-sel').value;
+      const comment = form.querySelector('.comment-inp').value;
+      btn.disabled = true;
+      const res = await fetch(`/api/materials/{{ mat.id }}/approve`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({step_key: stepKey, actor_id: parseInt(actorId), decision, comment})
+      });
+      if(res.ok){ window.location.reload(); } else { const e = await res.json(); alert(e.detail || 'خطا'); btn.disabled=false; }
+    });
+  });
+});
+
+document.getElementById('save-datasheet').addEventListener('click', async () => {
+  const form = document.getElementById('datasheet-form');
+  const fd = new FormData(form);
+  const body = Object.fromEntries(fd.entries());
+  body.preferred_supplier_ids = Array.from(document.querySelectorAll('.supplier-chk:checked')).map(c=>parseInt(c.value));
+  if(body.shelf_life_months === '') delete body.shelf_life_months; else body.shelf_life_months = parseInt(body.shelf_life_months);
+  const res = await fetch(`/api/materials/{{ mat.id }}/datasheet`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  document.getElementById('ds-msg').textContent = res.ok ? 'ذخیره شد ✔' : 'خطا در ذخیره';
+});
+
+document.getElementById('save-kraljic').addEventListener('click', async () => {
+  const supply_risk_score = parseInt(document.getElementById('kr-supply-risk').value);
+  const profit_impact_score = parseInt(document.getElementById('kr-profit-impact').value);
+  const res = await fetch(`/api/materials/{{ mat.id }}/kraljic`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({supply_risk_score, profit_impact_score})
+  });
+  if(res.ok){
+    const data = await res.json();
+    document.getElementById('kraljic-result').innerHTML = `<div class="gate-box pass"><strong>${data.quadrant}</strong><p style="margin-top:6px;">${data.strategy_note}</p></div>`;
+  }
+});
+</script>
+{% endblock %}

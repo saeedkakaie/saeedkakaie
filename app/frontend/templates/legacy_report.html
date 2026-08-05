@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}گزارش پاکسازی — {{ batch.filename }}{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>گزارش عارضه‌یابی: {{ batch.filename }}</h1>
+    <div class="subtitle">{{ batch.row_count }} ردیف — بارگذاری‌شده در {{ batch.imported_at.strftime('%Y-%m-%d %H:%M') }}</div>
+  </div>
+  <a class="btn primary" href="/legacy/{{ batch.id }}/export">⬇ دانلود گزارش کامل اکسل</a>
+</div>
+
+<div class="grid cols-4">
+  {% for k, v in batch.kpi_json.items() %}
+  <div class="kpi"><div class="kpi-label">{{ k }}</div><div class="kpi-value">{{ v }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>🧩 خوشه‌های تکراری (کدهای متفاوت برای یک کالا)</h3>
+  {% if clusters %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>نوع</th><th>شرح نرمال‌شده</th><th>کدها</th><th>کد پیشنهادی (طلایی)</th><th>ناهماهنگی گروه</th><th>ناهماهنگی واحد</th></tr></thead>
+      <tbody>
+        {% for c in clusters %}
+        <tr>
+          <td><span class="badge {{ 'brand' if c.kind=='exact' else 'blue' }}">{{ 'دقیق' if c.kind=='exact' else 'فرمتی' }}</span></td>
+          <td>{{ c.normalized_desc }}</td>
+          <td>{% for code in c.codes_json %}<span class="badge gray">{{ code }}</span>{% endfor %}</td>
+          <td class="mono">{{ c.golden_code }}</td>
+          <td>{% if c.group_conflict %}<span class="badge red">بله</span>{% else %}<span class="badge gray">خیر</span>{% endif %}</td>
+          <td>{% if c.unit_conflict %}<span class="badge red">بله</span>{% else %}<span class="badge gray">خیر</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="icon">✅</div><p>خوشه‌ی تکراری یافت نشد.</p></div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <div class="flex-between">
+    <h3 style="margin:0;">📋 ردیف‌های بانک (پس از عارضه‌یابی)</h3>
+  </div>
+  <div class="pill-filters">
+    <a href="?filter=all" class="{{ 'active' if filter=='all' else '' }}">همه</a>
+    <a href="?filter=duplicate" class="{{ 'active' if filter=='duplicate' else '' }}">تکراری</a>
+    <a href="?filter=non_compliant" class="{{ 'active' if filter=='non_compliant' else '' }}">ناسازگار با استاندارد جدید</a>
+    <a href="?filter=unit_conflict" class="{{ 'active' if filter=='unit_conflict' else '' }}">ناهماهنگی واحد</a>
+    <a href="?filter=group_missing" class="{{ 'active' if filter=='group_missing' else '' }}">گروه خالی</a>
+  </div>
+  <form method="get" style="margin-bottom:14px;">
+    <input type="hidden" name="filter" value="{{ filter }}">
+    <input type="text" name="q" value="{{ q }}" placeholder="جستجو در کد یا شرح..." style="max-width:320px; display:inline-block;">
+    <button class="btn sm" type="submit">جستجو</button>
+  </form>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>پلنت</th><th>کد</th><th>گروه استاندارد</th><th>شرح خام</th><th>شرح پیشنهادی</th><th>واحد</th><th>کد نهایی پیشنهادی</th><th>مسائل</th></tr></thead>
+      <tbody>
+        {% for r in records %}
+        <tr>
+          <td>{{ r.plant }}</td>
+          <td class="mono">{{ r.code }}</td>
+          <td>{{ r.material_group_mapped }}</td>
+          <td>{{ r.description_raw }}</td>
+          <td>{{ r.description_normalized }}</td>
+          <td>{{ r.unit }}</td>
+          <td class="mono">{{ r.suggested_final_code }}</td>
+          <td>
+            {% if r.duplicate_exact %}<span class="badge red">تکرار دقیق</span>{% endif %}
+            {% if r.duplicate_loose %}<span class="badge amber">تکرار فرمتی</span>{% endif %}
+            {% if r.quote_issue %}<span class="badge amber">نقل‌قول</span>{% endif %}
+            {% if r.unit_conflict %}<span class="badge red">واحد</span>{% endif %}
+            {% if r.group_missing %}<span class="badge red">گروه خالی</span>{% endif %}
+            {% if r.non_compliant_new_rule %}<span class="badge blue" title="{{ r.non_compliance_reasons|join(' | ') }}">ناسازگار</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="text-sm text-muted" style="margin-top:10px;">حداکثر ۵۰۰ ردیف اول نمایش داده می‌شود؛ برای فهرست کامل، اکسل را دانلود کنید.</p>
+</div>
+
+{% endblock %}

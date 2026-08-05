@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}داشبورد زنجیره تامین — سامانه کدینگ کالا{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>داشبورد حاکمیت داده کالا</h1>
+    <div class="subtitle">دید یکپارچه‌ی زنجیره تامین: وضعیت کدینگ، پاکسازی بانک فعلی، و طبقه‌بندی خرید</div>
+  </div>
+  <div class="btn-row">
+    <a class="btn primary" href="/materials/new">+ ثبت کالای جدید</a>
+    <a class="btn" href="/legacy">پاکسازی بانک فعلی</a>
+  </div>
+</div>
+
+<div class="grid cols-4">
+  <div class="kpi">
+    <div class="kpi-label">کل کالاهای ثبت‌شده در سامانه جدید</div>
+    <div class="kpi-value">{{ total_materials }}</div>
+    <div class="kpi-sub">شامل پیش‌نویس و صادرشده</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">کد فعال / صادرشده</div>
+    <div class="kpi-value">{{ active_materials }}</div>
+    <div class="kpi-sub">عبور کامل از گردش تایید ۴ مرحله‌ای</div>
+  </div>
+  <div class="kpi warn">
+    <div class="kpi-label">در جریان گردش تایید</div>
+    <div class="kpi-value">{{ in_progress }}</div>
+    <div class="kpi-sub">فنی / بازرگانی / MRP / حاکمیت داده</div>
+  </div>
+  <div class="kpi {{ 'danger' if missing_requests_open else '' }}">
+    <div class="kpi-label">درخواست مقدار جدید (باز)</div>
+    <div class="kpi-value">{{ missing_requests_open }}</div>
+    <div class="kpi-sub">نیازمند اقدام حاکمیت داده</div>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:18px;">
+  <div class="card">
+    <h3>📦 عارضه‌یابی آخرین بانک کالای وارد‌شده</h3>
+    {% if latest_batch %}
+      <p class="text-sm text-muted">فایل: {{ latest_batch.filename }} — {{ latest_batch.row_count }} ردیف</p>
+      <div class="grid cols-2">
+        {% for k, v in latest_batch.kpi_json.items() %}
+        <div class="text-sm" style="padding:6px 0; border-bottom:1px solid var(--border); display:flex; justify-content:space-between;">
+          <span class="text-muted">{{ k }}</span><strong>{{ v }}</strong>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="btn-row" style="margin-top:14px;">
+        <a class="btn sm primary" href="/legacy/{{ latest_batch.id }}">مشاهده گزارش کامل</a>
+        <a class="btn sm" href="/legacy/{{ latest_batch.id }}/export">دانلود اکسل</a>
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <div class="icon">🗂️</div>
+        <p>هنوز بانک کالای فعلی بارگذاری نشده است.</p>
+        <a class="btn sm primary" href="/legacy">شروع عارضه‌یابی</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h3>🧭 توزیع ماتریس کرالجیک (استراتژی خرید)</h3>
+    {% set total_k = kraljic_dist.values() | sum %}
+    {% if total_k %}
+      {% for label, cnt in kraljic_dist.items() %}
+      <div style="margin-bottom:10px;">
+        <div class="flex-between text-sm"><span>{{ label }}</span><strong>{{ cnt }}</strong></div>
+        <div style="background:var(--ink-100); border-radius:6px; height:8px; overflow:hidden;">
+          <div style="background:var(--brand); height:100%; width:{{ (cnt/total_k*100) if total_k else 0 }}%;"></div>
+        </div>
+      </div>
+      {% endfor %}
+      <a class="btn sm" href="/kraljic">مشاهده ماتریس کامل</a>
+    {% else %}
+      <div class="empty-state">
+        <div class="icon">📐</div>
+        <p>هنوز ارزیابی کرالجیک ثبت نشده است.</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>🗃️ کالاهای اخیر</h3>
+  {% if recent_materials %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>کد / پیش‌نویس</th><th>شرح</th><th>گروه</th><th>وضعیت</th><th></th></tr></thead>
+      <tbody>
+        {% for mat in recent_materials %}
+        <tr>
+          <td class="mono">{{ mat.code or mat.draft_no }}</td>
+          <td>{{ mat.description }}</td>
+          <td>{{ mat.item_type.group.name }}</td>
+          <td><span class="badge {{ 'brand' if mat.status=='active' else ('red' if mat.status=='rejected' else 'amber') }}">{{ status_labels[mat.status] }}</span></td>
+          <td><a class="btn sm" href="/materials/{{ mat.id }}">مشاهده</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="empty-state"><div class="icon">📭</div><p>هنوز کالایی ثبت نشده است.</p></div>
+  {% endif %}
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>🏭 توزیع کالا در گروه‌های استاندارد (۱۸ گروه)</h3>
+  <div class="grid cols-3">
+    {% for g in groups %}
+    <div class="flex-between text-sm" style="padding:8px 0; border-bottom:1px solid var(--border);">
+      <span>{{ g.number_range_prefix }} — {{ g.name }}</span>
+      <strong>{{ group_counts.get(g.name, 0) }}</strong>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% endblock %}
