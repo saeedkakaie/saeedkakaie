@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}ماتریس کرالجیک{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>ماتریس کرالجیک خرید</h1>
+    <div class="subtitle">دسته‌بندی کالاها بر اساس «ریسک تامین» و «تاثیر بر هزینه/سود» برای تعیین استراتژی خرید</div>
+  </div>
+</div>
+
+<div class="card">
+  {% set margin = 55 %}
+  {% set plot = 380 %}
+  {% set size = plot + margin*2 %}
+  <div class="kraljic-svg-box" style="overflow-x:auto;">
+  <svg viewBox="0 0 {{ size + 40 }} {{ size }}" width="100%" style="max-width:640px; display:block; margin:0 auto;">
+    <!-- quadrant backgrounds -->
+    <rect x="{{ margin }}" y="{{ margin }}" width="{{ plot/2 }}" height="{{ plot/2 }}" fill="#e6f0fb"/>
+    <rect x="{{ margin + plot/2 }}" y="{{ margin }}" width="{{ plot/2 }}" height="{{ plot/2 }}" fill="#fbe6e9"/>
+    <rect x="{{ margin }}" y="{{ margin + plot/2 }}" width="{{ plot/2 }}" height="{{ plot/2 }}" fill="#e7efed"/>
+    <rect x="{{ margin + plot/2 }}" y="{{ margin + plot/2 }}" width="{{ plot/2 }}" height="{{ plot/2 }}" fill="#fdf1dc"/>
+
+    <text x="{{ margin + plot/4 }}" y="{{ margin + 18 }}" text-anchor="middle" class="kraljic-quadrant-label" fill="#1f5fa8">اهرمی (Leverage)</text>
+    <text x="{{ margin + plot*3/4 }}" y="{{ margin + 18 }}" text-anchor="middle" class="kraljic-quadrant-label" fill="#b3273a">استراتژیک (Strategic)</text>
+    <text x="{{ margin + plot/4 }}" y="{{ margin + plot - 8 }}" text-anchor="middle" class="kraljic-quadrant-label" fill="#4a635e">عمومی / غیربحرانی</text>
+    <text x="{{ margin + plot*3/4 }}" y="{{ margin + plot - 8 }}" text-anchor="middle" class="kraljic-quadrant-label" fill="#b8790a">گلوگاهی (Bottleneck)</text>
+
+    <!-- axes -->
+    <line x1="{{ margin }}" y1="{{ margin }}" x2="{{ margin }}" y2="{{ margin+plot }}" stroke="#8aa19c"/>
+    <line x1="{{ margin }}" y1="{{ margin+plot }}" x2="{{ margin+plot }}" y2="{{ margin+plot }}" stroke="#8aa19c"/>
+    <text x="{{ margin+plot/2 }}" y="{{ size - 10 }}" text-anchor="middle" font-size="12" fill="#4a635e">ریسک تامین (کم ← زیاد) →</text>
+    <text x="18" y="{{ margin+plot/2 }}" text-anchor="middle" font-size="12" fill="#4a635e" transform="rotate(-90 18 {{ margin+plot/2 }})">تاثیر بر هزینه/سود (کم ← زیاد) →</text>
+
+    {% for p in points %}
+      {% set px = margin + (p.x - 1) / 4 * plot %}
+      {% set py = margin + (5 - p.y) / 4 * plot %}
+      <circle cx="{{ px }}" cy="{{ py }}" r="7" fill="#0f6e56" stroke="#fff" stroke-width="1.5">
+        <title>{{ p.code }} — {{ p.desc }} ({{ p.group }}) — {{ p.quadrant }}</title>
+      </circle>
+    {% endfor %}
+  </svg>
+  </div>
+</div>
+
+<div class="card" style="margin-top:18px;">
+  <h3>فهرست ارزیابی‌شده‌ها</h3>
+  {% if points %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>کد</th><th>شرح</th><th>گروه</th><th>ریسک تامین</th><th>تاثیر هزینه/سود</th><th>ربع ماتریس</th></tr></thead>
+      <tbody>
+        {% for p in points %}
+        <tr>
+          <td class="mono">{{ p.code }}</td><td>{{ p.desc }}</td><td>{{ p.group }}</td>
+          <td>{{ p.x }}</td><td>{{ p.y }}</td>
+          <td><span class="badge blue">{{ p.quadrant }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state"><div class="icon">📐</div><p>هنوز ارزیابی کرالجیک برای کالایی ثبت نشده. از صفحه‌ی جزئیات هر کالا این ارزیابی را ثبت کنید.</p></div>
+  {% endif %}
+</div>
+
+{% endblock %}

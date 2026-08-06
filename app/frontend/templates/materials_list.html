@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}بانک کالا{% endblock %}
+{% block content %}
+
+<div class="page-head">
+  <div>
+    <h1>بانک کالا</h1>
+    <div class="subtitle">جستجو در کالاهای ثبت‌شده در سامانه‌ی جدید (فعال و در جریان تایید)</div>
+  </div>
+  <a class="btn primary" href="/materials/new">+ ثبت کالای جدید</a>
+</div>
+
+<form class="card" method="get" style="margin-bottom:18px;">
+  <div class="grid cols-3">
+    <div class="field">
+      <label>جستجو (کد یا شرح)</label>
+      <input type="text" name="q" value="{{ q }}" placeholder="مثلا بلبرینگ یا 0900001">
+    </div>
+    <div class="field">
+      <label>گروه</label>
+      <select name="group_id">
+        <option value="0">همه گروه‌ها</option>
+        {% for g in groups %}<option value="{{ g.id }}" {{ 'selected' if group_id==g.id else '' }}>{{ g.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>وضعیت</label>
+      <select name="status">
+        <option value="">همه</option>
+        {% for k, v in status_labels.items() %}<option value="{{ k }}" {{ 'selected' if status==k else '' }}>{{ v }}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+  <button class="btn primary" type="submit">اعمال فیلتر</button>
+</form>
+
+{% if materials %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>کد / پیش‌نویس</th><th>شرح کالا</th><th>گروه</th><th>نوع کالا</th><th>واحد</th><th>وضعیت</th><th></th></tr></thead>
+    <tbody>
+      {% for mat in materials %}
+      <tr>
+        <td class="mono">{{ mat.code or mat.draft_no }}</td>
+        <td>{{ mat.description }}</td>
+        <td>{{ mat.item_type.group.name }}</td>
+        <td>{{ mat.item_type.name }}</td>
+        <td>{{ mat.unit.name_fa }}</td>
+        <td><span class="badge {{ 'brand' if mat.status=='active' else ('red' if mat.status=='rejected' else 'amber') }}">{{ status_labels[mat.status] }}</span></td>
+        <td><a class="btn sm" href="/materials/{{ mat.id }}">مشاهده</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="empty-state"><div class="icon">📭</div><p>کالایی با این فیلتر یافت نشد.</p></div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}سامانه کدینگ استاندارد کالا{% endblock %}</title>
+<link rel="stylesheet" href="/static/css/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>">
+</head>
+<body>
+<div class="app-shell">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="/">
+        <span class="brand-mark">CMDM</span>
+        <span class="brand-text">سامانه کدینگ استاندارد کالا <small>Material Master Data Governance</small></span>
+      </a>
+      <nav class="main-nav">
+        <a href="/">داشبورد</a>
+        <a href="/materials/new" class="cta">ثبت کالای جدید</a>
+        <a href="/materials">بانک کالا</a>
+        <a href="/legacy">پاکسازی بانک فعلی</a>
+        <a href="/kraljic">ماتریس کرالجیک</a>
+        <a href="/classification">مدیریت طبقه‌بندی</a>
+      </nav>
+    </div>
+  </header>
+  <main class="content">
+    {% block content %}{% endblock %}
+  </main>
+  <footer class="footer">
+    <span>سامانه کدینگ استاندارد کالا — نسخه‌ی نمایشی داخلی (سرور توسعه). داده‌ها تا انتقال نهایی روی این محیط باقی می‌مانند.</span>
+  </footer>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
