@@ -1,0 +1,239 @@
+<title>تحلیل ریاضی کدینگ گلوکوزان</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: long-form analytical report, RTL single column (max 860px); each section = claim, formula block, chart, reading */
+:root{
+  --bg:#f7f8f6; --surface:#ffffff; --ink:#15201a; --muted:#56625a; --rule:#dde2dc; --accent:#1f5a43; --formula:#eef3ef;
+  --o1:#104281; --o2:#2a78d6; --o3:#86b6ef; --o4:#c9c8c2; --s1:#2a78d6; --cell0:#f0efec;
+  --pos:#2a78d6; --neg:#e34948; --grid:#e6e8e3; --axis:#6b7570;
+  --font:"Vazirmatn",Tahoma,"Segoe UI",sans-serif; --mono:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121614; --surface:#1a1a19; --ink:#e9eeea; --muted:#a6b0a9; --rule:#2e3631; --accent:#8fcaa8; --formula:#202824;
+  --o1:#b7d3f6; --o2:#5598e7; --o3:#256abf; --o4:#5a5955; --s1:#3987e5; --cell0:#262624;
+  --pos:#3987e5; --neg:#e66767; --grid:#2c302d; --axis:#9aa39d; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#121614; --surface:#1a1a19; --ink:#e9eeea; --muted:#a6b0a9; --rule:#2e3631; --accent:#8fcaa8; --formula:#202824;
+  --o1:#b7d3f6; --o2:#5598e7; --o3:#256abf; --o4:#5a5955; --s1:#3987e5; --cell0:#262624;
+  --pos:#3987e5; --neg:#e66767; --grid:#2c302d; --axis:#9aa39d; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.85;
+  padding-block:28px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+main{direction:rtl;max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:30px}
+header h1{font-size:clamp(22px,4vw,30px);font-weight:800;line-height:1.35;margin:0 0 6px;text-wrap:balance}
+header p{margin:0;color:var(--muted)}
+.abstract{background:var(--surface);border:1px solid var(--rule);padding:16px 20px}
+.abstract h2{margin-top:0}
+h2{font-size:19px;font-weight:700;color:var(--accent);margin:0 0 8px;text-wrap:balance}
+h3{font-size:15px;font-weight:700;margin:14px 0 4px}
+p{margin:0 0 10px;max-width:72ch}
+section{display:flex;flex-direction:column;gap:6px;min-width:0}
+.f{direction:ltr;text-align:left;background:var(--formula);font-family:var(--mono);font-size:13.5px;line-height:1.9;padding:10px 14px;overflow-x:auto;white-space:pre;border-inline-start:3px solid var(--accent)}
+.f .c{color:var(--muted)}
+figure{margin:6px 0 4px;background:var(--surface);border:1px solid var(--rule);padding:12px 12px 8px;min-width:0}
+figcaption{font-size:13px;color:var(--muted);margin-top:4px}
+.chart{width:100%;height:auto;display:block;direction:ltr}
+.chart text{font-family:var(--font)}
+.chart .grid{stroke:var(--grid);stroke-width:1}
+.chart .ref{stroke:var(--axis);stroke-width:1;stroke-dasharray:4 4}
+.chart .ax{font-size:11px;fill:var(--axis)}
+.chart .lb{font-size:12.5px;fill:var(--ink)}
+.chart .val{font-size:12px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.chart .cell{font-size:11.5px;fill:var(--ink)}
+.chart .cell.on{fill:#ffffff}
+.chart .diag{stroke:var(--ink);stroke-width:1.5}
+.chart [data-tip]{cursor:default}
+.chart [data-tip]:hover{opacity:.85}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;list-style:none;padding:0;margin:0 0 6px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:11px;height:11px;margin-inline-end:6px;vertical-align:-1px;border-radius:2px}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;font-variant-numeric:tabular-nums}
+th{text-align:right;font-weight:500;color:var(--muted);border-bottom:1px solid var(--rule);padding:5px 8px}
+td{padding:5px 8px;border-bottom:1px solid var(--rule)}
+td.num,th.num{text-align:left;white-space:nowrap;direction:ltr;unicode-bidi:isolate}
+td.rz{background:color-mix(in srgb,var(--c) calc(var(--a)*55%),transparent)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--rule);padding:10px 14px}
+.kpi b{display:block;font-size:24px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.3}
+.kpi span{font-size:13px;color:var(--muted)}
+.read{border-inline-start:3px solid var(--o3);padding:2px 12px;color:var(--ink)}
+ol.concl{margin:0;padding-inline-start:22px;display:flex;flex-direction:column;gap:6px}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--surface);font-size:12.5px;padding:5px 9px;border-radius:4px;direction:rtl;max-width:280px;z-index:10}
+footer{font-size:12.5px;color:var(--muted);border-top:1px solid var(--rule);padding-top:10px}
+@page{size:A4;margin:12mm 11mm}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--ink:#15201a;--muted:#56625a;--rule:#dde2dc;--accent:#1f5a43;--formula:#eef3ef;
+    --o1:#104281;--o2:#2a78d6;--o3:#86b6ef;--o4:#c9c8c2;--s1:#2a78d6;--cell0:#f0efec;--pos:#2a78d6;--neg:#e34948;--grid:#e6e8e3;--axis:#6b7570;color-scheme:light}
+  body{padding:0;font-size:12.5px} main{gap:18px;max-width:none}
+  .f{font-size:9.6px;white-space:pre-wrap;overflow:visible}
+  figure,.f,.kpis,table,.read{break-inside:avoid} h2{break-after:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+<main>
+<header>
+  <h1>تحلیل ریاضی و آماری یکسان‌سازی کدینگ گلوکوزان و زرنام</h1>
+  <p>مدل تطابق، برآورد فاصلهٔ اطمینان، آزمون استقلال، توافق واحد سنجش و سناریوی کاتالوگ نهایی · ۲۲ مهر ۱۴۰۵</p>
+</header>
+
+<div class="kpis">
+  <div class="kpi"><b>۶٫۲٪</b><span>نرخ پوشش قطعی+قوی، فاصلهٔ ۹۵٪: ۵٫۸٪ تا ۶٫۶٪</span></div>
+  <div class="kpi"><b>۲۳٫۹٪</b><span>سقف پوشش با گروه احتمالی، فاصلهٔ ۹۵٪: ۲۳٫۱٪ تا ۲۴٫۶٪</span></div>
+  <div class="kpi"><b>κ = ۰٫۶۵</b><span>ضریب توافق کاپای کوهن برای واحد سنجش</span></div>
+  <div class="kpi"><b>V = ۰٫۱۴۸</b><span>کرامر: وابستگی تطابق به خانوادهٔ کالا (p کمتر از ۱۰⁻۱۰⁰)</span></div>
+</div>
+
+<section class="abstract">
+  <h2>چکیده</h2>
+  <p>برای هر کالای گلوکوزان، نزدیک‌ترین متریال زرنام با یک امتیاز شباهت ترکیبی پیدا شد و با کنترل اعداد و اسم اصلی کالا در چهار سطح دسته‌بندی شد. نرخ پوشش قطعی <b>۶٫۲٪</b> است و حتی اگر همهٔ موارد احتمالی تأیید شوند، از <b>۲۳٫۹٪</b> بالاتر نمی‌رود. شکاف اصلی در <b>واژگان</b> نیست: ۹۱٫۸٪ کلمات شرح‌های گلوکوزان در زرنام هم به‌کار رفته است. شکاف در <b>مشخصات عددی</b> است، یعنی سایز، ابعاد و پارت‌نامبر: در ۴۰٫۴٪ کالاها، بهترین کاندید زرنام عدد متفاوتی دارد. نتیجه این‌که پس از یکسان‌سازی، بین <b>۹٬۷۵۲</b> تا <b>۱۲٬۰۴۷</b> کد جدید به Master SAP اضافه می‌شود؛ یعنی رشد ۲۶٫۳٪ تا ۳۲٫۴٪.</p>
+</section>
+
+<section>
+  <h2>۱. تعریف مدل</h2>
+  <p>مجموعهٔ کالاهای گلوکوزان را G و مجموعهٔ متریال‌های یکتای زرنام را Z می‌نامیم. هدف، یافتن تابع نگاشت f است که هر کالای گلوکوزان را به یک متریال زرنام یا به «کد جدید» (∅) ببرد.</p>
+  <div class="f">|G| = 12,980      |Z| = 37,128   <span class="c">(133,724 rows, duplication factor 133,724 / 37,128 = 3.60)</span>
+f : G → Z ∪ {∅}
+
+s(g,z) = max( (cos_tfidf + TSR + TSet) / 3 ,  (cos_tfidf + TSR_spec) / 2 )      s ∈ [0,1]
+<span class="c">cos_tfidf : char 2–4-gram TF-IDF cosine   TSR / TSet : token-sort / token-set ratio</span>
+J_w(g,z)  = |W_g ∩ W_z| / |W_g ∪ W_z|         <span class="c">(key-word Jaccard, fuzzy ≥ 0.85)</span>
+ν(g,z)    ∈ {equal, none, subset, oneside, conflict}   <span class="c">(multiset of numbers)</span>
+
+tier(g) = 1  if  norm(g) = norm(z)
+        = 2  if  s ≥ 0.85 ∧ J_w ≥ 0.75 ∧ ν ∈ {equal,none} ∧ head(g)≈head(z)
+        = 3  if  s ≥ 0.70 ∧ J_w ≥ 0.40 ∧ ν ≠ conflict  (or equivalent relaxed rules)
+        = 4  otherwise</div>
+</section>
+
+<section>
+  <h2>۲. نرخ پوشش و فاصلهٔ اطمینان</h2>
+  <p>نرخ پوشش نسبتی از کالاهای گلوکوزان است که در زرنام معادل دارند. برای این نسبت، فاصلهٔ اطمینان ویلسون محاسبه شد. این فاصله فقط خطای نمونه‌ای را می‌سنجد و خطای قواعد تطابق را در بر نمی‌گیرد؛ آن خطا در بخش ۸ مدل شده است.</p>
+  <div class="f">p̂₁₂  = (n₁ + n₂) / N = (535 + 266) / 12,980 = 0.0617     95% Wilson CI = [0.0577 , 0.0660]
+p̂₁₂₃ = (n₁ + n₂ + n₃) / N = 3,096 / 12,980 = 0.2385    95% Wilson CI = [0.2313 , 0.2459]
+p̂₄   = n₄ / N = 9,884 / 12,980 = 0.7615
+
+Wilson:  ( p̂ + z²/2n ± z·√( p̂(1−p̂)/n + z²/4n² ) ) / (1 + z²/n) ,   z = 1.96</div>
+  <figure>
+    <svg viewBox="0 0 640 190" class="chart" role="img" aria-label="تعداد کالا در هر سطح تطابق"><line x1="110.0" x2="110.0" y1="10" y2="166" class="grid"/><text x="110.0" y="182" class="ax" text-anchor="middle">۰</text><line x1="220.0" x2="220.0" y1="10" y2="166" class="grid"/><text x="220.0" y="182" class="ax" text-anchor="middle">۲٬۵۰۰</text><line x1="330.0" x2="330.0" y1="10" y2="166" class="grid"/><text x="330.0" y="182" class="ax" text-anchor="middle">۵٬۰۰۰</text><line x1="440.0" x2="440.0" y1="10" y2="166" class="grid"/><text x="440.0" y="182" class="ax" text-anchor="middle">۷٬۵۰۰</text><line x1="550.0" x2="550.0" y1="10" y2="166" class="grid"/><text x="550.0" y="182" class="ax" text-anchor="middle">۱۰٬۰۰۰</text><text x="102" y="32.0" class="lb" text-anchor="end">مشترک قطعی</text><path d="M110,14 h19.5 a4,4 0 0 1 4,4 v20 a4,4 0 0 1 -4,4 h-19.5 z" fill="var(--o1)" data-tip="مشترک قطعی: ۵۳۵ کالا (۴٫۱٪)"/><text x="139.5" y="32.0" class="val">۵۳۵ · ۴٫۱٪</text><text x="102" y="72.0" class="lb" text-anchor="end">مشترک قوی</text><path d="M110,54 h7.7 a4,4 0 0 1 4,4 v20 a4,4 0 0 1 -4,4 h-7.7 z" fill="var(--o2)" data-tip="مشترک قوی: ۲۶۶ کالا (۲٫۰٪)"/><text x="127.7" y="72.0" class="val">۲۶۶ · ۲٫۰٪</text><text x="102" y="112.0" class="lb" text-anchor="end">احتمالی</text><path d="M110,94 h97.0 a4,4 0 0 1 4,4 v20 a4,4 0 0 1 -4,4 h-97.0 z" fill="var(--o3)" data-tip="احتمالی: ۲٬۲۹۵ کالا (۱۷٫۷٪)"/><text x="217.0" y="112.0" class="val">۲٬۲۹۵ · ۱۷٫۷٪</text><text x="102" y="152.0" class="lb" text-anchor="end">غیرمشترک</text><path d="M110,134 h430.9 a4,4 0 0 1 4,4 v20 a4,4 0 0 1 -4,4 h-430.9 z" fill="var(--o4)" data-tip="غیرمشترک: ۹٬۸۸۴ کالا (۷۶٫۱٪)"/><text x="550.9" y="152.0" class="val">۹٬۸۸۴ · ۷۶٫۱٪</text></svg>
+    <figcaption>نمودار ۱: تعداد کالا در هر سطح تطابق؛ کل N = ۱۲٬۹۸۰.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>۳. توزیع امتیاز شباهت</h2>
+  <p>توزیع امتیاز s برای بهترین کاندید هر کالا تقریباً تک‌قله‌ای است. میانگین آن ۰٫۷۰۹، میانه ۰٫۷۰۶ و انحراف معیار σ = ۰٫۱۴۲ است. همپوشانی دسته‌ها روی محور s نشان می‌دهد که شباهت متنی به‌تنهایی برای تصمیم کافی نیست. برای همین، کنترل اعداد و اسم اصلی کالا لازم بود: کالاهای زیادی با s بالاتر از ۰٫۸ به‌خاطر مغایرت عددی در سطح ۴ مانده‌اند.</p>
+  <figure>
+  <ul class="legend"><li><i style="background:var(--o1)"></i>مشترک قطعی</li><li><i style="background:var(--o2)"></i>مشترک قوی</li><li><i style="background:var(--o3)"></i>احتمالی</li><li><i style="background:var(--o4)"></i>غیرمشترک</li></ul>
+    <svg viewBox="0 0 640 260" class="chart" role="img" aria-label="توزیع امتیاز شباهت بهترین کاندید"><line x1="48" x2="628" y1="220.0" y2="220.0" class="grid"/><text x="42" y="224.0" class="ax" text-anchor="end">۰</text><line x1="48" x2="628" y1="178.4" y2="178.4" class="grid"/><text x="42" y="182.4" class="ax" text-anchor="end">۵۰۰</text><line x1="48" x2="628" y1="136.8" y2="136.8" class="grid"/><text x="42" y="140.8" class="ax" text-anchor="end">۱٬۰۰۰</text><line x1="48" x2="628" y1="95.2" y2="95.2" class="grid"/><text x="42" y="99.2" class="ax" text-anchor="end">۱٬۵۰۰</text><line x1="48" x2="628" y1="53.6" y2="53.6" class="grid"/><text x="42" y="57.6" class="ax" text-anchor="end">۲٬۰۰۰</text><line x1="48" x2="628" y1="12.0" y2="12.0" class="grid"/><text x="42" y="16.0" class="ax" text-anchor="end">۲٬۵۰۰</text><rect x="50.0" y="219.0" width="37.4" height="1.0" fill="var(--o4)" data-tip="امتیاز ۰٫۳۰–۰٫۳۵ · غیرمشترک: ۱۲ کالا"/><text x="48.0" y="236" class="ax" text-anchor="middle">۰٫۳۰</text><rect x="91.4" y="215.3" width="37.4" height="4.7" fill="var(--o4)" data-tip="امتیاز ۰٫۳۵–۰٫۴۰ · غیرمشترک: ۵۶ کالا"/><rect x="132.9" y="202.7" width="37.4" height="17.3" fill="var(--o4)" data-tip="امتیاز ۰٫۴۰–۰٫۴۵ · غیرمشترک: ۲۰۸ کالا"/><text x="130.9" y="236" class="ax" text-anchor="middle">۰٫۴۰</text><rect x="174.3" y="169.1" width="37.4" height="50.9" fill="var(--o4)" data-tip="امتیاز ۰٫۴۵–۰٫۵۰ · غیرمشترک: ۶۱۲ کالا"/><rect x="215.7" y="136.1" width="37.4" height="83.9" fill="var(--o4)" data-tip="امتیاز ۰٫۵۰–۰٫۵۵ · غیرمشترک: ۱٬۰۰۹ کالا"/><text x="213.7" y="236" class="ax" text-anchor="middle">۰٫۵۰</text><rect x="257.1" y="121.3" width="37.4" height="98.7" fill="var(--o4)" data-tip="امتیاز ۰٫۵۵–۰٫۶۰ · غیرمشترک: ۱٬۱۸۶ کالا"/><rect x="298.6" y="91.7" width="37.4" height="128.3" fill="var(--o4)" data-tip="امتیاز ۰٫۶۰–۰٫۶۵ · غیرمشترک: ۱٬۵۴۲ کالا"/><text x="296.6" y="236" class="ax" text-anchor="middle">۰٫۶۰</text><rect x="340.0" y="82.0" width="37.4" height="138.0" fill="var(--o4)" data-tip="امتیاز ۰٫۶۵–۰٫۷۰ · غیرمشترک: ۱٬۶۵۹ کالا"/><rect x="381.4" y="113.4" width="37.4" height="106.6" fill="var(--o4)" data-tip="امتیاز ۰٫۷۰–۰٫۷۵ · غیرمشترک: ۱٬۲۸۱ کالا"/><rect x="381.4" y="81.2" width="37.4" height="30.2" fill="var(--o3)" data-tip="امتیاز ۰٫۷۰–۰٫۷۵ · احتمالی: ۳۸۷ کالا"/><text x="379.4" y="236" class="ax" text-anchor="middle">۰٫۷۰</text><rect x="422.9" y="134.6" width="37.4" height="85.4" fill="var(--o4)" data-tip="امتیاز ۰٫۷۵–۰٫۸۰ · غیرمشترک: ۱٬۰۲۶ کالا"/><rect x="422.9" y="92.5" width="37.4" height="40.1" fill="var(--o3)" data-tip="امتیاز ۰٫۷۵–۰٫۸۰ · احتمالی: ۵۰۶ کالا"/><rect x="464.3" y="163.7" width="37.4" height="56.3" fill="var(--o4)" data-tip="امتیاز ۰٫۸۰–۰٫۸۵ · غیرمشترک: ۶۷۷ کالا"/><rect x="464.3" y="120.1" width="37.4" height="41.6" fill="var(--o3)" data-tip="امتیاز ۰٫۸۰–۰٫۸۵ · احتمالی: ۵۲۴ کالا"/><text x="462.3" y="236" class="ax" text-anchor="middle">۰٫۸۰</text><rect x="505.7" y="188.4" width="37.4" height="31.6" fill="var(--o4)" data-tip="امتیاز ۰٫۸۵–۰٫۹۰ · غیرمشترک: ۳۸۰ کالا"/><rect x="505.7" y="143.8" width="37.4" height="42.6" fill="var(--o3)" data-tip="امتیاز ۰٫۸۵–۰٫۹۰ · احتمالی: ۵۳۶ کالا"/><rect x="505.7" y="138.1" width="37.4" height="3.7" fill="var(--o2)" data-tip="امتیاز ۰٫۸۵–۰٫۹۰ · مشترک قوی: ۶۸ کالا"/><rect x="547.1" y="203.9" width="37.4" height="16.1" fill="var(--o4)" data-tip="امتیاز ۰٫۹۰–۰٫۹۵ · غیرمشترک: ۱۹۴ کالا"/><rect x="547.1" y="180.4" width="37.4" height="21.5" fill="var(--o3)" data-tip="امتیاز ۰٫۹۰–۰٫۹۵ · احتمالی: ۲۸۲ کالا"/><rect x="547.1" y="172.7" width="37.4" height="5.7" fill="var(--o2)" data-tip="امتیاز ۰٫۹۰–۰٫۹۵ · مشترک قوی: ۹۳ کالا"/><text x="545.1" y="236" class="ax" text-anchor="middle">۰٫۹۰</text><rect x="588.6" y="216.5" width="37.4" height="3.5" fill="var(--o4)" data-tip="امتیاز ۰٫۹۵–۱٫۰۰ · غیرمشترک: ۴۲ کالا"/><rect x="588.6" y="211.5" width="37.4" height="3.0" fill="var(--o3)" data-tip="امتیاز ۰٫۹۵–۱٫۰۰ · احتمالی: ۶۰ کالا"/><rect x="588.6" y="202.8" width="37.4" height="6.7" fill="var(--o2)" data-tip="امتیاز ۰٫۹۵–۱٫۰۰ · مشترک قوی: ۱۰۵ کالا"/><rect x="588.6" y="158.3" width="37.4" height="42.5" fill="var(--o1)" data-tip="امتیاز ۰٫۹۵–۱٫۰۰ · مشترک قطعی: ۵۳۵ کالا"/><text x="628" y="236" class="ax" text-anchor="end">۱٫۰۰</text><text x="338.0" y="256" class="ax" text-anchor="middle">امتیاز شباهت ترکیبی s (بهترین کاندید)</text></svg>
+    <figcaption>نمودار ۲: هیستوگرام انباشتهٔ امتیاز s با بازه‌های ۰٫۰۵. کالاهای سطح ۱ به‌طور تعریفی s = ۱ دارند.</figcaption>
+  </figure>
+  <div class="tw"><table>
+    <thead><tr><th>سطح</th><th class="num">n</th><th class="num">میانگین s</th><th class="num">میانه</th><th class="num">σ</th></tr></thead>
+    <tbody><tr><td>مشترک قطعی</td><td class="num">۵۳۵</td><td class="num">۱٫۰۰۰</td><td class="num">۱٫۰۰۰</td><td class="num">۰٫۰۰۰</td></tr><tr><td>مشترک قوی</td><td class="num">۲۶۶</td><td class="num">۰٫۹۲۸</td><td class="num">۰٫۹۳۳</td><td class="num">۰٫۰۳۷</td></tr><tr><td>احتمالی</td><td class="num">۲٬۲۹۵</td><td class="num">۰٫۸۲۴</td><td class="num">۰٫۸۲۷</td><td class="num">۰٫۰۶۸</td></tr><tr><td>غیرمشترک</td><td class="num">۹٬۸۸۴</td><td class="num">۰٫۶۶۱</td><td class="num">۰٫۶۵۹</td><td class="num">۰٫۱۱۸</td></tr></tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>۴. علت عدم تطابق: مشخصات عددی</h2>
+  <p>۷۵٫۵٪ عنوان‌های گلوکوزان و ۸۰٫۸٪ شرح‌های زرنام دست‌کم یک عدد دارند (سایز، رده، توان، پارت‌نامبر). نمودار زیر رابطهٔ اعداد هر کالا را با بهترین کاندید زرنامش نشان می‌دهد.</p>
+  <figure>
+    <svg viewBox="0 0 640 200" class="chart" role="img" aria-label="سازگاری اعداد با بهترین کاندید"><line x1="140.0" x2="140.0" y1="6" y2="174" class="grid"/><text x="140.0" y="194" class="ax" text-anchor="middle">۰</text><line x1="242.5" x2="242.5" y1="6" y2="174" class="grid"/><text x="242.5" y="194" class="ax" text-anchor="middle">۱٬۵۰۰</text><line x1="345.0" x2="345.0" y1="6" y2="174" class="grid"/><text x="345.0" y="194" class="ax" text-anchor="middle">۳٬۰۰۰</text><line x1="447.5" x2="447.5" y1="6" y2="174" class="grid"/><text x="447.5" y="194" class="ax" text-anchor="middle">۴٬۵۰۰</text><line x1="550.0" x2="550.0" y1="6" y2="174" class="grid"/><text x="550.0" y="194" class="ax" text-anchor="middle">۶٬۰۰۰</text><text x="132" y="26.0" class="lb" text-anchor="end">مغایرت اعداد/ابعاد</text><path d="M140,10 h354.1 a4,4 0 0 1 4,4 v16 a4,4 0 0 1 -4,4 h-354.1 z" fill="var(--s1)" data-tip="مغایرت اعداد/ابعاد: ۵٬۲۴۱ کالا (۴۰٫۴٪)"/><text x="504.1" y="26.0" class="val">۵٬۲۴۱ · ۴۰٫۴٪</text><text x="132" y="60.0" class="lb" text-anchor="end">عدد فقط در یک طرف</text><path d="M140,44 h150.6 a4,4 0 0 1 4,4 v16 a4,4 0 0 1 -4,4 h-150.6 z" fill="var(--s1)" data-tip="عدد فقط در یک طرف: ۲٬۲۶۲ کالا (۱۷٫۴٪)"/><text x="300.6" y="60.0" class="val">۲٬۲۶۲ · ۱۷٫۴٪</text><text x="132" y="94.0" class="lb" text-anchor="end">هیچ‌کدام عدد ندارند</text><path d="M140,78 h148.2 a4,4 0 0 1 4,4 v16 a4,4 0 0 1 -4,4 h-148.2 z" fill="var(--s1)" data-tip="هیچ‌کدام عدد ندارند: ۲٬۲۲۷ کالا (۱۷٫۲٪)"/><text x="298.2" y="94.0" class="val">۲٬۲۲۷ · ۱۷٫۲٪</text><text x="132" y="128.0" class="lb" text-anchor="end">اعداد یکسان</text><path d="M140,112 h112.9 a4,4 0 0 1 4,4 v16 a4,4 0 0 1 -4,4 h-112.9 z" fill="var(--s1)" data-tip="اعداد یکسان: ۱٬۷۱۰ کالا (۱۳٫۲٪)"/><text x="262.9" y="128.0" class="val">۱٬۷۱۰ · ۱۳٫۲٪</text><text x="132" y="162.0" class="lb" text-anchor="end">اعداد جزئی مشترک</text><path d="M140,146 h101.2 a4,4 0 0 1 4,4 v16 a4,4 0 0 1 -4,4 h-101.2 z" fill="var(--s1)" data-tip="اعداد جزئی مشترک: ۱٬۵۴۰ کالا (۱۱٫۹٪)"/><text x="251.2" y="162.0" class="val">۱٬۵۴۰ · ۱۱٫۹٪</text></svg>
+    <figcaption>نمودار ۳: سازگاری مجموعهٔ اعداد (ν) میان هر کالای گلوکوزان و بهترین کاندید زرنام.</figcaption>
+  </figure>
+  <p class="read">در <b>۹۷۳</b> کالای غیرمشترک، شباهت متنی s ≥ ۰٫۸۰ است ولی اعداد فرق دارد؛ در ۵۱۷ مورد حتی s ≥ ۰٫۸۵. این‌ها همان کالا در سایز دیگری هستند، مثل کاسه‌نمد، بلبرینگ یا اتصالات. زرنام خانوادهٔ این کالا را دارد ولی آن سایز را ندارد. در کد جدید باید از همان قالب شرح زرنام استفاده شود.</p>
+</section>
+
+<section>
+  <h2>۵. وابستگی تطابق به نوع کالا (آزمون χ²)</h2>
+  <p>فرض صفر H₀: «وضعیت تطابق مستقل از خانوادهٔ کد کالاست». جدول توافقی ۷ × ۳ آزمون شد.</p>
+  <div class="f">χ² = Σ (Oᵢⱼ − Eᵢⱼ)² / Eᵢⱼ = 571.7      df = (7−1)(3−1) = 12      p ≈ 1.2e-114
+Cramér's V = √( χ² / (N · (min(r,c) − 1)) ) = √( 571.7 / (12,980 × 2) ) = 0.148
+standardized residual  rᵢⱼ = (Oᵢⱼ − Eᵢⱼ) / √Eᵢⱼ      |r| &gt; 2  →  significant deviation</div>
+  <p>H₀ با اطمینان کامل رد می‌شود؛ یعنی شانس تطابق به نوع کالا وابسته است. البته V = ۰٫۱۵ یعنی اندازهٔ اثر <b>ضعیف تا متوسط</b> است. معنی‌اش این است که تطابق در همهٔ خانواده‌ها پایین است و فقط بعضی از آن‌ها از این سطح عمومی بهترند.</p>
+  <figure>
+  <ul class="legend"><li><i style="background:var(--o1)"></i>مشترک (قطعی+قوی)</li><li><i style="background:var(--o3)"></i>احتمالی</li><li><i style="background:var(--o4)"></i>غیرمشترک</li></ul>
+    <svg viewBox="0 0 640 300" class="chart" role="img" aria-label="ترکیب وضعیت تطابق در هر خانوادهٔ کد"><line x1="130.0" x2="130.0" y1="6" y2="268" class="grid"/><text x="130.0" y="292" class="ax" text-anchor="middle">۰٪</text><line x1="242.5" x2="242.5" y1="6" y2="268" class="grid"/><text x="242.5" y="292" class="ax" text-anchor="middle">۲۵٪</text><line x1="355.0" x2="355.0" y1="6" y2="268" class="grid"/><text x="355.0" y="292" class="ax" text-anchor="middle">۵۰٪</text><line x1="467.5" x2="467.5" y1="6" y2="268" class="grid"/><text x="467.5" y="292" class="ax" text-anchor="middle">۷۵٪</text><line x1="580.0" x2="580.0" y1="6" y2="268" class="grid"/><text x="580.0" y="292" class="ax" text-anchor="middle">۱۰۰٪</text><text x="122" y="27.0" class="lb" text-anchor="end">۳۱ قطعات یدکی</text><rect x="130.0" y="10" width="18.9" height="26" fill="var(--o1)" data-tip="۳۱ قطعات یدکی · مشترک (قطعی+قوی): ۴۴۰ از ۹٬۴۶۱ (۴٫۷٪)"/><rect x="150.9" y="10" width="78.3" height="26" fill="var(--o3)" data-tip="۳۱ قطعات یدکی · احتمالی: ۱٬۶۸۸ از ۹٬۴۶۱ (۱۷٫۸٪)"/><rect x="231.2" y="10" width="348.8" height="26" fill="var(--o4)" data-tip="۳۱ قطعات یدکی · غیرمشترک: ۷٬۳۳۳ از ۹٬۴۶۱ (۷۷٫۵٪)"/><text x="586" y="27.0" class="val">n=۹٬۴۶۱</text><text x="122" y="65.0" class="lb" text-anchor="end">۳۵ تجهیزات و عمومی</text><rect x="130.0" y="48" width="26.2" height="26" fill="var(--o1)" data-tip="۳۵ تجهیزات و عمومی · مشترک (قطعی+قوی): ۸۸ از ۱٬۴۰۳ (۶٫۳٪)"/><rect x="158.2" y="48" width="62.1" height="26" fill="var(--o3)" data-tip="۳۵ تجهیزات و عمومی · احتمالی: ۲۰۰ از ۱٬۴۰۳ (۱۴٫۳٪)"/><rect x="222.4" y="48" width="357.6" height="26" fill="var(--o4)" data-tip="۳۵ تجهیزات و عمومی · غیرمشترک: ۱٬۱۱۵ از ۱٬۴۰۳ (۷۹٫۵٪)"/><text x="586" y="65.0" class="val">n=۱٬۴۰۳</text><text x="122" y="103.0" class="lb" text-anchor="end">۹۹ اداری و IT</text><rect x="130.0" y="86" width="67.7" height="26" fill="var(--o1)" data-tip="۹۹ اداری و IT · مشترک (قطعی+قوی): ۹۷ از ۶۲۶ (۱۵٫۵٪)"/><rect x="199.7" y="86" width="96.5" height="26" fill="var(--o3)" data-tip="۹۹ اداری و IT · احتمالی: ۱۳۷ از ۶۲۶ (۲۱٫۹٪)"/><rect x="298.2" y="86" width="281.8" height="26" fill="var(--o4)" data-tip="۹۹ اداری و IT · غیرمشترک: ۳۹۲ از ۶۲۶ (۶۲٫۶٪)"/><text x="586" y="103.0" class="val">n=۶۲۶</text><text x="122" y="141.0" class="lb" text-anchor="end">۱۶ برق و موتور</text><rect x="130.0" y="124" width="6.9" height="26" fill="var(--o1)" data-tip="۱۶ برق و موتور · مشترک (قطعی+قوی): ۱۱ از ۵۵۵ (۲٫۰٪)"/><rect x="138.9" y="124" width="62.9" height="26" fill="var(--o3)" data-tip="۱۶ برق و موتور · احتمالی: ۸۰ از ۵۵۵ (۱۴٫۴٪)"/><rect x="203.8" y="124" width="376.2" height="26" fill="var(--o4)" data-tip="۱۶ برق و موتور · غیرمشترک: ۴۶۴ از ۵۵۵ (۸۳٫۶٪)"/><text x="586" y="141.0" class="val">n=۵۵۵</text><text x="122" y="179.0" class="lb" text-anchor="end">۸۸ آزمایشگاه</text><rect x="130.0" y="162" width="75.5" height="26" fill="var(--o1)" data-tip="۸۸ آزمایشگاه · مشترک (قطعی+قوی): ۵۲ از ۳۰۲ (۱۷٫۲٪)"/><rect x="207.5" y="162" width="78.5" height="26" fill="var(--o3)" data-tip="۸۸ آزمایشگاه · احتمالی: ۵۴ از ۳۰۲ (۱۷٫۹٪)"/><rect x="287.9" y="162" width="292.1" height="26" fill="var(--o4)" data-tip="۸۸ آزمایشگاه · غیرمشترک: ۱۹۶ از ۳۰۲ (۶۴٫۹٪)"/><text x="586" y="179.0" class="val">n=۳۰۲</text><text x="122" y="217.0" class="lb" text-anchor="end">۷۷ خوراکی و رفاهی</text><rect x="130.0" y="200" width="154.3" height="26" fill="var(--o1)" data-tip="۷۷ خوراکی و رفاهی · مشترک (قطعی+قوی): ۷۴ از ۲۱۳ (۳۴٫۷٪)"/><rect x="286.3" y="200" width="93.1" height="26" fill="var(--o3)" data-tip="۷۷ خوراکی و رفاهی · احتمالی: ۴۵ از ۲۱۳ (۲۱٫۱٪)"/><rect x="381.4" y="200" width="198.6" height="26" fill="var(--o4)" data-tip="۷۷ خوراکی و رفاهی · غیرمشترک: ۹۴ از ۲۱۳ (۴۴٫۱٪)"/><text x="586" y="217.0" class="val">n=۲۱۳</text><text x="122" y="255.0" class="lb" text-anchor="end">سایر</text><rect x="130.0" y="238" width="39.8" height="26" fill="var(--o1)" data-tip="سایر · مشترک (قطعی+قوی): ۳۹ از ۴۲۰ (۹٫۳٪)"/><rect x="171.8" y="238" width="95.5" height="26" fill="var(--o3)" data-tip="سایر · احتمالی: ۹۱ از ۴۲۰ (۲۱٫۷٪)"/><rect x="269.3" y="238" width="310.7" height="26" fill="var(--o4)" data-tip="سایر · غیرمشترک: ۲۹۰ از ۴۲۰ (۶۹٫۰٪)"/><text x="586" y="255.0" class="val">n=۴۲۰</text></svg>
+    <figcaption>نمودار ۴: ترکیب درصدی وضعیت تطابق در هر خانوادهٔ کد گلوکوزان (پیشوند دو رقمی کد).</figcaption>
+  </figure>
+  <div class="tw"><table>
+    <thead><tr><th>خانواده</th><th class="num">n</th><th class="num">r مشترک</th><th class="num">r احتمالی</th><th class="num">r غیرمشترک</th></tr></thead>
+    <tbody><tr><td>۳۱ قطعات یدکی</td><td class="num">۹٬۴۶۱</td><td class="num rz" style="--a:0.50;--c:var(--neg)">−۵٫۹۵</td><td class="num rz" style="--a:0.03;--c:var(--pos)">+۰٫۳۷</td><td class="num rz" style="--a:0.13;--c:var(--pos)">+۱٫۵۲</td></tr><tr><td>۳۵ تجهیزات و عمومی</td><td class="num">۱٬۴۰۳</td><td class="num rz" style="--a:0.01;--c:var(--pos)">+۰٫۱۵</td><td class="num rz" style="--a:0.25;--c:var(--neg)">−۳٫۰۵</td><td class="num rz" style="--a:0.12;--c:var(--pos)">+۱٫۴۳</td></tr><tr><td>۹۹ اداری و IT</td><td class="num">۶۲۶</td><td class="num rz" style="--a:0.78;--c:var(--pos)">+۹٫۳۹</td><td class="num rz" style="--a:0.21;--c:var(--pos)">+۲٫۵۰</td><td class="num rz" style="--a:0.32;--c:var(--neg)">−۳٫۸۸</td></tr><tr><td>۱۶ برق و موتور</td><td class="num">۵۵۵</td><td class="num rz" style="--a:0.33;--c:var(--neg)">−۳٫۹۷</td><td class="num rz" style="--a:0.15;--c:var(--neg)">−۱٫۸۳</td><td class="num rz" style="--a:0.17;--c:var(--pos)">+۲٫۰۱</td></tr><tr><td>۸۸ آزمایشگاه</td><td class="num">۳۰۲</td><td class="num rz" style="--a:0.64;--c:var(--pos)">+۷٫۷۳</td><td class="num rz" style="--a:0.01;--c:var(--pos)">+۰٫۰۸</td><td class="num rz" style="--a:0.19;--c:var(--neg)">−۲٫۲۴</td></tr><tr><td>۷۷ خوراکی و رفاهی</td><td class="num">۲۱۳</td><td class="num rz" style="--a:1.00;--c:var(--pos)">+۱۶٫۷۹</td><td class="num rz" style="--a:0.10;--c:var(--pos)">+۱٫۲۰</td><td class="num rz" style="--a:0.45;--c:var(--neg)">−۵٫۳۵</td></tr><tr><td>سایر</td><td class="num">۴۲۰</td><td class="num rz" style="--a:0.21;--c:var(--pos)">+۲٫۵۷</td><td class="num rz" style="--a:0.16;--c:var(--pos)">+۱٫۹۴</td><td class="num rz" style="--a:0.14;--c:var(--neg)">−۱٫۶۷</td></tr></tbody>
+  </table></div>
+  <p class="read">باقیماندهٔ مثبت یعنی تعداد واقعی از مقدار مورد انتظار بیشتر است. اقلام <b>خوراکی (r = +۱۶٫۸)</b>، آزمایشگاهی (+۷٫۷) و اداری (+۹٫۴) خیلی بیشتر از انتظار مشترک‌اند. <b>قطعات یدکی (−۵٫۹۵)</b> و برقی (−۳٫۹۷) کمتر از انتظار مشترک‌اند. قطعات یدکی ۷۴٫۲٪ کل کدهای جدید را می‌سازند، پس تمرکز تیم کدینگ باید روی همین خانواده باشد.</p>
+</section>
+
+<section>
+  <h2>۶. توافق واحد سنجش (کاپای کوهن)</h2>
+  <p>برای ۳٬۰۹۶ کالای مشترک و احتمالی، واحد راهکاران به کد SAP نگاشت و با واحد پایهٔ زرنام مقایسه شد. PC و EA یکی در نظر گرفته شدند. توافق ساده بخشی از توافق را که به‌طور تصادفی هم رخ می‌داد در بر دارد؛ کاپا این سهم تصادفی را کنار می‌گذارد.</p>
+  <div class="f">p₀ = observed agreement           = 0.8472      (shared only, n=801: 0.8702)
+pₑ = Σₖ p_G(k) · p_Z(k)            = 0.5590      (chance agreement; "piece" dominates)
+κ  = (p₀ − pₑ) / (1 − pₑ)           = 0.654      → substantial agreement (Landis–Koch 0.61–0.80)
+
+Shannon entropy of UoM:  H = −Σ pₖ log₂ pₖ
+H_G = 1.507 bits (35 units)      H_Z = 1.653 bits (43 units)</div>
+  <figure>
+    <svg viewBox="0 0 596 266" class="chart" role="img" aria-label="ماتریس واحد گلوکوزان در برابر واحد زرنام"><text x="121.0" y="22" class="ax" text-anchor="middle">PC</text><text x="121.0" y="36" class="ax" text-anchor="middle">عدد</text><text x="183.0" y="22" class="ax" text-anchor="middle">M</text><text x="183.0" y="36" class="ax" text-anchor="middle">متر</text><text x="245.0" y="22" class="ax" text-anchor="middle">KG</text><text x="245.0" y="36" class="ax" text-anchor="middle">کیلوگرم</text><text x="307.0" y="22" class="ax" text-anchor="middle">DST</text><text x="307.0" y="36" class="ax" text-anchor="middle">دستگاه</text><text x="369.0" y="22" class="ax" text-anchor="middle">L</text><text x="369.0" y="36" class="ax" text-anchor="middle">لیتر</text><text x="431.0" y="22" class="ax" text-anchor="middle">M2</text><text x="431.0" y="36" class="ax" text-anchor="middle">متر مربع</text><text x="493.0" y="22" class="ax" text-anchor="middle">DAS</text><text x="493.0" y="36" class="ax" text-anchor="middle">دست</text><text x="555.0" y="22" class="ax" text-anchor="middle">PAC</text><text x="555.0" y="36" class="ax" text-anchor="middle">بسته</text><text x="82" y="65.0" class="lb" text-anchor="end">عدد</text><rect x="91" y="47" width="60" height="28" rx="2" fill="#0d366b" class="diag" data-tip="گلوکوزان عدد ← زرنام PC: ۲٬۱۴۱ کالا"/><text x="121.0" y="65.0" text-anchor="middle" class="cell on">۲٬۱۴۱</text><rect x="153" y="47" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان عدد ← زرنام M: ۱۶ کالا"/><text x="183.0" y="65.0" text-anchor="middle" class="cell">۱۶</text><rect x="215" y="47" width="60" height="28" rx="2" fill="#9ec5f4" data-tip="گلوکوزان عدد ← زرنام KG: ۸ کالا"/><text x="245.0" y="65.0" text-anchor="middle" class="cell">۸</text><rect x="277" y="47" width="60" height="28" rx="2" fill="#3987e5" data-tip="گلوکوزان عدد ← زرنام DST: ۵۵ کالا"/><text x="307.0" y="65.0" text-anchor="middle" class="cell on">۵۵</text><rect x="339" y="47" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان عدد ← زرنام L: ۳ کالا"/><text x="369.0" y="65.0" text-anchor="middle" class="cell">۳</text><rect x="401" y="47" width="60" height="28" rx="2" fill="#9ec5f4" data-tip="گلوکوزان عدد ← زرنام M2: ۶ کالا"/><text x="431.0" y="65.0" text-anchor="middle" class="cell">۶</text><rect x="463" y="47" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان عدد ← زرنام DAS: ۲۴ کالا"/><text x="493.0" y="65.0" text-anchor="middle" class="cell">۲۴</text><rect x="525" y="47" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان عدد ← زرنام PAC: ۱۵ کالا"/><text x="555.0" y="65.0" text-anchor="middle" class="cell">۱۵</text><text x="82" y="95.0" class="lb" text-anchor="end">کیلوگرم</text><rect x="91" y="77" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان کیلوگرم ← زرنام PC: ۱۶ کالا"/><text x="121.0" y="95.0" text-anchor="middle" class="cell">۱۶</text><rect x="153" y="77" width="60" height="28" rx="2" fill="#3987e5" data-tip="گلوکوزان کیلوگرم ← زرنام M: ۳۸ کالا"/><text x="183.0" y="95.0" text-anchor="middle" class="cell on">۳۸</text><rect x="215" y="77" width="60" height="28" rx="2" fill="#256abf" class="diag" data-tip="گلوکوزان کیلوگرم ← زرنام KG: ۱۵۸ کالا"/><text x="245.0" y="95.0" text-anchor="middle" class="cell on">۱۵۸</text><rect x="277" y="77" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان کیلوگرم ← زرنام DST: ۱ کالا"/><text x="307.0" y="95.0" text-anchor="middle" class="cell">۱</text><rect x="339" y="77" width="60" height="28" rx="2" fill="#9ec5f4" data-tip="گلوکوزان کیلوگرم ← زرنام L: ۵ کالا"/><text x="369.0" y="95.0" text-anchor="middle" class="cell">۵</text><rect x="401" y="77" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان کیلوگرم ← زرنام M2: ۱۵ کالا"/><text x="431.0" y="95.0" text-anchor="middle" class="cell">۱۵</text><rect x="463" y="77" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان کیلوگرم ← زرنام DAS: ۰ کالا"/><rect x="525" y="77" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان کیلوگرم ← زرنام PAC: ۳ کالا"/><text x="555.0" y="95.0" text-anchor="middle" class="cell">۳</text><text x="82" y="125.0" class="lb" text-anchor="end">متر</text><rect x="91" y="107" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان متر ← زرنام PC: ۲۸ کالا"/><text x="121.0" y="125.0" text-anchor="middle" class="cell">۲۸</text><rect x="153" y="107" width="60" height="28" rx="2" fill="#256abf" class="diag" data-tip="گلوکوزان متر ← زرنام M: ۱۱۴ کالا"/><text x="183.0" y="125.0" text-anchor="middle" class="cell on">۱۱۴</text><rect x="215" y="107" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان متر ← زرنام KG: ۱ کالا"/><text x="245.0" y="125.0" text-anchor="middle" class="cell">۱</text><rect x="277" y="107" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان متر ← زرنام DST: ۰ کالا"/><rect x="339" y="107" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان متر ← زرنام L: ۰ کالا"/><rect x="401" y="107" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان متر ← زرنام M2: ۲ کالا"/><text x="431.0" y="125.0" text-anchor="middle" class="cell">۲</text><rect x="463" y="107" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان متر ← زرنام DAS: ۰ کالا"/><rect x="525" y="107" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان متر ← زرنام PAC: ۰ کالا"/><text x="82" y="155.0" class="lb" text-anchor="end">دستگاه</text><rect x="91" y="137" width="60" height="28" rx="2" fill="#3987e5" data-tip="گلوکوزان دستگاه ← زرنام PC: ۳۹ کالا"/><text x="121.0" y="155.0" text-anchor="middle" class="cell on">۳۹</text><rect x="153" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام M: ۰ کالا"/><rect x="215" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام KG: ۰ کالا"/><rect x="277" y="137" width="60" height="28" rx="2" fill="#3987e5" class="diag" data-tip="گلوکوزان دستگاه ← زرنام DST: ۴۳ کالا"/><text x="307.0" y="155.0" text-anchor="middle" class="cell on">۴۳</text><rect x="339" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام L: ۰ کالا"/><rect x="401" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام M2: ۰ کالا"/><rect x="463" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام DAS: ۰ کالا"/><rect x="525" y="137" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دستگاه ← زرنام PAC: ۰ کالا"/><text x="82" y="185.0" class="lb" text-anchor="end">لیتر</text><rect x="91" y="167" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان لیتر ← زرنام PC: ۳ کالا"/><text x="121.0" y="185.0" text-anchor="middle" class="cell">۳</text><rect x="153" y="167" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان لیتر ← زرنام M: ۰ کالا"/><rect x="215" y="167" width="60" height="28" rx="2" fill="#9ec5f4" data-tip="گلوکوزان لیتر ← زرنام KG: ۸ کالا"/><text x="245.0" y="185.0" text-anchor="middle" class="cell">۸</text><rect x="277" y="167" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان لیتر ← زرنام DST: ۰ کالا"/><rect x="339" y="167" width="60" height="28" rx="2" fill="#3987e5" class="diag" data-tip="گلوکوزان لیتر ← زرنام L: ۴۷ کالا"/><text x="369.0" y="185.0" text-anchor="middle" class="cell on">۴۷</text><rect x="401" y="167" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان لیتر ← زرنام M2: ۰ کالا"/><rect x="463" y="167" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان لیتر ← زرنام DAS: ۰ کالا"/><rect x="525" y="167" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان لیتر ← زرنام PAC: ۰ کالا"/><text x="82" y="215.0" class="lb" text-anchor="end">بسته</text><rect x="91" y="197" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان بسته ← زرنام PC: ۱۵ کالا"/><text x="121.0" y="215.0" text-anchor="middle" class="cell">۱۵</text><rect x="153" y="197" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان بسته ← زرنام M: ۰ کالا"/><rect x="215" y="197" width="60" height="28" rx="2" fill="#cde2fb" data-tip="گلوکوزان بسته ← زرنام KG: ۱ کالا"/><text x="245.0" y="215.0" text-anchor="middle" class="cell">۱</text><rect x="277" y="197" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان بسته ← زرنام DST: ۰ کالا"/><rect x="339" y="197" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان بسته ← زرنام L: ۰ کالا"/><rect x="401" y="197" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان بسته ← زرنام M2: ۰ کالا"/><rect x="463" y="197" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان بسته ← زرنام DAS: ۰ کالا"/><rect x="525" y="197" width="60" height="28" rx="2" fill="#6da7ec" class="diag" data-tip="گلوکوزان بسته ← زرنام PAC: ۲۰ کالا"/><text x="555.0" y="215.0" text-anchor="middle" class="cell">۲۰</text><text x="82" y="245.0" class="lb" text-anchor="end">دست</text><rect x="91" y="227" width="60" height="28" rx="2" fill="#6da7ec" data-tip="گلوکوزان دست ← زرنام PC: ۲۰ کالا"/><text x="121.0" y="245.0" text-anchor="middle" class="cell">۲۰</text><rect x="153" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام M: ۰ کالا"/><rect x="215" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام KG: ۰ کالا"/><rect x="277" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام DST: ۰ کالا"/><rect x="339" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام L: ۰ کالا"/><rect x="401" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام M2: ۰ کالا"/><rect x="463" y="227" width="60" height="28" rx="2" fill="#6da7ec" class="diag" data-tip="گلوکوزان دست ← زرنام DAS: ۲۳ کالا"/><text x="493.0" y="245.0" text-anchor="middle" class="cell">۲۳</text><rect x="525" y="227" width="60" height="28" rx="2" fill="var(--cell0)" data-tip="گلوکوزان دست ← زرنام PAC: ۰ کالا"/></svg>
+    <figcaption>نمودار ۵: ماتریس توافقی واحد سنجش. سطرها واحد گلوکوزان و ستون‌ها واحد پایهٔ زرنام‌اند. قطر (کادردار) یعنی توافق و خانه‌های بیرون قطر یعنی ضریب تبدیل لازم است. شدت رنگ لگاریتمی است.</figcaption>
+  </figure>
+  <p class="read">κ = ۰٫۶۵ توافق «قابل‌توجه» است، ولی کامل نیست. بیشترین مغایرت‌ها عدد ↔ دستگاه، کیلوگرم ↔ متر و شاخه ↔ متر است. آنتروپی واحدها در هر دو شرکت حدود ۱٫۵ تا ۱٫۷ بیت است، یعنی تنوع واحد در دو شرکت مشابه است و مغایرت از تعریف واحد در سطح کالا می‌آید، نه از تفاوت فهرست واحدها.</p>
+</section>
+
+<section>
+  <h2>۷. شکاف نام‌گذاری</h2>
+  <div class="f">Vocabulary Jaccard   J = |V_G ∩ V_Z| / |V_G ∪ V_Z| = 3,323 / 13,082 = 0.254
+Token coverage       C = Σ 1[w ∈ V_Z] / |tokens_G|     = 0.918
+|V_G| = 4,964   |V_Z| = 11,441</div>
+  <div class="tw"><table>
+    <thead><tr><th>شاخص</th><th class="num">گلوکوزان</th><th class="num">زرنام</th></tr></thead>
+    <tbody>
+      <tr><td>میانگین طول شرح (کاراکتر)</td><td class="num">۲۶٫۰</td><td class="num">۲۷٫۳</td></tr>
+      <tr><td>سهم شرح‌های بیش از ۴۰ کاراکتر (پس از حذف فاصلهٔ اضافه)</td><td class="num">۱۰٫۱٪</td><td class="num">۰٫۰٪ (سقف SAP)</td></tr>
+      <tr><td>سهم شرح‌های دارای فاصلهٔ تکراری</td><td class="num">۵۴٫۹٪</td><td class="num">۷٫۵٪</td></tr>
+      <tr><td>سهم شرح‌های دارای ي و ك عربی</td><td class="num">۰٫۰٪</td><td class="num">۵٫۸٪</td></tr>
+    </tbody>
+  </table></div>
+  <p class="read">J = ۰٫۲۵ کم به نظر می‌رسد، ولی C = ۰٫۹۲ نشان می‌دهد ۹۱٫۸٪ کلماتی که گلوکوزان در عمل به‌کار برده در زرنام هم هست. واژگان اضافهٔ زرنام از کاتالوگ بزرگ‌ترش می‌آید. پس دو شرکت به یک زبان کالا را نام می‌برند و تفاوت در <b>قالب</b> نوشتن است: ترتیب کلمات، فاصله‌ها، نوشتن اینچ و ابعاد.</p>
+</section>
+
+<section>
+  <h2>۸. مدل سناریو: تعداد قابل اکستند و اندازهٔ کاتالوگ نهایی</h2>
+  <p>اگر πₖ دقت سطح k باشد (سهمی از نگاشت‌ها که کارشناس تأیید می‌کند)، تعداد مورد انتظار کالاهای قابل اکستند این است:</p>
+  <div class="f">E[X] = n₁·π₁ + n₂·π₂ + n₃·π₃ ,   π₁ = 1 ,  π₂ ≈ 0.90 (sample) ,  π₃ ∈ [0,1] unknown
+E[X] = 535 + 266×0.90 + 2,295×π₃ = 774.4 + 2,295·π₃
+π₃ = 0.5  →  E[X] ≈ 1,922   (14.8% of G)
+
+New master records:  N_new = |unique(tier-4 descriptions)| + n₃(1 − π₃)
+                     = 9,752 + 2,295(1 − π₃)   ∈ [9,752 , 12,047]
+Master growth:       ΔZ / Z = N_new / 37,128 ∈ [26.3% , 32.4%]
+Many-to-one compression (tiers 1–2): 801 items → 733 Zarnam codes  (ratio 1.093)</div>
+  <figure>
+    <svg viewBox="0 0 640 260" class="chart" role="img" aria-label="تعداد مورد انتظار کالاهای قابل اکستند بر حسب دقت گروه احتمالی"><line x1="60" x2="530" y1="220.0" y2="220.0" class="grid"/><text x="54" y="224.0" class="ax" text-anchor="end">۰</text><line x1="60" x2="530" y1="168.5" y2="168.5" class="grid"/><text x="54" y="172.5" class="ax" text-anchor="end">۸۰۰</text><line x1="60" x2="530" y1="117.0" y2="117.0" class="grid"/><text x="54" y="121.0" class="ax" text-anchor="end">۱٬۶۰۰</text><line x1="60" x2="530" y1="65.5" y2="65.5" class="grid"/><text x="54" y="69.5" class="ax" text-anchor="end">۲٬۴۰۰</text><line x1="60" x2="530" y1="14.0" y2="14.0" class="grid"/><text x="54" y="18.0" class="ax" text-anchor="end">۳٬۲۰۰</text><text x="60.0" y="236" class="ax" text-anchor="middle">۰٫۰۰</text><text x="177.5" y="236" class="ax" text-anchor="middle">۰٫۲۵</text><text x="295.0" y="236" class="ax" text-anchor="middle">۰٫۵۰</text><text x="412.5" y="236" class="ax" text-anchor="middle">۰٫۷۵</text><text x="530.0" y="236" class="ax" text-anchor="middle">۱٫۰۰</text><text x="295.0" y="256" class="ax" text-anchor="middle">π₃ = سهم تأییدشدهٔ گروه احتمالی</text><path d="M60,169.3 L530,21.6 L530,23.3 L60,171.0 Z" fill="var(--s1)" opacity=".18"/><line x1="60" y1="170.1" x2="530" y2="22.4" stroke="var(--s1)" stroke-width="2"/><line x1="60" x2="530" y1="168.4" y2="168.4" class="ref"/><text x="536" y="172.4" class="ax">کران پایین ۸۰۱</text><line x1="60" x2="530" y1="20.7" y2="20.7" class="ref"/><text x="536" y="24.7" class="ax">کران بالا ۳٬۰۹۶</text><circle cx="201.0" cy="125.8" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" data-tip="π₃=۰٫۳ ، π₂=۰٫۹ → E=۱٬۴۶۳ کالا (۱۱٫۳٪)"/><text x="201.0" y="115.8" class="val" text-anchor="middle">۱٬۴۶۳</text><circle cx="295.0" cy="96.3" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" data-tip="π₃=۰٫۵ ، π₂=۰٫۹ → E=۱٬۹۲۲ کالا (۱۴٫۸٪)"/><text x="295.0" y="86.3" class="val" text-anchor="middle">۱٬۹۲۲</text><circle cx="389.0" cy="66.7" r="5" fill="var(--s1)" stroke="var(--surface)" stroke-width="2" data-tip="π₃=۰٫۷ ، π₂=۰٫۹ → E=۲٬۳۸۱ کالا (۱۸٫۳٪)"/><text x="389.0" y="56.7" class="val" text-anchor="middle">۲٬۳۸۱</text></svg>
+    <figcaption>نمودار ۶: E[X] بر حسب π₃ با π₂ = ۰٫۹. نوار کم‌رنگ بازهٔ π₂ بین ۰٫۸۵ و ۰٫۹۵ است و خط‌چین‌ها کران پایین و بالای پوشش‌اند.</figcaption>
+  </figure>
+  <p class="read">E[X] نسبت به π₃ خطی است و شیب آن n₃ = ۲٬۲۹۵ است. یعنی هر ۱۰ واحد درصد دقت بیشتر در بررسی کارشناسی، حدود ۲۳۰ کالای دیگر را قابل اکستند می‌کند. عدم قطعیت π₂ اثر ناچیزی دارد (±۱۳ کالا). پس <b>بررسی گروه احتمالی مؤثرترین اهرم</b> برای کاهش کدهای جدید است.</p>
+</section>
+
+<section>
+  <h2>۹. جمع‌بندی ریاضی</h2>
+  <ol class="concl">
+    <li>نرخ پوشش قطعی ۶٫۲٪ است (فاصلهٔ ۹۵٪: ۵٫۸٪ تا ۶٫۶٪) و سقف پوشش ۲۳٫۹٪. در هر سناریو، دست‌کم ۷۶٪ کالاها کد جدید لازم دارند.</li>
+    <li>علت غالب عدم تطابق، مغایرت مشخصات عددی است (۴۰٫۴٪)، نه تفاوت واژگان (پوشش واژگانی ۹۱٫۸٪).</li>
+    <li>تطابق به نوع کالا وابسته است (χ² = ۵۷۲، df = ۱۲، V = ۰٫۱۵). اقلام خوراکی، اداری و آزمایشگاهی سریع اکستند می‌شوند و قطعات یدکی بیشترین کار را دارند.</li>
+    <li>توافق واحد سنجش κ = ۰٫۶۵ است. حدود ۱۵٫۳٪ کالاهای مشترک و احتمالی ضریب تبدیل یا واحد فرعی لازم دارند.</li>
+    <li>Master SAP بین ۲۶٫۳٪ و ۳۲٫۴٪ بزرگ‌تر می‌شود. هر ۱۰٪ دقت بیشتر در بررسی گروه احتمالی حدود ۲۳۰ کد جدید را حذف می‌کند.</li>
+  </ol>
+</section>
+
+<footer>منبع: خروجی کدینگ راهکاران گلوکوزان (۱۲٬۹۸۰ کالا) و خروجی SAP زرنام، پلنت ۱۰۰۲ (۳۷٬۱۲۸ متریال یکتا). π₂ = ۰٫۹ از نمونه‌گیری دستی کوچک به دست آمده و π₃ نامعلوم است؛ هر دو فرض‌اند. آمارها روی خروجی خودکار تطابق محاسبه شده‌اند و جزئیات هر کالا در فایل اکسل تحلیل آمده است.</footer>
+</main>
+<div id="tip" hidden></div>
+<script>
+(function(){var t=document.getElementById('tip');
+document.addEventListener('pointermove',function(e){var el=e.target.closest&&e.target.closest('[data-tip]');
+if(!el){t.hidden=true;return} t.textContent=el.getAttribute('data-tip'); t.hidden=false;
+var x=e.clientX+14, y=e.clientY+14; var w=t.offsetWidth, h=t.offsetHeight;
+if(x+w>innerWidth-8)x=e.clientX-w-14; if(y+h>innerHeight-8)y=e.clientY-h-14; t.style.left=x+'px'; t.style.top=y+'px';});
+document.addEventListener('pointerleave',function(){t.hidden=true});})();
+</script>
