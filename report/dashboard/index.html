@@ -1,0 +1,572 @@
+<style>
+.gz{direction:rtl;font-family:var(--font-anthropic-sans);display:flex;flex-direction:column;gap:var(--cds-gap-xl)}
+.gz h1{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);margin:0;line-height:1.3}
+.gz .gz-take{margin:var(--cds-gap-xs) 0 0;color:var(--color-fg-muted);font-size:var(--cds-font-size-body)}
+.gz .gz-take b{color:var(--color-fg);font-weight:600}
+.gz h2{font-size:var(--cds-font-size-heading);font-weight:var(--cds-font-weight-medium);margin:0 0 var(--cds-gap-sm)}
+.gz h3{font-size:var(--cds-font-size-body);font-weight:var(--cds-font-weight-medium);margin:0}
+.gz .gz-note{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin:2px 0 var(--cds-gap-sm)}
+.gz-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr));gap:var(--cds-gap-md)}
+.gz-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,22rem),1fr));gap:var(--cds-gap-md)}
+.gz-card{background:var(--color-panel);border:1px solid var(--color-border-line);border-radius:var(--cds-radius);padding:var(--cds-pad-lg);position:relative;min-width:0}
+.gz-kpi{display:flex;flex-direction:column;gap:2px}
+.gz-kpi .gz-l{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted)}
+.gz-kpi .gz-v{font-family:var(--font-anthropic-serif);font-weight:400;font-size:var(--cds-font-size-title);font-variant-numeric:tabular-nums;line-height:1.2}
+.gz-kpi .gz-s{font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);font-variant-numeric:tabular-nums}
+.gz-kpi.gz-good .gz-v{color:var(--color-ok)}
+.gz-kpi.gz-bad .gz-v{color:var(--color-bad)}
+.gz-plot{min-height:120px;direction:ltr}
+.gz-plot svg{display:block}
+.gz-svg text{font-family:var(--font-anthropic-sans)}
+.gz-lb{font-size:12px;fill:var(--color-fg)}
+.gz-val{font-size:11.5px;fill:var(--color-fg-muted);font-variant-numeric:tabular-nums}
+.gz-tick{font-size:11px;fill:var(--color-fg-muted);font-variant-numeric:tabular-nums}
+.gz-grid-l{stroke:var(--cds-chart-grid);stroke-width:1}
+.gz-ref{stroke:var(--cds-chart-reference);stroke-width:1;stroke-dasharray:4 4}
+.gz-hit{fill:transparent;cursor:default}
+.gz-legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:var(--cds-font-size-caption);color:var(--color-fg-muted);margin:0 0 var(--cds-gap-sm);padding:0;list-style:none}
+.gz-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-inline-end:6px;vertical-align:-1px}
+.gz-tip{position:absolute;z-index:5;pointer-events:none;background:var(--cds-surface-popover);border:1px solid var(--cds-border);border-radius:var(--cds-radius);box-shadow:var(--cds-shadow-popover);padding:var(--cds-pad-xs) var(--cds-pad-sm);font-size:var(--cds-font-size-caption);direction:rtl;white-space:nowrap}
+.gz-tip .gz-tip-h{color:var(--cds-text-secondary);margin-bottom:2px}
+.gz-sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-inline-end:6px}
+.gz-tw{overflow-x:auto}
+.gz table{width:100%;border-collapse:collapse;font-size:var(--cds-font-size-caption);font-variant-numeric:tabular-nums}
+.gz th{text-align:right;font-weight:var(--cds-font-weight-medium);color:var(--color-fg-muted);border-bottom:1px solid var(--color-border-line);padding:6px 8px;white-space:nowrap}
+.gz td{padding:6px 8px;border-bottom:1px solid var(--color-border-line)}
+.gz td.n,.gz th.n{text-align:left;direction:ltr;white-space:nowrap}
+.gz .gz-chip{display:inline-block;min-width:3.4em;text-align:center;padding:1px 6px;border-radius:4px}
+.gz .gz-inbar{display:flex;align-items:center;gap:6px;direction:ltr}
+.gz .gz-inbar span.b{display:block;height:8px;border-radius:4px;background:var(--cds-chart-muted)}
+.gz .gz-fail{display:flex;align-items:center;justify-content:center;gap:6px;min-height:120px;color:var(--color-fg-muted);font-size:var(--cds-font-size-caption)}
+.gz .gz-fail i{width:.375rem;height:.375rem;border-radius:50%;background:var(--color-bad);display:inline-block}
+.gz [data-dash-source-state=empty]{color:transparent}
+.gz [data-dash-source-state=refreshing]{opacity:.5;transition:opacity var(--cds-dur-slow)}
+</style>
+
+<div class="gz">
+  <header>
+    <h1 id="top">یکسان‌سازی کدینگ گلوکوزان و زرنام</h1>
+    <p class="gz-take">از <b class="dash-skeleton" data-source="kpis" data-field="value" data-where="metric=glucosan_items">—</b> کالای گلوکوزان، <b class="dash-skeleton" data-source="kpis" data-field="value" data-where="metric=extend_now">—</b> کالا (<b class="dash-skeleton" data-source="extend_share" data-field="share" data-row="0">—</b>) مستقیم قابل اکستند است و <b class="dash-skeleton" data-source="kpis" data-field="value" data-where="metric=new_codes">—</b> کالا (<b class="dash-skeleton" data-source="tiers" data-field="share" data-where="tier=4">—</b>) کد جدید در SAP لازم دارد.</p>
+  </header>
+
+  <section class="gz-kpis" id="kpis">
+    <div class="gz-card gz-kpi"><span class="gz-l">کالای گلوکوزان</span><span class="gz-v dash-skeleton" data-source="kpis" data-field="value" data-where="metric=glucosan_items">—</span><span class="gz-s">کدینگ راهکاران</span></div>
+    <div class="gz-card gz-kpi"><span class="gz-l">متریال یکتای زرنام</span><span class="gz-v dash-skeleton" data-source="kpis" data-field="value" data-where="metric=zarnam_materials">—</span><span class="gz-s">از <span class="dash-skeleton" data-source="kpis" data-field="value" data-where="metric=zarnam_rows">—</span> ردیف خروجی SAP</span></div>
+    <div class="gz-card gz-kpi gz-good"><span class="gz-l">قابل اکستند (قطعی + قوی)</span><span class="gz-v dash-skeleton" data-source="kpis" data-field="value" data-where="metric=extend_now">—</span><span class="gz-s dash-skeleton" data-source="extend_share" data-field="share" data-row="0">—</span></div>
+    <div class="gz-card gz-kpi"><span class="gz-l">نیاز به بررسی کارشناس</span><span class="gz-v dash-skeleton" data-source="kpis" data-field="value" data-where="metric=review">—</span><span class="gz-s dash-skeleton" data-source="tiers" data-field="share" data-where="tier=3">—</span></div>
+    <div class="gz-card gz-kpi gz-bad"><span class="gz-l">نیاز به کد جدید</span><span class="gz-v dash-skeleton" data-source="kpis" data-field="value" data-where="metric=new_codes">—</span><span class="gz-s dash-skeleton" data-source="tiers" data-field="share" data-where="tier=4">—</span></div>
+  </section>
+
+  <section id="match">
+    <h2>وضعیت تطابق</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>کالاها در هر سطح تطابق</h3>
+        <p class="gz-note">تعداد و سهم از کل کالاهای گلوکوزان</p>
+        <div class="gz-plot dash-skeleton" id="c-tiers" data-source="tiers"></div>
+      </div>
+      <div class="gz-card">
+        <h3>توزیع امتیاز شباهت</h3>
+        <p class="gz-note">امتیاز شباهت شرح با نزدیک‌ترین متریال زرنام</p>
+        <ul class="gz-legend" id="lg-hist"></ul>
+        <div class="gz-plot dash-skeleton" id="c-hist" data-source="score_hist"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="why">
+    <h2>علت عدم تطابق</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>مقایسهٔ اعداد و ابعاد با نزدیک‌ترین کاندید</h3>
+        <p class="gz-note">سایز، رده، توان و پارت‌نامبر در شرح کالا</p>
+        <div class="gz-plot dash-skeleton" id="c-num" data-source="numcheck"></div>
+      </div>
+      <div class="gz-card">
+        <h3>مقایسهٔ نام‌گذاری دو شرکت</h3>
+        <p class="gz-note">قالب نوشتن شرح کالا</p>
+        <div class="gz-tw">
+          <table id="t-naming" data-source="naming" data-row-key="metric">
+            <thead><tr><th data-field="metric">شاخص</th><th class="n" data-field="glucosan">گلوکوزان</th><th class="n" data-field="zarnam">زرنام</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="family">
+    <h2>تطابق به تفکیک نوع کالا</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>ترکیب وضعیت در هر خانوادهٔ کد</h3>
+        <p class="gz-note">پیشوند دو رقمی کد گلوکوزان، سهم از تعداد همان خانواده</p>
+        <ul class="gz-legend" id="lg-fam"></ul>
+        <div class="gz-plot dash-skeleton" id="c-fam" data-source="families"></div>
+      </div>
+      <div class="gz-card">
+        <h3>جدول خانواده‌ها</h3>
+        <p class="gz-note">انحراف از حالت مورد انتظار: آبی یعنی بیشتر از انتظار مشترک، قرمز یعنی کمتر</p>
+        <div class="gz-tw">
+          <table id="t-fam" data-source="families" data-row-key="family">
+            <thead><tr><th data-field="family">خانواده</th><th class="n" data-field="total">تعداد</th><th class="n" data-field="shared_share">مشترک</th><th class="n" data-field="any_share">با احتمالی</th><th class="n" data-field="residual">انحراف</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="uom">
+    <h2>واحد سنجش</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>واحد گلوکوزان در برابر واحد پایهٔ زرنام</h3>
+        <p class="gz-note">کالاهای مشترک و احتمالی؛ خانه‌های کادردار یعنی واحد یکسان</p>
+        <div class="gz-plot dash-skeleton" id="c-heat" data-source="uom_matrix"></div>
+      </div>
+      <div class="gz-card">
+        <h3>وضعیت واحد سنجش</h3>
+        <p class="gz-note">تعداد کالا در هر وضعیت</p>
+        <ul class="gz-legend" id="lg-uom"></ul>
+        <div class="gz-plot dash-skeleton" id="c-uom" data-source="uom_status"></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="groups">
+    <h2>کالاهای مشترک به تفکیک گروه کالای زرنام</h2>
+    <div class="gz-card">
+      <h3>۱۲ گروه پرتکرار</h3>
+      <p class="gz-note">تعداد کالای گلوکوزان نگاشت‌شده به هر گروه کالای SAP زرنام</p>
+      <ul class="gz-legend" id="lg-grp"></ul>
+      <div class="gz-plot dash-skeleton" id="c-grp" data-source="zgroups"></div>
+    </div>
+  </section>
+
+  <section id="new">
+    <h2>کدهای جدید و ریسک‌های داده</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>کدهای جدید به تفکیک نوع متریال پیشنهادی</h3>
+        <p class="gz-note">بر اساس نزدیک‌ترین کالای مشابه زرنام و ماهیت کالا</p>
+        <div class="gz-plot dash-skeleton" id="c-newtype" data-source="newcodes_type"></div>
+      </div>
+      <div class="gz-card">
+        <h3>ریسک‌ها و شاخص‌های کیفیت داده</h3>
+        <p class="gz-note">تعداد کالا</p>
+        <div class="gz-tw">
+          <table id="t-risk" data-source="kpis" data-row-key="metric">
+            <thead><tr><th data-field="label">شاخص</th><th class="n" data-field="value">مقدار</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="scenario">
+    <h2>سناریوی بررسی کارشناسی</h2>
+    <div class="gz-grid">
+      <div class="gz-card">
+        <h3>کالاهای قابل اکستند</h3>
+        <p class="gz-note">بر حسب درصد موارد احتمالی که کارشناس تأیید کند</p>
+        <div class="gz-plot dash-skeleton" id="c-scn1" data-source="scenario"></div>
+      </div>
+      <div class="gz-card">
+        <h3>کدهای جدید لازم</h3>
+        <p class="gz-note">پس از حذف تکراری‌ها، بر حسب همان درصد تأیید</p>
+        <div class="gz-plot dash-skeleton" id="c-scn2" data-source="scenario"></div>
+      </div>
+    </div>
+    <div class="gz-card" style="margin-top:var(--cds-gap-md)">
+      <h3>جدول سناریو</h3>
+      <div class="gz-tw">
+        <table id="t-scn" data-source="scenario" data-row-key="review_approval">
+          <thead><tr><th class="n" data-field="review_approval">درصد تأیید موارد احتمالی</th><th class="n" data-field="extendable">قابل اکستند</th><th class="n" data-field="share">سهم از کل</th><th class="n" data-field="new_codes">کد جدید</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const F = d3.format(','), P = d3.format('.1%'), P0 = d3.format('.0%'), D2 = d3.format('+.2f');
+  const num = (v) => Number(v);
+  const TIER_OP = { 1: 1, 2: 0.62, 3: 0.32 };
+  const RISK = ['dup_items', 'dup_groups', 'many_to_one', 'zarnam_dup', 'size_variants', 'long_titles', 'with_spec', 'production', 'uom_same_pct', 'kappa', 'vocab_cov'];
+  const PCT_METRICS = new Set(['uom_same_pct', 'vocab_cov']);
+  const UNIT_CODE = { 'عدد': 'PC', 'کیلوگرم': 'KG', 'دستگاه': 'DST', 'متر': 'M', 'بسته': 'PAC', 'دست': 'DAS', 'لیتر': 'L', 'گرم': 'G', 'شاخه': 'SHK', 'متر مربع': 'M2' };
+
+  dash.calc('extend_share', {
+    inputs: ['tiers'],
+    title: 'سهم قابل اکستند',
+    description: 'سهم کالاهای مشترک قطعی و قوی از کل کالاهای گلوکوزان.',
+    fn: (tiers) => {
+      const all = d3.sum(tiers, (t) => Number(t.items));
+      const ok = d3.sum(tiers.filter((t) => Number(t.tier) <= 2), (t) => Number(t.items));
+      return [{ share: all ? ok / all : 0 }];
+    }
+  });
+
+  function cssColor(c) {
+    const s = document.createElement('span'); s.style.color = c; document.body.appendChild(s);
+    const v = getComputedStyle(s).color; s.remove(); return v;
+  }
+  function tierFill(t) { return t === 4 ? 'var(--cds-chart-muted)' : dash.colors[0]; }
+  function tierOp(t) { return t === 4 ? 1 : TIER_OP[t]; }
+
+  function guard(el, id) {
+    const d = dash.data(id);
+    if (d.status === 'ok') { el.classList.remove('dash-skeleton'); return d.data; }
+    el.replaceChildren();
+    if (d.status === 'loading') { el.classList.add('dash-skeleton'); return null; }
+    el.classList.remove('dash-skeleton');
+    if (d.status === 'error' || d.status === 'connect' || d.status === 'missing' || d.status === 'declined') {
+      const f = document.createElement('div'); f.className = 'gz-fail';
+      const i = document.createElement('i'); f.appendChild(i); f.appendChild(document.createTextNode('بارگذاری نشد'));
+      el.appendChild(f);
+    }
+    return null;
+  }
+
+  function tip(el) {
+    const card = el.closest('.gz-card');
+    let t = card.querySelector(':scope > .gz-tip');
+    if (!t) { t = document.createElement('div'); t.className = 'gz-tip'; t.hidden = true; card.appendChild(t); }
+    return {
+      show(ev, head, lines) {
+        t.replaceChildren();
+        const h = document.createElement('div'); h.className = 'gz-tip-h'; h.textContent = head; t.appendChild(h);
+        lines.forEach((l) => {
+          const d = document.createElement('div');
+          if (l.color) { const s = document.createElement('span'); s.className = 'gz-sw'; s.style.background = l.color; s.style.opacity = l.op == null ? 1 : l.op; d.appendChild(s); }
+          d.appendChild(document.createTextNode(l.text)); t.appendChild(d);
+        });
+        t.hidden = false;
+        const r = card.getBoundingClientRect(); const w = t.offsetWidth, hh = t.offsetHeight;
+        let x = ev.clientX - r.left + 12, y = ev.clientY - r.top + 12;
+        if (x + w > r.width - 4) x = ev.clientX - r.left - w - 12;
+        if (x < 4) x = 4;
+        if (y + hh > r.height - 4) y = ev.clientY - r.top - hh - 12;
+        t.style.left = x + 'px'; t.style.top = y + 'px';
+      },
+      hide() { t.hidden = true; }
+    };
+  }
+
+  function measure(svg, texts, cls) {
+    const g = svg.append('g'); let m = 0;
+    texts.forEach((s) => { const n = g.append('text').attr('class', cls).text(s).node(); m = Math.max(m, n.getComputedTextLength()); });
+    g.remove(); return m;
+  }
+
+  function legend(id, items) {
+    const ul = document.getElementById(id); ul.replaceChildren();
+    items.forEach((it) => {
+      const li = document.createElement('li'); const i = document.createElement('i');
+      i.style.background = it.color; i.style.opacity = it.op == null ? 1 : it.op;
+      li.appendChild(i); li.appendChild(document.createTextNode(it.name)); ul.appendChild(li);
+    });
+  }
+
+  // Horizontal bars growing from the right (RTL). series: [{key,name,color,op}]
+  function hbars(el, rows, o) {
+    el.replaceChildren();
+    const W = Math.max(280, el.clientWidth || 600), bh = o.bh || 22, gap = o.gap || 10, top = 4, axisH = 20;
+    const H = top + rows.length * (bh + gap) - gap + axisH + 6;
+    const svg = d3.select(el).append('svg').attr('class', 'gz-svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const lw = Math.min(W * 0.42, measure(svg, rows.map(o.label), 'gz-lb') + 10);
+    const vw = o.end ? measure(svg, rows.map(o.end), 'gz-val') + 10 : 4;
+    const total = (r) => d3.sum(o.series, (s) => num(r[s.key]));
+    const max = o.max != null ? o.max : d3.max(rows, total);
+    const x = d3.scaleLinear([0, max], [W - lw, vw]);
+    const ticks = x.ticks(Math.max(2, Math.floor((W - lw - vw) / 90)));
+    const yb = top + rows.length * (bh + gap) - gap;
+    svg.append('g').selectAll('line').data(ticks).join('line').attr('class', 'gz-grid-l')
+      .attr('x1', (d) => x(d)).attr('x2', (d) => x(d)).attr('y1', 0).attr('y2', yb);
+    svg.append('g').selectAll('text').data(ticks).join('text').attr('class', 'gz-tick').attr('text-anchor', 'middle')
+      .attr('x', (d) => x(d)).attr('y', yb + 16).text(o.tickFmt || F);
+    const tp = tip(el);
+    rows.forEach((r, i) => {
+      const y = top + i * (bh + gap);
+      svg.append('text').attr('class', 'gz-lb').attr('x', W - 2).attr('y', y + bh / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text(o.label(r));
+      let acc = 0;
+      o.series.forEach((s, j) => {
+        const v = num(r[s.key]); if (!v) return;
+        const xa = x(acc), xb = x(acc + v);
+        const w = Math.max(0.5, xa - xb - (j > 0 ? 2 : 0));
+        svg.append('rect').attr('x', xb).attr('y', y).attr('width', w).attr('height', bh).attr('rx', 4)
+          .attr('fill', typeof s.color === 'function' ? s.color(r) : s.color).attr('fill-opacity', typeof s.op === 'function' ? s.op(r) : (s.op == null ? 1 : s.op));
+        acc += v;
+      });
+      if (o.end) svg.append('text').attr('class', 'gz-val').attr('x', x(acc) - 6).attr('y', y + bh / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text(o.end(r));
+      svg.append('rect').attr('class', 'gz-hit').attr('x', 0).attr('y', y - gap / 2).attr('width', W).attr('height', bh + gap)
+        .on('pointermove', (ev) => tp.show(ev, o.label(r), o.tip(r)))
+        .on('pointerleave', () => tp.hide());
+    });
+  }
+
+  function drawTiers() {
+    const el = document.getElementById('c-tiers'); const rows = guard(el, 'tiers'); if (!rows) return;
+    const rs = rows.slice().sort((a, b) => num(a.tier) - num(b.tier));
+    hbars(el, rs, {
+      bh: 28, gap: 12,
+      label: (r) => r.status,
+      series: [{ key: 'items', color: (r) => tierFill(num(r.tier)), op: (r) => tierOp(num(r.tier)) }],
+      end: (r) => `${F(num(r.items))} · ${P(num(r.share))}`,
+      tip: (r) => [{ text: `${F(num(r.items))} کالا` }, { text: `${P(num(r.share))} از کل` }]
+    });
+  }
+
+  function drawHist() {
+    const el = document.getElementById('c-hist'); const rows = guard(el, 'score_hist'); if (!rows) return;
+    const tiers = [4, 3, 2, 1];
+    const names = {}; rows.forEach((r) => { names[num(r.tier)] = r.status; });
+    legend('lg-hist', [1, 2, 3, 4].map((t) => ({ name: names[t], color: tierFill(t), op: tierOp(t) })));
+    const bins = Array.from(d3.group(rows, (r) => num(r.score_from)), ([k, v]) => {
+      const o = { from: k, to: num(v[0].score_to) }; tiers.forEach((t) => { o[t] = d3.sum(v.filter((r) => num(r.tier) === t), (r) => num(r.items)); }); return o;
+    }).sort((a, b) => a.from - b.from);
+    el.replaceChildren();
+    const W = Math.max(280, el.clientWidth || 600), H = 250, mb = 34, mt = 8;
+    const svg = d3.select(el).append('svg').attr('class', 'gz-svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const ymax = d3.max(bins, (b) => d3.sum(tiers, (t) => b[t]));
+    const y = d3.scaleLinear([0, ymax], [H - mb, mt]).nice();
+    const yt = y.ticks(5);
+    const ml = measure(svg, yt.map(F), 'gz-tick') + 10;
+    const x = d3.scaleBand(bins.map((b) => b.from), [ml, W - 4]).padding(0.12);
+    svg.append('g').selectAll('line').data(yt).join('line').attr('class', 'gz-grid-l').attr('x1', ml).attr('x2', W - 4).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
+    svg.append('g').selectAll('text').data(yt).join('text').attr('class', 'gz-tick').attr('text-anchor', 'end').attr('x', ml - 6).attr('y', (d) => y(d)).attr('dy', '0.35em').text(F);
+    const every = Math.ceil(bins.length / Math.max(2, Math.floor((W - ml) / 60)));
+    svg.append('g').selectAll('text').data(bins.filter((b, i) => i % every === 0)).join('text').attr('class', 'gz-tick').attr('text-anchor', 'middle')
+      .attr('x', (b) => x(b.from) + x.bandwidth() / 2).attr('y', H - mb + 16).text((b) => b.from.toFixed(2));
+    svg.append('text').attr('class', 'gz-tick').attr('text-anchor', 'middle').attr('x', (ml + W) / 2).attr('y', H - 2).text('امتیاز شباهت (۰ تا ۱)');
+    const tp = tip(el);
+    bins.forEach((b) => {
+      let acc = 0;
+      tiers.forEach((t) => {
+        const v = b[t]; if (!v) return;
+        const y0 = y(acc), y1 = y(acc + v); const h = y0 - y1 - (acc > 0 ? 2 : 0);
+        if (h > 0.5) svg.append('rect').attr('x', x(b.from)).attr('y', y1).attr('width', x.bandwidth()).attr('height', h).attr('rx', 3).attr('fill', tierFill(t)).attr('fill-opacity', tierOp(t));
+        acc += v;
+      });
+      svg.append('rect').attr('class', 'gz-hit').attr('x', x(b.from)).attr('y', mt).attr('width', x.bandwidth()).attr('height', H - mb - mt)
+        .on('pointermove', (ev) => tp.show(ev, `امتیاز ${b.from.toFixed(2)} تا ${b.to.toFixed(2)}`, [1, 2, 3, 4].filter((t) => b[t]).map((t) => ({ color: tierFill(t), op: tierOp(t), text: `${names[t]}: ${F(b[t])}` }))))
+        .on('pointerleave', () => tp.hide());
+    });
+  }
+
+  function drawNum() {
+    const el = document.getElementById('c-num'); const rows = guard(el, 'numcheck'); if (!rows) return;
+    hbars(el, rows, {
+      bh: 24, gap: 10,
+      label: (r) => r.check,
+      series: [{ key: 'items', color: (r) => r.check === rows[0].check ? dash.colors[0] : 'var(--cds-chart-muted)' }],
+      end: (r) => `${F(num(r.items))} · ${P(num(r.share))}`,
+      tip: (r) => [{ text: `${F(num(r.items))} کالا` }, { text: `${P(num(r.share))} از کل` }]
+    });
+  }
+
+  function drawNaming() {
+    const tb = document.querySelector('#t-naming tbody'); const d = dash.data('naming');
+    tb.replaceChildren(); if (d.status !== 'ok') return;
+    d.data.forEach((r) => {
+      const tr = document.createElement('tr');
+      const isCount = /میانگین|تعداد/.test(r.metric);
+      const fmt = (v) => isCount ? (Number.isInteger(num(v)) ? F(num(v)) : d3.format(',.1f')(num(v))) : P(num(v));
+      [r.metric, fmt(r.glucosan), fmt(r.zarnam)].forEach((v, i) => { const td = document.createElement('td'); if (i) td.className = 'n'; td.textContent = v; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+  }
+
+  function drawFam() {
+    const el = document.getElementById('c-fam'); const rows = guard(el, 'families'); if (!rows) return;
+    const S = [
+      { key: 'shared', name: 'مشترک (قطعی + قوی)', color: dash.colors[0], op: 1 },
+      { key: 'probable', name: 'احتمالی', color: dash.colors[0], op: 0.32 },
+      { key: 'no_match', name: 'غیرمشترک', color: 'var(--cds-chart-muted)', op: 1 }
+    ];
+    legend('lg-fam', S);
+    const rs = rows.map((r) => { const t = num(r.total); return { family: r.family, total: t, shared: num(r.shared) / t, probable: num(r.probable) / t, no_match: num(r.no_match) / t, raw: r }; });
+    hbars(el, rs, {
+      bh: 22, gap: 10, max: 1, tickFmt: P0,
+      label: (r) => r.family,
+      series: S,
+      end: (r) => F(r.total),
+      tip: (r) => S.map((s) => ({ color: s.color, op: s.op, text: `${s.name}: ${F(num(r.raw[s.key]))} (${P(r[s.key])})` }))
+    });
+  }
+
+  function drawFamTable() {
+    const tb = document.querySelector('#t-fam tbody'); const d = dash.data('families');
+    tb.replaceChildren(); if (d.status !== 'ok') return;
+    const maxShare = d3.max(d.data, (r) => num(r.shared_share));
+    d.data.forEach((r) => {
+      const tr = document.createElement('tr');
+      const c1 = document.createElement('td'); c1.textContent = r.family; tr.appendChild(c1);
+      const c2 = document.createElement('td'); c2.className = 'n'; c2.textContent = F(num(r.total)); tr.appendChild(c2);
+      const c3 = document.createElement('td'); c3.className = 'n';
+      const wrap = document.createElement('div'); wrap.className = 'gz-inbar';
+      const bar = document.createElement('span'); bar.className = 'b'; bar.style.width = (60 * num(r.shared_share) / maxShare) + 'px'; bar.style.background = dash.colors[0];
+      const tx = document.createElement('span'); tx.textContent = P(num(r.shared_share));
+      wrap.appendChild(bar); wrap.appendChild(tx); c3.appendChild(wrap); tr.appendChild(c3);
+      const c4 = document.createElement('td'); c4.className = 'n'; c4.textContent = P(num(r.any_share)); tr.appendChild(c4);
+      const c5 = document.createElement('td'); c5.className = 'n';
+      const chip = document.createElement('span'); chip.className = 'gz-chip'; const v = num(r.residual);
+      const a = Math.min(Math.abs(v) / 12, 1) * 0.55;
+      chip.style.background = `color-mix(in srgb, ${v >= 0 ? dash.colors[0] : 'var(--cds-chart-status-critical)'} ${Math.round(a * 100)}%, transparent)`;
+      chip.textContent = D2(v); c5.appendChild(chip); tr.appendChild(c5);
+      tb.appendChild(tr);
+    });
+  }
+
+  function drawHeat() {
+    const el = document.getElementById('c-heat'); const rows = guard(el, 'uom_matrix'); if (!rows) return;
+    el.replaceChildren();
+    const rN = Array.from(new Set(rows.map((r) => r.glucosan_unit))), cN = Array.from(new Set(rows.map((r) => r.zarnam_unit)));
+    const W = Math.max(280, el.clientWidth || 600);
+    const svg = d3.select(el).append('svg').attr('class', 'gz-svg').attr('width', '100%');
+    const lw = measure(svg, rN, 'gz-lb') + 10, top = 26;
+    const cw = (W - lw - 2) / cN.length, ch = Math.max(24, Math.min(34, cw * 0.7));
+    const H = top + ch * rN.length + 4; svg.attr('viewBox', `0 0 ${W} ${H}`);
+    const hi = cssColor(dash.colors[0]), lo = cssColor('var(--color-panel)');
+    const vmax = d3.max(rows, (r) => num(r.items));
+    const s = d3.scaleLog([1, vmax], [0.12, 1]).clamp(true);
+    const col = (v) => v ? d3.interpolateRgb(lo, hi)(s(v)) : 'transparent';
+    svg.append('g').selectAll('text').data(cN).join('text').attr('class', 'gz-tick').attr('text-anchor', 'middle')
+      .attr('x', (c, j) => 2 + j * cw + cw / 2).attr('y', top - 8).text((c) => c);
+    const tp = tip(el);
+    rN.forEach((rn, i) => {
+      svg.append('text').attr('class', 'gz-lb').attr('x', W - 2).attr('y', top + i * ch + ch / 2).attr('dy', '0.35em').attr('text-anchor', 'end').text(rn);
+      cN.forEach((cn, j) => {
+        const r = rows.find((q) => q.glucosan_unit === rn && q.zarnam_unit === cn); const v = r ? num(r.items) : 0;
+        const x = 2 + j * cw, y = top + i * ch; const same = UNIT_CODE[rn] === cn;
+        svg.append('rect').attr('x', x + 1).attr('y', y + 1).attr('width', cw - 2).attr('height', ch - 2).attr('rx', 3)
+          .attr('fill', v ? col(v) : 'var(--cds-chart-grid)').attr('fill-opacity', v ? 1 : 0.35)
+          .attr('stroke', same ? 'var(--color-fg)' : 'none').attr('stroke-width', same ? 1.5 : 0);
+        if (v) svg.append('text').attr('class', 'gz-val').attr('text-anchor', 'middle').attr('x', x + cw / 2).attr('y', y + ch / 2).attr('dy', '0.35em')
+          .style('fill', s(v) > 0.6 ? '#ffffff' : 'var(--color-fg)').text(F(v));
+        svg.append('rect').attr('class', 'gz-hit').attr('x', x).attr('y', y).attr('width', cw).attr('height', ch)
+          .on('pointermove', (ev) => tp.show(ev, `گلوکوزان: ${rn} ← زرنام: ${cn}`, [{ text: `${F(v)} کالا` }, { text: same ? 'واحد یکسان' : 'نیاز به ضریب تبدیل' }]))
+          .on('pointerleave', () => tp.hide());
+      });
+    });
+  }
+
+  function drawUom() {
+    const el = document.getElementById('c-uom'); const rows = guard(el, 'uom_status'); if (!rows) return;
+    const S = [{ key: 'shared', name: 'مشترک (قطعی + قوی)', color: dash.colors[0], op: 1 }, { key: 'probable', name: 'احتمالی', color: dash.colors[0], op: 0.32 }];
+    legend('lg-uom', S);
+    hbars(el, rows, {
+      bh: 24, gap: 12, label: (r) => r.status, series: S,
+      end: (r) => F(num(r.shared) + num(r.probable)),
+      tip: (r) => S.map((s) => ({ color: s.color, op: s.op, text: `${s.name}: ${F(num(r[s.key]))}` }))
+    });
+  }
+
+  function drawGroups() {
+    const el = document.getElementById('c-grp'); const rows = guard(el, 'zgroups'); if (!rows) return;
+    const S = [{ key: 'definite', name: 'مشترک قطعی', color: dash.colors[0], op: 1 }, { key: 'strong', name: 'مشترک قوی', color: dash.colors[0], op: 0.62 }, { key: 'probable', name: 'احتمالی', color: dash.colors[0], op: 0.32 }];
+    legend('lg-grp', S);
+    hbars(el, rows, {
+      bh: 20, gap: 9, label: (r) => r.group, series: S,
+      end: (r) => F(num(r.total)),
+      tip: (r) => S.map((s) => ({ color: s.color, op: s.op, text: `${s.name}: ${F(num(r[s.key]))}` }))
+    });
+  }
+
+  function drawNewType() {
+    const el = document.getElementById('c-newtype'); const rows = guard(el, 'newcodes_type'); if (!rows) return;
+    hbars(el, rows, {
+      bh: 22, gap: 10, label: (r) => r.material_type,
+      series: [{ key: 'items', color: (r) => r === rows[0] ? dash.colors[0] : 'var(--cds-chart-muted)' }],
+      end: (r) => `${F(num(r.items))} · ${P(num(r.share))}`,
+      tip: (r) => [{ text: `${F(num(r.items))} کد جدید` }, { text: `${P(num(r.share))} از کدهای جدید` }]
+    });
+  }
+
+  function drawRisk() {
+    const tb = document.querySelector('#t-risk tbody'); const d = dash.data('kpis');
+    tb.replaceChildren(); if (d.status !== 'ok') return;
+    RISK.forEach((k) => {
+      const r = d.data.find((q) => q.metric === k); if (!r) return;
+      const tr = document.createElement('tr'); tr.setAttribute('data-key', r.metric);
+      const a = document.createElement('td'); a.textContent = r.label; tr.appendChild(a);
+      const b = document.createElement('td'); b.className = 'n';
+      const v = num(r.value); b.textContent = PCT_METRICS.has(k) ? P(v) : (k === 'kappa' ? v.toFixed(2) : F(v));
+      tr.appendChild(b); tb.appendChild(tr);
+    });
+  }
+
+  function line(el, rows, key, o) {
+    el.replaceChildren();
+    const W = Math.max(280, el.clientWidth || 600), H = 230, mt = 18, mb = 34;
+    const svg = d3.select(el).append('svg').attr('class', 'gz-svg').attr('width', '100%').attr('viewBox', `0 0 ${W} ${H}`);
+    const y = d3.scaleLinear([o.min, o.max], [H - mb, mt]).nice(); const yt = y.ticks(5);
+    const ml = measure(svg, yt.map(F), 'gz-tick') + 10;
+    const endW = measure(svg, [F(num(rows[rows.length - 1][key]))], 'gz-val') + 14;
+    const x = d3.scaleLinear([0, 1], [ml, W - endW]);
+    svg.append('g').selectAll('line').data(yt).join('line').attr('class', 'gz-grid-l').attr('x1', ml).attr('x2', W - endW).attr('y1', (d) => y(d)).attr('y2', (d) => y(d));
+    svg.append('g').selectAll('text').data(yt).join('text').attr('class', 'gz-tick').attr('text-anchor', 'end').attr('x', ml - 6).attr('y', (d) => y(d)).attr('dy', '0.35em').text(F);
+    svg.append('g').selectAll('text').data([0, 0.25, 0.5, 0.75, 1]).join('text').attr('class', 'gz-tick').attr('text-anchor', 'middle').attr('x', (d) => x(d)).attr('y', H - mb + 16).text(P0);
+    svg.append('text').attr('class', 'gz-tick').attr('text-anchor', 'middle').attr('x', (ml + W - endW) / 2).attr('y', H - 2).text('درصد تأیید موارد احتمالی');
+    const pts = rows.map((r) => ({ p: num(r.review_approval), v: num(r[key]), r }));
+    svg.append('path').datum(pts).attr('fill', 'none').attr('stroke', o.color).attr('stroke-width', 2).attr('stroke-linecap', 'round').attr('stroke-linejoin', 'round')
+      .attr('d', d3.line().x((d) => x(d.p)).y((d) => y(d.v)));
+    const last = pts[pts.length - 1], first = pts[0];
+    svg.append('text').attr('class', 'gz-val').attr('x', x(last.p) + 6).attr('y', y(last.v)).attr('dy', '0.35em').text(F(last.v));
+    svg.append('text').attr('class', 'gz-val').attr('x', x(first.p) + 6).attr('y', y(first.v) + (o.firstBelow ? 14 : -10)).text(F(first.v));
+    const tp = tip(el);
+    const dot = svg.append('circle').attr('r', 5).attr('fill', o.color).attr('stroke', 'var(--color-panel)').attr('stroke-width', 2).style('display', 'none');
+    svg.append('rect').attr('class', 'gz-hit').attr('x', ml).attr('y', mt).attr('width', W - endW - ml).attr('height', H - mb - mt)
+      .on('pointermove', (ev) => {
+        const [mx] = d3.pointer(ev); const p = x.invert(mx);
+        const d = pts.reduce((a, b) => Math.abs(b.p - p) < Math.abs(a.p - p) ? b : a);
+        dot.style('display', null).attr('cx', x(d.p)).attr('cy', y(d.v));
+        tp.show(ev, `تأیید ${P0(d.p)} از موارد احتمالی`, [{ text: `${o.name}: ${F(d.v)}` }]);
+      })
+      .on('pointerleave', () => { tp.hide(); dot.style('display', 'none'); });
+  }
+
+  function drawScenario() {
+    const e1 = document.getElementById('c-scn1'), e2 = document.getElementById('c-scn2');
+    const r1 = guard(e1, 'scenario'); guard(e2, 'scenario');
+    const tb = document.querySelector('#t-scn tbody'); tb.replaceChildren();
+    if (!r1) return;
+    const rows = r1.slice().sort((a, b) => num(a.review_approval) - num(b.review_approval));
+    line(e1, rows, 'extendable', { min: 0, max: d3.max(rows, (r) => num(r.extendable)), color: dash.colors[0], name: 'قابل اکستند' });
+    line(e2, rows, 'new_codes', { min: d3.min(rows, (r) => num(r.new_codes)) * 0.95, max: d3.max(rows, (r) => num(r.new_codes)), color: 'var(--cds-chart-status-critical)', name: 'کد جدید', firstBelow: true });
+    rows.forEach((r) => {
+      const tr = document.createElement('tr');
+      [String(r.review_approval), F(num(r.extendable)), P(num(r.share)), F(num(r.new_codes))].forEach((v) => { const td = document.createElement('td'); td.className = 'n'; td.textContent = v; tr.appendChild(td); });
+      tb.appendChild(tr);
+    });
+  }
+
+  function fillMarks() {
+    document.querySelectorAll('.gz [data-source][data-field]:not(th)').forEach((el) => {
+      if (el.closest('table')) return;
+      const id = el.getAttribute('data-source'); const d = dash.data(id);
+      if (d.status !== 'ok') { if (d.status !== 'loading') el.classList.remove('dash-skeleton'); el.textContent = '—'; return; }
+      el.classList.remove('dash-skeleton');
+      const field = el.getAttribute('data-field'); let row = null;
+      if (el.hasAttribute('data-row')) row = d.data[Number(el.getAttribute('data-row'))];
+      else {
+        const [k, v] = el.getAttribute('data-where').split('=');
+        row = d.data.find((r) => String(r[k]) === decodeURIComponent(v));
+      }
+      if (!row) { el.textContent = '—'; return; }
+      const v = num(row[field]);
+      el.textContent = (field === 'share') ? P(v) : F(v);
+    });
+  }
+
+  dash.onData(() => {
+    fillMarks();
+    drawTiers(); drawHist(); drawNum(); drawNaming(); drawFam(); drawFamTable();
+    drawHeat(); drawUom(); drawGroups(); drawNewType(); drawRisk(); drawScenario();
+  });
+})();
+</script>
