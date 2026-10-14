@@ -1,0 +1,146 @@
+<title>یکسان‌سازی کدینگ گلوکوزان</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;700;800&display=swap">
+<style>
+/* Layout: a single A4 report sheet, RTL; header band, KPI strip, status bar, two-column body, numbered roadmap */
+:root{
+  --paper:#fbfaf6; --sheet:#ffffff; --ink:#1d2621; --muted:#5e6a62; --rule:#dfe3dc;
+  --accent:#2f5d46; --gold:#c8962a; --gold-soft:#f6ecd5;
+  --t1:#2f7d4f; --t2:#79b38c; --t3:#e0b44a; --t4:#d9826a;
+  --font:"Vazirmatn",Tahoma,"Segoe UI",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#141915; --sheet:#1b221d; --ink:#e7ece8; --muted:#a3afa7; --rule:#2f3a33;
+  --accent:#8cc5a3; --gold:#e3b75a; --gold-soft:#3a3120;
+  --t1:#4fa872; --t2:#8fc8a1; --t3:#e3bb58; --t4:#e0907a; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#141915; --sheet:#1b221d; --ink:#e7ece8; --muted:#a3afa7; --rule:#2f3a33;
+  --accent:#8cc5a3; --gold:#e3b75a; --gold-soft:#3a3120;
+  --t1:#4fa872; --t2:#8fc8a1; --t3:#e3bb58; --t4:#e0907a; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--paper);color:var(--ink);font-family:var(--font);font-size:13px;line-height:1.7;
+  padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.sheet{direction:rtl;max-width:210mm;margin:0 auto;background:var(--sheet);border:1px solid var(--rule);padding:28px 32px;display:flex;flex-direction:column;gap:14px}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--accent);padding-bottom:10px}
+h1{font-size:21px;font-weight:800;margin:0;line-height:1.35;text-wrap:balance}
+.sub{color:var(--muted);font-size:12px;margin:2px 0 0}
+.meta{font-size:11.5px;color:var(--muted);text-align:left;line-height:1.6}
+.meta b{color:var(--ink);font-weight:500}
+h2{font-size:13.5px;font-weight:700;color:var(--accent);margin:0 0 6px;letter-spacing:0}
+p{margin:0}
+.lead{background:var(--gold-soft);border-right:3px solid var(--gold);padding:9px 12px;font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.kpi{border:1px solid var(--rule);padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.kpi .v{font-size:22px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
+.kpi .l{font-size:11.5px;color:var(--muted)}
+.kpi.hi .v{color:var(--t1)} .kpi.lo .v{color:var(--t4)}
+.bar{display:flex;height:16px;gap:2px;margin:4px 0 6px}
+.seg{display:block;min-width:4px}
+.t1{background:var(--t1)} .t2{background:var(--t2)} .t3{background:var(--t3)} .t4{background:var(--t4)}
+.legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:2px 18px;font-size:12px}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend .ll{flex:1} .legend b{font-variant-numeric:tabular-nums} .legend em{font-style:normal;color:var(--muted);min-width:42px;text-align:left}
+.sw{width:10px;height:10px;display:inline-block}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.cols>section{min-width:0}
+table{width:100%;border-collapse:collapse;font-size:11.5px}
+th{text-align:right;font-weight:500;color:var(--muted);border-bottom:1px solid var(--rule);padding:3px 4px}
+td{padding:3px 4px;border-bottom:1px solid var(--rule)}
+td.num,th.num{text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
+.code{font-family:ui-monospace,Consolas,monospace;font-size:10.5px;color:var(--accent);direction:ltr;unicode-bidi:isolate}
+.note{font-size:11.5px;color:var(--muted);margin-top:5px}
+ul.pts{margin:0;padding:0 16px 0 0;font-size:12px;display:flex;flex-direction:column;gap:2px}
+.key{border:1px solid var(--accent);padding:8px 12px;font-size:12.5px}
+.key b{color:var(--accent)}
+ol.road{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;counter-reset:s}
+ol.road li{counter-increment:s;border-top:3px solid var(--accent);padding-top:5px;font-size:11.5px;line-height:1.55}
+ol.road li::before{content:"گام " counter(s,persian);display:block;font-weight:700;color:var(--accent);font-size:11.5px}
+ol.road li b{display:block;font-weight:700;font-size:12px}
+footer{border-top:1px solid var(--rule);padding-top:7px;font-size:10.5px;color:var(--muted);line-height:1.6}
+@media (max-width:640px){
+  .sheet{padding:18px 14px} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .cols{grid-template-columns:minmax(0,1fr)} ol.road{grid-template-columns:minmax(0,1fr)} .legend{grid-template-columns:minmax(0,1fr)}
+}
+@page{size:A4;margin:8mm 9mm}
+@media print{
+  :root{--paper:#fff;--sheet:#fff;--ink:#1d2621;--muted:#5e6a62;--rule:#dfe3dc;--accent:#2f5d46;--gold:#c8962a;--gold-soft:#f6ecd5;--t1:#2f7d4f;--t2:#79b38c;--t3:#e0b44a;--t4:#d9826a;color-scheme:light}
+  body{padding:0;font-size:11.5px;line-height:1.6} .sheet{border:0;padding:0;max-width:none;gap:8px} .lead{padding:7px 10px} .kpi .v{font-size:20px}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+</style>
+<article class="sheet">
+<header>
+  <div>
+    <h1>گزارش یکسان‌سازی کدینگ کالا: گلوکوزان و زرنام</h1>
+    <p class="sub">انتقال گلوکوزان از راهکاران به SAP و اکستند کدهای متریال زرنام</p>
+  </div>
+  <div class="meta">تاریخ: <b>۲۲ مهر ۱۴۰۵</b><br>پلنت مبدأ SAP زرنام: <b>۱۰۰۲</b></div>
+</header>
+
+<p class="lead">از <b>۱۲٬۹۸۰</b> کالای گلوکوزان، فقط <b>۸۰۱ کالا (۶٫۲٪)</b> با اطمینان در SAP زرنام معادل دارند و مستقیماً قابل اکستندند. <b>۲٬۲۹۵</b> کالای دیگر کاندید احتمالی دارند و کارشناس باید آن‌ها را تأیید کند. <b>۹٬۸۸۴ کالا (۷۶٫۱٪)</b> در زرنام معادلی ندارند و کد جدید لازم دارند؛ بیشتر آن‌ها قطعات یدکی خاص ماشین‌آلات گلوکوزان هستند. در بهترین حالت، پس از بررسی کارشناسی حدود <b>۲۳٫۹٪</b> کالاها قابل اکستند خواهند بود.</p>
+
+<div class="kpis">
+  <div class="kpi"><span class="v">۱۲٬۹۸۰</span><span class="l">کالای گلوکوزان (راهکاران)</span></div>
+  <div class="kpi"><span class="v">۳۷٬۱۲۸</span><span class="l">متریال یکتای زرنام (SAP)</span></div>
+  <div class="kpi hi"><span class="v">۸۰۱</span><span class="l">قابل اکستند مستقیم (۶٫۲٪)</span></div>
+  <div class="kpi lo"><span class="v">۹٬۸۸۴</span><span class="l">نیاز به کد جدید (۷۶٫۱٪)</span></div>
+</div>
+
+<section>
+  <h2>وضعیت تطابق کالاهای گلوکوزان با زرنام</h2>
+  <div class="bar" role="img" aria-label="سهم هر وضعیت تطابق"><span class="seg t1" style="flex:535" title="مشترک - تطابق قطعی"></span><span class="seg t2" style="flex:266" title="مشترک - تطابق قوی"></span><span class="seg t3" style="flex:2295" title="احتمالی - نیاز به بررسی"></span><span class="seg t4" style="flex:9884" title="غیرمشترک - نیاز به کد جدید"></span></div>
+  <ul class="legend"><li><i class="sw t1"></i><span class="ll">مشترک - تطابق قطعی</span><b>۵۳۵</b><em>۴٫۱٪</em></li><li><i class="sw t2"></i><span class="ll">مشترک - تطابق قوی</span><b>۲۶۶</b><em>۲٫۰٪</em></li><li><i class="sw t3"></i><span class="ll">احتمالی - نیاز به بررسی</span><b>۲٬۲۹۵</b><em>۱۷٫۷٪</em></li><li><i class="sw t4"></i><span class="ll">غیرمشترک - نیاز به کد جدید</span><b>۹٬۸۸۴</b><em>۷۶٫۱٪</em></li></ul>
+</section>
+
+<div class="cols">
+  <section>
+    <h2>تطابق به تفکیک خانوادهٔ کد گلوکوزان</h2>
+    <table>
+      <thead><tr><th>پیشوند</th><th>نوع کالا</th><th class="num">تعداد</th><th class="num">مشترک</th><th class="num">با احتمالی</th></tr></thead>
+      <tbody><tr><td>۳۱</td><td>قطعات یدکی و فنی</td><td class="num">۹٬۴۶۱</td><td class="num">۴٫۷٪</td><td class="num">۲۲٫۵٪</td></tr><tr><td>۳۵</td><td>تجهیزات، برد و اقلام عمومی</td><td class="num">۱٬۴۰۳</td><td class="num">۶٫۳٪</td><td class="num">۲۰٫۵٪</td></tr><tr><td>۹۹</td><td>اداری، فرم و IT</td><td class="num">۶۲۶</td><td class="num">۱۵٫۵٪</td><td class="num">۳۷٫۴٪</td></tr><tr><td>۱۶</td><td>برق و الکتروموتور</td><td class="num">۵۵۵</td><td class="num">۲٫۰٪</td><td class="num">۱۶٫۴٪</td></tr><tr><td>۸۸</td><td>آزمایشگاه</td><td class="num">۳۰۲</td><td class="num">۱۷٫۲٪</td><td class="num">۳۵٫۱٪</td></tr><tr><td>۷۷</td><td>خوراکی و رفاهی</td><td class="num">۲۱۳</td><td class="num">۳۴٫۷٪</td><td class="num">۵۵٫۹٪</td></tr><tr><td>سایر</td><td>مواد اولیه، بسته‌بندی، محصول</td><td class="num">۴۲۰</td><td class="num">—</td><td class="num">—</td></tr></tbody>
+    </table>
+    <p class="note">بیشترین هم‌پوشانی در اقلام خوراکی، اداری و آزمایشگاهی است و کمترین در قطعات یدکی و برقی.</p>
+  </section>
+  <section>
+    <h2>واحد سنجش</h2>
+    <p style="font-size:12px">از ۸۰۱ کالای مشترک، <b>۸۷٫۰٪</b> واحد پایهٔ یکسان دارند. <b>۲۷</b> کالا با ضریب ثابت تبدیل می‌شوند (مثل عدد و دستگاه با ضریب ۱) و <b>۷۷</b> کالا ضریب تبدیل اختصاصی همان کالا را لازم دارند.</p>
+    <table style="margin-top:4px">
+      <thead><tr><th>واحد راهکاران</th><th>واحد زرنام</th><th class="num">تعداد*</th></tr></thead>
+      <tbody><tr><td>عدد</td><td><span class="code">DST</span> دستگاه</td><td class="num">۵۵</td></tr><tr><td>دستگاه</td><td><span class="code">PC</span> عدد</td><td class="num">۳۹</td></tr><tr><td>کیلوگرم</td><td><span class="code">M</span> متر</td><td class="num">۳۸</td></tr><tr><td>شاخه</td><td><span class="code">M</span> متر</td><td class="num">۲۸</td></tr><tr><td>متر</td><td><span class="code">PC</span> عدد</td><td class="num">۲۸</td></tr><tr><td>عدد</td><td><span class="code">DAS</span> دست</td><td class="num">۲۴</td></tr></tbody>
+    </table>
+    <p class="note">* پرتکرارترین مغایرت‌ها در کالاهای مشترک و احتمالی.</p>
+  </section>
+</div>
+
+<div class="cols">
+  <section>
+    <h2>ریسک‌های کیفیت داده</h2>
+    <ul class="pts">
+      <li><b>۴۱۶</b> کالای گلوکوزان در <b>۱۹۶</b> گروه تکراری‌اند (شرح یکسان، کد متفاوت) و باید به یک کد برسند.</li>
+      <li><b>۱٬۱۸۹</b> کالای مشترک یا احتمالی، چندتایی روی یک کد زرنام نشسته‌اند؛ برای ادغام یا تفکیک تصمیم لازم است.</li>
+      <li><b>۴۸۴</b> متریال زرنام شرح تکراری دارند؛ کد مقصد باید با دقت انتخاب شود.</li>
+      <li><b>۱٬۷۷۱</b> عنوان گلوکوزان از سقف ۴۰ کاراکتری شرح کوتاه SAP طولانی‌ترند و <b>۳٬۱۶۷</b> کالا مشخصهٔ فنی دارند که باید به متن بلند منتقل شود.</li>
+      <li><b>۲۴۳</b> کالای تولیدی (مادهٔ اولیه، نیمه‌ساخته، محصول) به بررسی BOM، Routing و نماهای MRP و بهای تمام‌شده نیاز دارند.</li>
+    </ul>
+  </section>
+  <section>
+    <h2>نکتهٔ کلیدی SAP</h2>
+    <div class="key">شرح، <b>واحد پایه</b>، گروه کالا و نوع متریال در سطح Client (جدول <span class="code">MARA</span>) بین دو شرکت مشترک است. با اکستند فقط نماهای پلنت، انبار، خرید و حسابداری برای گلوکوزان ساخته می‌شود. بنابراین واحد پایه را نمی‌توان فقط برای گلوکوزان تغییر داد؛ مغایرت با <b>واحد فرعی</b> (<span class="code">MARM</span>) یا تبدیل مانده‌ها به واحد پایهٔ زرنام حل می‌شود.</div>
+    <p class="note">کدهای جدید هم در همان Client ساخته می‌شوند و برای هر دو شرکت قابل استفاده‌اند؛ پس پیش از ساخت، دستورالعمل نام‌گذاری مشترک لازم است.</p>
+  </section>
+</div>
+
+<section>
+  <h2>نقشهٔ راه پیشنهادی</h2>
+  <ol class="road">
+    <li><b>تأیید واحدها</b>نگاشت واحدهای راهکاران به جدول <span class="code">T006</span> تأیید شود.</li>
+    <li><b>اکستند انبوه</b>۸۰۱ کالای مشترک پس از کنترل نمونه‌ای با LSMW یا MASS اکستند شوند.</li>
+    <li><b>بررسی کارشناسی</b>۲٬۲۹۵ کالای احتمالی از میان ۳ کاندید پیشنهادی تأیید یا رد شوند.</li>
+    <li><b>کد جدید</b>پس از ادغام تکراری‌ها، کدهای جدید با نوع و گروه پیشنهادی ساخته شوند.</li>
+    <li><b>موجودی افتتاحیه</b>مانده‌ها به واحد پایهٔ SAP تبدیل و بارگذاری شوند.</li>
+  </ol>
+</section>
+
+<footer>روش: شرح‌ها پس از یکسان‌سازی متن فارسی (ی و ک عربی، ارقام، اینچ، واحدها) با شباهت متنی مقایسه شدند. مغایرت اعداد و ابعاد یا اسم اصلی کالا مانع تطابق است. در نمونه‌گیری، حدود ۱ مورد از هر ۱۰ تطابق «قوی» نادرست بود؛ کنترل نمونه‌ای پیش از اکستند ضروری است. فایل زرنام ۱۳۳٬۷۲۴ ردیف داشت که پس از حذف تکرار، ۳۷٬۱۲۸ متریال یکتا ماند. جزئیات کامل در فایل اکسل «تحلیل_یکسان_سازی_کدینگ_گلوکوزان_زرنام» آمده است.</footer>
+</article>
