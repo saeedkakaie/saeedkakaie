@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Integrated Business Planning — نرم‌افزار برنامه‌ریزی یکپارچه کسب‌وکار">
+  <title>Integrated Business Planning</title>
+  <link rel="stylesheet" href="assets/css/fonts.css">
+  <link rel="stylesheet" href="assets/css/app.css">
+  <script>
+    // اعمال پوسته پیش از نمایش صفحه تا صفحه چشمک نزند
+    try { var t = localStorage.getItem('ibp-theme'); if (t === 'dark' || t === 'light') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+  </script>
+</head>
+<body>
+  <div id="boot" class="boot"><div class="boot-inner"><div class="boot-spinner"></div>در حال بارگذاری Integrated Business Planning…</div></div>
+  <div id="root"></div>
+  <div id="toasts" aria-live="polite"></div>
+
+  <!-- هسته -->
+  <script src="js/core/format.js"></script>
+  <script src="js/core/jalali.js"></script>
+  <script src="js/core/schema.js"></script>
+  <script src="js/core/store.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/analytics.js"></script>
+  <!-- اجزای رابط -->
+  <script src="js/components/charts.js"></script>
+  <script src="js/components/form.js"></script>
+  <script src="js/components/grid.js"></script>
+  <script src="js/components/csv.js"></script>
+  <!-- داده تستی -->
+  <script src="js/data/templates.js"></script>
+  <script src="js/data/seed.js"></script>
+  <!-- ماژول‌ها -->
+  <script src="js/modules/dashboard.js"></script>
+  <script src="js/modules/cycle.js"></script>
+  <script src="js/modules/masterdata.js"></script>
+  <script src="js/modules/roadmap.js"></script>
+  <script src="js/modules/settings.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
