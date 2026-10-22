@@ -65,37 +65,49 @@
   function importDialog(entityKey, done) {
     var def = SC.entity(entityKey);
     var body = h('div',
-      h('p.confirm-text', 'فایل CSV (ذخیره‌شده از Excel با قالب «CSV UTF-8») را انتخاب کنید. ردیف اول باید عنوان ستون‌ها باشد.'),
+      h('p.confirm-text', 'فایل Excel (xlsx) یا CSV را انتخاب کنید. ردیف اول باید عنوان ستون‌ها باشد؛ ساده‌ترین راه، دریافت فایل الگو و تکمیل آن است.'),
       h('ul.muted', { style: { lineHeight: '2', paddingInlineStart: '18px', fontSize: '12.5px' } },
         h('li', 'ستون‌های الزامی: ' + def.fields.filter(function (f) { return f.required; }).map(function (f) { return f.label; }).join('، ')),
         h('li', 'ارجاع‌ها (مثل خانواده یا کارخانه) با «کد» یا «نام» شناسایی می‌شوند.'),
-        def.fields.some(function (f) { return f.key === 'code'; }) ? h('li', 'رکوردهایی که کد آن‌ها موجود است به‌روزرسانی می‌شوند.') : null,
-        h('li', 'تاریخ‌ها شمسی (۱۴۰۵/۰۷/۱۵) و دوره‌ها به‌صورت ۱۴۰۵/۰۷ وارد شوند.')
-      ),
+        def.naturalKey ? h('li', 'رکوردهای موجود (بر اساس ' + def.naturalKey.map(function (k) { return SC.field(entityKey, k).label; }).join(' + ') + ') به‌روزرسانی می‌شوند.') : null,
+        h('li', 'تاریخ‌ها شمسی (۱۴۰۵/۰۷/۱۵) و دوره‌ها به‌صورت ۱۴۰۵/۰۷ وارد شوند.'),
+        h('li', 'برای ورود چند بخش با هم از «مرکز داده» استفاده کنید.')),
       h('div', { style: { display: 'flex', gap: '8px', marginTop: '12px' } },
-        h('button.btn', { type: 'button', html: icon('download', 16) + '<span>دریافت فایل الگو</span>', onclick: function () { IBP.csv.template(entityKey); } }))
+        IBP.ui.excelButton('دریافت فایل الگو', function () { return IBP.dataio.downloadTemplate({ entities: [entityKey], filename: 'الگوی ' + def.label }); }))
     );
     IBP.ui.modal({
       title: 'ورود ' + def.label + ' از فایل', body: body,
       actions: [
         { label: 'انصراف' },
         {
-          label: 'انتخاب فایل و ورود', primary: true, onClick: function (close) {
-            IBP.ui.pickFile('.csv,.txt').then(function (file) {
+          label: 'انتخاب فایل', primary: true, onClick: function (close) {
+            var input = h('input', { type: 'file', accept: '.xlsx,.csv,.txt' });
+            input.addEventListener('change', function () {
+              var file = input.files && input.files[0];
               if (!file) return;
-              var res = IBP.csv.importEntity(entityKey, file.text);
-              close();
-              var msg = F.num(res.inserted) + ' رکورد جدید، ' + F.num(res.updated) + ' به‌روزرسانی';
-              if (res.errors.length) {
+              IBP.excel.readFile(file).then(function (wb) {
+                var plan = IBP.dataio.plan(wb.sheets, { entityHint: entityKey });
+                plan.items = plan.items.filter(function (it) { return it.entity === entityKey; });
+                close();
+                var it = plan.items[0];
+                if (!it) { IBP.ui.toast('برگه‌ای برای «' + def.label + '» در فایل یافت نشد', 'warning'); return; }
+                plan.errorsTotal = it.errors.length; plan.rowsTotal = it.rows;
                 IBP.ui.modal({
-                  title: 'نتیجه ورود داده',
-                  body: '<p class="confirm-text">' + msg + ' · <b>' + F.num(res.errors.length) + ' خطا</b></p><div style="max-height:300px;overflow:auto;font-size:12.5px;line-height:2">' +
-                    res.errors.slice(0, 200).map(function (e) { return 'ردیف ' + F.num(e.line) + ': ' + F.escape(e.msg); }).join('<br>') + '</div>',
-                  actions: [{ label: 'بستن', primary: true }]
+                  title: 'پیش‌نمایش ورود ' + def.label,
+                  body: '<p class="confirm-text">' + F.num(it.rows) + ' ردیف · <b>' + F.num(it.inserts) + '</b> جدید · <b>' + F.num(it.updates) + '</b> به‌روزرسانی · <b>' + F.num(it.errors.length) + '</b> خطا</p>' +
+                    (it.errors.length ? '<div style="max-height:260px;overflow:auto;font-size:12.5px;line-height:2;color:var(--critical-text)">' + it.errors.slice(0, 150).map(function (e) { return 'ردیف ' + F.num(e.row) + (e.field ? ' · ' + F.escape(e.field) : '') + ': ' + F.escape(e.msg); }).join('<br>') + '</div>' : ''),
+                  actions: [
+                    { label: 'انصراف' },
+                    it.errors.length ? { label: 'گزارش خطا (Excel)', keepOpen: true, onClick: function () { IBP.dataio.errorReport(plan); } } : null,
+                    { label: 'اعمال ' + F.num(it.records.length) + ' ردیف', primary: true, onClick: function () {
+                      if (!it.records.length) return;
+                      IBP.dataio.apply(plan, 'merge').then(function () { IBP.ui.toast(F.num(it.records.length) + ' ردیف اعمال شد', 'success'); done(); });
+                    } }
+                  ].filter(Boolean)
                 });
-              } else IBP.ui.toast(msg, 'success');
-              done();
+              }).catch(function (e) { IBP.ui.toast(e.message, 'error'); });
             });
+            input.click();
             return false;
           }
         }
@@ -126,7 +138,7 @@
     var countEl = h('span.muted');
     var head = h('div.md-head', h('div', h('h2', def.label), countEl), h('div.actions',
       h('button.btn', { type: 'button', html: icon('upload', 16) + '<span>ورود از فایل</span>', onclick: function () { importDialog(entityKey, refresh); } }),
-      h('button.btn', { type: 'button', html: icon('download', 16) + '<span>خروجی Excel</span>', onclick: function () { IBP.csv.exportEntity(entityKey, g.filtered()); } }),
+      IBP.ui.excelButton('خروجی Excel', function () { return IBP.dataio.exportEntities([entityKey], { records: g.filtered() }); }),
       h('button.btn.btn-primary', { type: 'button', html: icon('plus', 16) + '<span>افزودن ' + def.single + '</span>', onclick: function () { IBP.form.editRecord(entityKey, null, refresh); } })
     ));
     panel.appendChild(head);

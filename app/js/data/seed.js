@@ -186,8 +186,11 @@
           _base: f.volume[0] + (f.volume[1] - f.volume[0]) * volR * volR,
           _growth: growth, _noise: R.pick([0.05, 0.06, 0.1, 0.12, 0.14, 0.25]), _season: season,
           _bias: R.range(-0.04, 0.12), _launch: lifecycle === 'معرفی' ? H - R.int(6, 10) : -999,
-          _uph: R.range(f.uph[0], f.uph[1])
+          _uph: R.range(f.uph[0], f.uph[1]),
+          _sporadic: lifecycle !== 'معرفی' && R() < 0.1 // کالای سفارشی/صادراتی با تقاضای متناوب
         };
+        // در دو خانواده اول، محصول دوم جایگزین محصول اول است (نوسان معکوس: هم‌خواری فروش)
+        if (ii === 1 && fi < 2 && lifecycle !== 'معرفی') { p._cannibalOf = products[products.length - 1].id; p._sporadic = false; products[products.length - 1]._noise = 0.16; products[products.length - 1]._sporadic = false; }
         if (lifecycle === 'معرفی') p.launchDate = dayIso(histPeriods[p._launch], 1);
         else p.launchDate = dayIso(J.addMonths(cycle, -R.int(30, 120)), R.int(1, 28));
         out.products.push(p);
@@ -229,6 +232,7 @@
 
     /* ---------- فروش واقعی (محصول × مشتری × ماه) ---------- */
     var actualQty = {}; // productId → [qty per hist period]
+    var epsBy = {};
     products.forEach(function (p) {
       var custs = R.shuffle(out.customers).slice(0, R.int(4, 12));
       var ws = custs.map(function (c) { return c._w * R.range(0.5, 1.5); });
@@ -236,7 +240,11 @@
       actualQty[p.id] = [];
       histPeriods.forEach(function (per, t) {
         var e = expected(p, t);
-        var q = Math.max(0, Math.round(e * (1 + p._noise * R.normal())));
+        var eps = p._cannibalOf && epsBy[p._cannibalOf] ? -0.9 * epsBy[p._cannibalOf][t] + 0.03 * R.normal() : p._noise * R.normal();
+        (epsBy[p.id] = epsBy[p.id] || [])[t] = eps;
+        var q = p._sporadic
+          ? (R() < 0.45 ? 0 : Math.max(0, Math.round(e * 1.9 * Math.exp(0.55 * R.normal() - 0.15))))
+          : Math.max(0, Math.round(e * (1 + eps)));
         actualQty[p.id].push(q);
         if (!q) return;
         var price = priceAt(p, per);
@@ -348,7 +356,7 @@
     });
 
     // کلاس‌بندی ABC / XYZ از روی فروش واقعی
-    classify(out.products, out.salesActuals, histPeriods.slice(-12));
+    classify(out.products, out.salesActuals, histPeriods.slice(-12), opts.thresholds);
 
     return {
       data: out,
@@ -379,7 +387,9 @@
   }
 
   /** کلاس‌بندی ABC (سهم تجمعی فروش ریالی) و XYZ (ضریب تغییرات تقاضا) */
-  function classify(products, sales, periods) {
+  function classify(products, sales, periods, th) {
+    th = th || (IBP.store ? { a: IBP.store.settings().abcA, b: IBP.store.settings().abcB, x: IBP.store.settings().xyzX, y: IBP.store.settings().xyzY } : {});
+    var tA = th.a || 0.8, tB = th.b || 0.95, tX = th.x || 0.2, tY = th.y || 0.5;
     var set = new Set(periods), rev = {}, q = {};
     sales.forEach(function (s) {
       if (!set.has(s.period)) return;
@@ -392,12 +402,13 @@
     var cum = 0;
     sorted.forEach(function (p) {
       cum += (rev[p.id] || 0) / total;
-      p.abc = cum <= 0.8 ? 'A' : cum <= 0.95 ? 'B' : 'C';
+      var before = cum - (rev[p.id] || 0) / total;
+      p.abc = !rev[p.id] ? 'C' : before < tA ? 'A' : before < tB ? 'B' : 'C';
       var vals = periods.map(function (per) { return (q[p.id] || {})[per] || 0; });
       var mean = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
       var sd = Math.sqrt(vals.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0) / vals.length);
       var cv = mean > 0 ? sd / mean : 9;
-      p.xyz = cv <= 0.15 ? 'X' : cv <= 0.35 ? 'Y' : 'Z';
+      p.xyz = cv <= tX ? 'X' : cv <= tY ? 'Y' : 'Z';
     });
   }
 

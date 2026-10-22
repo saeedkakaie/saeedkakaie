@@ -40,6 +40,8 @@
     var inflation = pctInput(st.priceInflation !== undefined ? st.priceInflation : 0.025);
     var service = pctInput(st.serviceLevelTarget), accT = pctInput(st.forecastAccuracyTarget);
     var uWarn = pctInput(st.utilizationWarn), uMax = pctInput(st.utilizationMax), excess = numInput(st.excessMonths);
+    var abcA = pctInput(st.abcA || 0.8), abcB = pctInput(st.abcB || 0.95), xyzX = numInput(st.xyzX || 0.2), xyzY = numInput(st.xyzY || 0.5);
+    var engineUrl = h('input', { type: 'url', dir: 'ltr', value: st.engineUrl || 'http://127.0.0.1:8765' });
 
     var saveBtn = h('button.btn.btn-primary', { type: 'button', html: icon('check', 16) + '<span>ذخیره تنظیمات</span>', onclick: save });
     function save() {
@@ -48,7 +50,9 @@
         cyclePeriod: cycle.getValue(), fiscalStartMonth: +fiscal.value,
         historyMonths: F.parseNumber(history.value) || 24, horizonMonths: F.parseNumber(horizon.value) || 18, frozenMonths: F.parseNumber(frozen.value) || 0,
         priceInflation: readPct(inflation) || 0, serviceLevelTarget: readPct(service) || 0.95, forecastAccuracyTarget: readPct(accT) || 0.8,
-        utilizationWarn: readPct(uWarn) || 0.85, utilizationMax: readPct(uMax) || 1, excessMonths: F.parseNumber(excess.value) || 3
+        utilizationWarn: readPct(uWarn) || 0.85, utilizationMax: readPct(uMax) || 1, excessMonths: F.parseNumber(excess.value) || 3,
+        abcA: readPct(abcA) || 0.8, abcB: readPct(abcB) || 0.95, xyzX: F.parseNumber(xyzX.value) || 0.2, xyzY: F.parseNumber(xyzY.value) || 0.5,
+        engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765'
       };
       var cycleChanged = patch.cyclePeriod !== st.cyclePeriod;
       S.saveSettings(patch);
@@ -75,36 +79,35 @@
           field('هدف دقت پیش‌بینی', accT),
           field('موجودی مازاد بیش از (ماه پوشش)', excess),
           field('آستانه هشدار ظرفیت', uWarn),
-          field('حداکثر ظرفیت مجاز', uMax)),
+          field('حداکثر ظرفیت مجاز', uMax),
+          field('مرز کلاس A (سهم تجمعی فروش)', abcA),
+          field('مرز کلاس B (سهم تجمعی فروش)', abcB),
+          field('مرز کلاس X (ضریب تغییرات)', xyzX, 'مثلاً ۰٫۲'),
+          field('مرز کلاس Y (ضریب تغییرات)', xyzY, 'مثلاً ۰٫۵')),
         h('div', { style: { marginTop: '16px' } }, saveBtn)), 'gear'));
 
-    /* ---------------- داده تستی ---------------- */
-    var tplSel = h('select');
-    IBP.templates.list.forEach(function (t) { tplSel.appendChild(h('option', { value: t.id }, t.name + ' — ' + t.company)); });
-    tplSel.value = st.templateId || 'food';
-    var seedCycle = IBP.form.periodInput(st.cyclePeriod);
-    var tplInfo = h('div.hint');
-    function info() {
-      var t = IBP.templates.get(tplSel.value);
-      var n = t.families.reduce(function (a, f) { return a + f.items.length; }, 0);
-      tplInfo.textContent = F.num(t.plants.length) + ' کارخانه، ' + F.num(t.families.length) + ' خانواده، ' + F.num(n) + ' محصول، ' + F.num(t.channels.length) + ' کانال فروش · خانواده‌ها: ' + t.families.map(function (f) { return f.name; }).join('، ');
+    /* ---------------- موتور تحلیل پایتون ---------------- */
+    var statusEl = h('div');
+    function drawStatus() {
+      var e = IBP.engine.state();
+      statusEl.innerHTML = e.status === 'online'
+        ? IBP.ui.statusBadge('good', 'متصل') + ' <span class="cell-sub">نسخه ' + F.escape((e.info && e.info.version) || '') + ' · پایتون ' + F.escape((e.info && e.info.python) || '') + ' · ' + F.escape(Object.keys((e.info && e.info.libraries) || {}).map(function (k) { return k + ' ' + e.info.libraries[k]; }).join('، ')) + '</span>'
+        : IBP.ui.statusBadge('neutral', e.status === 'unknown' ? 'در حال بررسی' : 'متصل نیست');
     }
-    tplSel.addEventListener('change', info); info();
-    root.appendChild(section('داده تستی', 'یک شرکت تولیدی کامل با ۲۴ ماه فروش، پیش‌بینی ۱۸ ماه، بودجه، موجودی، BOM و ظرفیت خطوط',
+    drawStatus();
+    root.appendChild(section('موتور تحلیل پایتون', 'تحلیل‌های پیشرفته (تجزیه روند و فصل، آزمون روند، خوشه‌بندی) و خروجی Excel همراه با نمودار',
       h('div',
-        h('div.settings-grid', field('الگوی صنعت', tplSel), field('ماه جاری چرخه', seedCycle)),
-        tplInfo,
-        h('div', { style: { marginTop: '16px', display: 'flex', gap: '8px', flexWrap: 'wrap' } },
-          h('button.btn.btn-primary', { type: 'button', html: icon('sparkles', 16) + '<span>ساخت داده تستی</span>', onclick: function () {
-            IBP.ui.confirm('همه داده‌های فعلی حذف و داده تستی «' + IBP.templates.get(tplSel.value).name + '» جایگزین می‌شود. ادامه می‌دهید؟', { danger: true, ok: 'ساخت داده' }).then(function (ok) {
-              if (!ok) return;
-              IBP.seed.load({ templateId: tplSel.value, cyclePeriod: seedCycle.getValue(), fiscalStartMonth: +fiscal.value }).then(function () {
-                IBP.ui.toast('داده تستی ساخته شد', 'success');
-                IBP.app.navigate('#/dashboard');
-                IBP.app.refresh();
-              });
-            });
-          } }))), 'sparkles'));
+        h('div.settings-grid', field('نشانی موتور', engineUrl, 'پیش‌فرض: http://127.0.0.1:8765'), field('وضعیت اتصال', statusEl)),
+        h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' } },
+          h('button.btn', { type: 'button', html: icon('refresh', 16) + '<span>آزمایش اتصال</span>', onclick: function () {
+            S.saveSettings({ engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765' });
+            IBP.engine.check().then(function (ok) { drawStatus(); IBP.ui.toast(ok ? 'موتور پایتون متصل است' : 'موتور پایتون پاسخ نمی‌دهد', ok ? 'success' : 'warning'); });
+          } })),
+        h('div.engine-panel', { style: { marginTop: '14px' } },
+          h('div.ep-icon', { html: icon('python', 22) }),
+          h('div', { style: { flex: 1, minWidth: '240px' } },
+            h('div.ep-t', 'راه‌اندازی موتور روی ویندوز'),
+            h('div.ep-d', { html: '۱. پایتون ۳٫۱۰ یا جدیدتر را نصب کنید. ۲. در پوشه <code>engine</code> فایل <code>start_engine.bat</code> را اجرا کنید (بار اول کتابخانه‌ها نصب می‌شوند). ۳. پنجره را باز بگذارید؛ برنامه به‌طور خودکار متصل می‌شود. در نسخه نصبی ویندوز (فاز ۸) این مرحله خودکار است.' })))), 'python'));
 
     /* ---------------- پشتیبان‌گیری ---------------- */
     var counts = IBP.schema.keys().map(function (k) { return S.count(k); }).reduce(function (a, b) { return a + b; }, 0);

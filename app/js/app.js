@@ -1,12 +1,12 @@
 /*
- * پوسته برنامه: منو، مسیریابی، نوار بالا، پوسته روشن/تیره و راه‌اندازی.
+ * پوسته برنامه: منو، مسیریابی، نوار بالا، جستجوی فرمان، اعلان‌ها، وضعیت موتور پایتون و راه‌اندازی.
  */
 (function (IBP) {
   'use strict';
 
-  var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store;
+  var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.1.0', phase: 1 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.2.0', phase: 2 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
@@ -17,8 +17,14 @@
       ]
     },
     {
+      group: 'داده', items: [
+        { route: 'datahub', label: 'مرکز داده', icon: 'cloud', badge: 'جدید' },
+        { route: 'masterdata', label: 'داده‌های پایه', icon: 'database' }
+      ]
+    },
+    {
       group: 'برنامه‌ریزی', items: [
-        { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers', phase: 2 },
+        { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers', badge: 'جدید' },
         { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend', phase: 3 },
         { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory', phase: 4 },
         { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse', phase: 4 },
@@ -34,8 +40,7 @@
       ]
     },
     {
-      group: 'داده و سیستم', items: [
-        { route: 'masterdata', label: 'داده‌های پایه', icon: 'database' },
+      group: 'سیستم', items: [
         { route: 'settings', label: 'تنظیمات', icon: 'settings' },
         { route: 'users', label: 'کاربران و دسترسی', icon: 'users', phase: 9 }
       ]
@@ -50,35 +55,49 @@
     for (var g = 0; g < NAV.length; g++) for (var i = 0; i < NAV[g].items.length; i++) if (NAV[g].items[i].route === route) return NAV[g].items[i];
     return null;
   }
+  function navGroup(route) {
+    for (var g = 0; g < NAV.length; g++) if (NAV[g].items.some(function (it) { return it.route === route; })) return NAV[g].group;
+    return '';
+  }
+  function pref(key, val) {
+    try { if (val === undefined) return localStorage.getItem(key); localStorage.setItem(key, val); } catch (e) { return null; }
+    return null;
+  }
 
   function buildShell() {
-    var app = h('div.app');
+    var app = h('div.app' + (pref('ibp-collapsed') === '1' ? '.collapsed' : ''));
     var side = h('aside.sidebar', { 'aria-label': 'منوی اصلی' });
     side.appendChild(h('div.brand',
       h('div.brand-logo', 'IBP'),
-      h('div', h('div.brand-name', 'Integrated Business Planning'), h('div.brand-sub', 'برنامه‌ریزی یکپارچه کسب‌وکار'))
+      h('div.brand-text', h('div.brand-name', 'Integrated Business Planning'), h('div.brand-sub', 'برنامه‌ریزی یکپارچه کسب‌وکار'))
     ));
     var nav = h('nav');
     NAV.forEach(function (g) {
       var grp = h('div.nav-group', h('div.nav-group-title', g.group));
       g.items.forEach(function (it) {
-        grp.appendChild(h('a.nav-item', { href: '#/' + it.route, 'data-route': it.route, html: icon(it.icon, 18) + '<span>' + it.label + '</span>' + (it.phase ? '<span class="phase">فاز ' + it.phase + '</span>' : '') }));
+        var extra = it.phase ? '<span class="phase">فاز ' + it.phase + '</span>' : (it.badge ? '<span class="new-dot">' + it.badge + '</span>' : '');
+        grp.appendChild(h('a.nav-item', { href: '#/' + it.route, 'data-route': it.route, title: it.label, html: icon(it.icon, 19) + '<span class="nav-label">' + it.label + '</span>' + extra }));
       });
       nav.appendChild(grp);
     });
     side.appendChild(nav);
-    els.storeInfo = h('div');
-    side.appendChild(h('div.sidebar-foot', els.storeInfo, h('div', 'نسخه ' + IBP.APP.version + ' · فاز ' + IBP.APP.phase)));
+    els.engineLine = h('div.status-line');
+    els.storeLine = h('div.status-line');
+    side.appendChild(h('div.sidebar-foot', els.engineLine, els.storeLine,
+      h('button.collapse-btn', { type: 'button', 'aria-label': 'جمع کردن منو', html: icon('sidebar', 17) + '<span class="collapse-label">جمع کردن منو · نسخه ' + IBP.APP.version + '</span>', onclick: toggleCollapse })));
 
     var main = h('div.main');
     els.title = h('h1');
     els.crumb = h('div.crumb');
-    els.cycleChip = h('a.cycle-chip', { href: '#/settings', title: 'تغییر در تنظیمات' });
-    els.theme = h('button.icon-btn', { type: 'button', 'aria-label': 'تغییر پوسته روشن و تیره', onclick: toggleTheme });
+    els.cycleChip = h('a.cycle-chip', { href: '#/cycle', title: 'چرخه برنامه‌ریزی' });
+    els.theme = h('button.tb-btn', { type: 'button', 'aria-label': 'تغییر پوسته روشن و تیره', onclick: toggleTheme });
+    els.bell = h('button.tb-btn', { type: 'button', 'aria-label': 'اعلان‌ها', onclick: function () { showNotifications(); } });
+    var search = h('button.search-trigger', { type: 'button', 'aria-label': 'جستجو و فرمان', onclick: function () { IBP.palette.open(); },
+      html: icon('search', 16) + '<span class="st-label">جستجو در صفحه‌ها، محصولات و فرمان‌ها…</span><span class="kbd">Ctrl K</span>' });
     var top = h('header.topbar',
-      h('button.icon-btn.menu-btn', { type: 'button', 'aria-label': 'منو', html: icon('menu'), onclick: function () { app.classList.toggle('nav-open'); } }),
-      h('div', els.title, els.crumb),
-      h('div.topbar-actions', els.cycleChip, h('span.today-chip', J.longDate()), els.theme)
+      h('button.tb-btn.menu-btn', { type: 'button', 'aria-label': 'منو', html: icon('menu'), onclick: function () { app.classList.toggle('nav-open'); } }),
+      h('div', els.crumb, els.title),
+      h('div.topbar-actions', search, els.cycleChip, h('span.today-chip', J.longDate()), els.bell, els.theme)
     );
     els.content = h('main.content', { id: 'content', tabindex: '-1' });
     main.appendChild(top); main.appendChild(els.content);
@@ -89,17 +108,50 @@
     document.getElementById('root').appendChild(app);
   }
 
+  function toggleCollapse() {
+    els.app.classList.toggle('collapsed');
+    pref('ibp-collapsed', els.app.classList.contains('collapsed') ? '1' : '0');
+  }
+
   function updateChrome() {
     var st = S.settings();
-    els.cycleChip.innerHTML = icon('calendar', 15) + '<span>چرخه برنامه‌ریزی</span><strong>' + J.label(st.cyclePeriod) + '</strong>';
+    els.cycleChip.innerHTML = icon('calendar', 16) + '<span class="cc-label">چرخه</span><strong>' + J.label(st.cyclePeriod) + '</strong>';
     var kind = S.adapterKind();
-    els.storeInfo.innerHTML = '<span class="store-pill' + (kind === 'memory' ? ' memory' : '') + '">' + (kind === 'memory' ? 'ذخیره موقت (بدون ماندگاری)' : 'ذخیره محلی فعال') + '</span>';
-    els.storeInfo.lastChild.title = st.companyName;
+    els.storeLine.innerHTML = '<span class="dot ' + (kind === 'memory' ? 'warn' : 'on') + '"></span><span class="status-text">' + (kind === 'memory' ? 'ذخیره موقت' : 'پایگاه داده محلی') + '</span>';
+    updateEngine();
+    updateBell();
     applyThemeIcon();
+  }
+  function updateEngine() {
+    var es = IBP.engine.state();
+    var on = es.status === 'online';
+    els.engineLine.innerHTML = '<span class="dot ' + (on ? 'on' : 'off') + '"></span><span class="status-text">موتور پایتون: ' + (on ? 'متصل' : es.status === 'unknown' ? 'در حال بررسی' : 'غیرفعال') + '</span>';
+    els.engineLine.title = on ? 'نسخه ' + (es.info && es.info.version) : 'برای تحلیل پیشرفته، موتور پایتون را اجرا کنید (تنظیمات)';
+  }
+  function updateBell() {
+    var n = 0;
+    try { n = IBP.analytics.alerts().filter(function (a) { return a.level === 'critical'; }).length; } catch (e) { n = 0; }
+    els.bell.innerHTML = icon('bell', 18) + (n ? '<span class="count">' + (n > 99 ? '99+' : F.num(n)) + '</span>' : '');
+  }
+  function showNotifications() {
+    var alerts = [];
+    try { alerts = IBP.analytics.alerts(); } catch (e) { alerts = []; }
+    var list = h('ul.alerts', { style: { maxHeight: '420px' } });
+    if (!alerts.length) list.appendChild(h('li.alert-item', { html: IBP.ui.statusBadge('good', 'موردی برای بررسی وجود ندارد') }));
+    alerts.slice(0, 12).forEach(function (a) {
+      list.appendChild(h('li.alert-item',
+        h('div.alert-icon.' + a.level, { html: icon(a.level === 'critical' ? 'critical' : 'alert', 16) }),
+        h('div', h('div.alert-text', a.text), h('div.alert-detail', a.detail)),
+        h('span.alert-type', a.type)));
+    });
+    var crit = alerts.filter(function (a) { return a.level === 'critical'; }).length;
+    IBP.ui.popover(els.bell, h('div',
+      h('div.popover-head', { html: icon('bell', 16) + '<span>اعلان‌ها و استثناها</span><span style="margin-inline-start:auto">' + IBP.ui.statusBadge('critical', F.num(crit) + ' بحرانی') + '</span>' }),
+      list,
+      h('div', { style: { padding: '10px 16px', borderTop: '1px solid var(--border)' } }, h('a', { href: '#/dashboard', onclick: function () { IBP.ui.closePopover(); } }, 'مشاهده همه در داشبورد'))));
   }
 
   /* ---------------- پوسته ---------------- */
-  function getTheme() { try { return localStorage.getItem('ibp-theme') || 'auto'; } catch (e) { return 'auto'; } }
   function effectiveTheme() {
     var t = document.documentElement.getAttribute('data-theme');
     if (t) return t;
@@ -113,7 +165,7 @@
   function toggleTheme() {
     var next = effectiveTheme() === 'dark' ? 'light' : 'dark';
     applyTheme(next);
-    try { localStorage.setItem('ibp-theme', next); } catch (e) { /* ذخیره اختیاری */ }
+    pref('ibp-theme', next);
     applyThemeIcon();
     render(true);
   }
@@ -133,10 +185,13 @@
     if (current.cleanup) { try { current.cleanup(); } catch (e) { console.error(e); } }
     IBP.charts.hideTip();
     IBP.form.closePicker();
+    IBP.ui.closePopover();
     var y = window.scrollY;
     els.content.textContent = '';
+    els.content.classList.remove('enter');
+    if (!keepScroll) { void els.content.offsetWidth; els.content.classList.add('enter'); }
     els.title.textContent = mod.title ? (typeof mod.title === 'function' ? mod.title(r.params, nav) : mod.title) : (nav ? nav.label : '');
-    els.crumb.textContent = S.settings().companyName || '';
+    els.crumb.innerHTML = F.escape(S.settings().companyName || '') + (navGroup(r.route) ? '<span class="sep">/</span>' + F.escape(navGroup(r.route)) : '');
     document.querySelectorAll('.nav-item').forEach(function (a) { a.classList.toggle('active', a.getAttribute('data-route') === r.route); });
     els.app.classList.remove('nav-open');
     document.title = (nav ? nav.label + ' — ' : '') + 'Integrated Business Planning';
@@ -147,33 +202,45 @@
       els.content.appendChild(h('div.card', h('div.card-body', 'خطا در نمایش صفحه: ' + e.message)));
     }
     current.route = r.route;
+    updateBell();
     window.scrollTo(0, keepScroll ? y : 0);
   }
 
   IBP.app = {
     render: render,
     refresh: function () { updateChrome(); render(true); },
-    navigate: function (hash) { if (location.hash === hash) render(); else location.hash = hash; }
+    navigate: function (hash) { if (location.hash === hash) render(); else location.hash = hash; },
+    toggleTheme: toggleTheme,
+    toggleCollapse: toggleCollapse
   };
 
   /* ---------------- راه‌اندازی ---------------- */
   function boot() {
-    applyTheme(getTheme());
+    applyTheme(pref('ibp-theme') || 'auto');
     buildShell();
     var bootEl = document.getElementById('boot');
     S.init().then(function (r) {
       if (r.empty) {
         return IBP.seed.load({ templateId: 'food', cyclePeriod: J.currentPeriod() }).then(function () {
-          IBP.ui.toast('داده تستی «صنایع غذایی» بارگذاری شد. از تنظیمات می‌توانید صنعت دیگری انتخاب کنید.', 'success');
+          IBP.ui.toast('داده تستی «صنایع غذایی» بارگذاری شد. از «مرکز داده» می‌توانید الگوی صنعت دیگر یا داده خودتان را بارگذاری کنید.', 'success');
         });
       }
     }).then(function () {
       updateChrome();
       render();
-      if (bootEl) bootEl.remove();
+      if (bootEl) { bootEl.style.transition = 'opacity .3s'; bootEl.style.opacity = '0'; setTimeout(function () { bootEl.remove(); }, 300); }
       window.addEventListener('hashchange', function () { render(); });
       S.on(function (evt) {
-        if (['settings', 'import', 'clear'].indexOf(evt.type) >= 0) updateChrome();
+        if (['settings', 'import', 'clear', 'bulk', 'replace'].indexOf(evt.type) >= 0) updateChrome();
+      });
+      IBP.engine.on(function (es) {
+        updateEngine();
+        // صفحه‌هایی که از تحلیل پایتون استفاده می‌کنند با تغییر وضعیت موتور به‌روز می‌شوند
+        if (['dashboard', 'portfolio', 'settings'].indexOf(current.route) >= 0 && es.status !== 'unknown' && !document.querySelector('.modal-overlay')) render(true);
+      });
+      IBP.engine.startWatch();
+      document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) { e.preventDefault(); IBP.palette.open(); }
       });
       if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyThemeIcon(); render(true); });
     }).catch(function (e) {

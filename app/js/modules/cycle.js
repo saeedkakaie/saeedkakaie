@@ -20,9 +20,22 @@
     var cycle = S.settings().cyclePeriod;
     var steps = S.all('cycleSteps').filter(function (s) { return s.cycle === cycle; }).sort(function (a, b) { return a.order - b.order; });
 
-    root.appendChild(h('div.page-head', h('div',
-      h('h2', 'چرخه IBP — ' + J.label(cycle)),
-      h('p', 'فرایند ماهانه برنامه‌ریزی یکپارچه از جمع‌آوری داده تا تصمیم مدیریت. وضعیت، مسئول و سررسید هر مرحله را اینجا به‌روز کنید.'))));
+    root.appendChild(IBP.ui.pageHead({
+      title: 'چرخه IBP — ' + J.label(cycle),
+      desc: 'فرایند ماهانه برنامه‌ریزی یکپارچه از جمع‌آوری داده تا تصمیم مدیریت. وضعیت، مسئول و سررسید هر مرحله را اینجا به‌روز کنید.',
+      actions: steps.length ? [IBP.ui.excelButton('خروجی Excel', function () {
+        var cur = S.all('cycleSteps').filter(function (s) { return s.cycle === cycle; }).sort(function (a, b) { return a.order - b.order; });
+        return IBP.excel.exportTables({
+          filename: 'چرخه IBP ' + J.label(cycle),
+          sheets: [{ name: 'مراحل چرخه', title: 'چرخه IBP — ' + J.label(cycle), columns: [
+            { header: 'ترتیب', key: 'order', type: 'int' }, { header: 'مرحله', key: 'name', type: 'text' }, { header: 'مسئول', key: 'owner', type: 'text' },
+            { header: 'سررسید', value: function (s) { return J.isoToJalaliStr(s.dueDate); }, type: 'text' }, { header: 'وضعیت', key: 'status', type: 'text' },
+            { header: 'شرح مرحله', value: function (s) { return GUIDE[s.name] || ''; }, type: 'text', width: 60 }, { header: 'یادداشت', key: 'notes', type: 'text', width: 40 }],
+            rows: cur,
+            cellStyle: function (r, c) { return c.header === 'وضعیت' ? (r.status === 'تکمیل' ? { color: 'FF067A06', bold: true } : r.status === 'تأخیر' ? { color: 'FFB42323', bold: true } : null) : null; } }]
+        });
+      })] : []
+    }));
 
     if (!steps.length) {
       root.appendChild(h('div.card', h('div.roadmap-hero',

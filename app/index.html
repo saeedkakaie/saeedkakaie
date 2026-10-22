@@ -13,10 +13,12 @@
   </script>
 </head>
 <body>
-  <div id="boot" class="boot"><div class="boot-inner"><div class="boot-spinner"></div>در حال بارگذاری Integrated Business Planning…</div></div>
+  <div id="boot" class="boot"><div class="boot-inner"><div class="boot-logo">IBP</div>در حال بارگذاری Integrated Business Planning…</div></div>
   <div id="root"></div>
   <div id="toasts" aria-live="polite"></div>
 
+  <!-- کتابخانه‌های داخلی (بدون نیاز به اینترنت) -->
+  <script src="vendor/exceljs/exceljs.min.js"></script>
   <!-- هسته -->
   <script src="js/core/format.js"></script>
   <script src="js/core/jalali.js"></script>
@@ -24,18 +26,25 @@
   <script src="js/core/store.js"></script>
   <script src="js/core/ui.js"></script>
   <script src="js/core/analytics.js"></script>
+  <script src="js/core/excel.js"></script>
+  <script src="js/core/engine.js"></script>
+  <script src="js/core/portfolio.js"></script>
   <!-- اجزای رابط -->
   <script src="js/components/charts.js"></script>
   <script src="js/components/form.js"></script>
   <script src="js/components/grid.js"></script>
   <script src="js/components/csv.js"></script>
+  <script src="js/core/dataio.js"></script>
   <!-- داده تستی -->
   <script src="js/data/templates.js"></script>
   <script src="js/data/seed.js"></script>
   <!-- ماژول‌ها -->
+  <script src="js/components/palette.js"></script>
   <script src="js/modules/dashboard.js"></script>
   <script src="js/modules/cycle.js"></script>
+  <script src="js/modules/datahub.js"></script>
   <script src="js/modules/masterdata.js"></script>
+  <script src="js/modules/portfolio.js"></script>
   <script src="js/modules/roadmap.js"></script>
   <script src="js/modules/settings.js"></script>
   <script src="js/app.js"></script>

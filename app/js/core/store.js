@@ -119,6 +119,9 @@
     utilizationWarn: 0.85,
     utilizationMax: 1.0,
     excessMonths: 3,            // پوشش بیش از این مقدار = مازاد
+    abcA: 0.8, abcB: 0.95,      // مرز سهم تجمعی کلاس‌های A و B
+    xyzX: 0.2, xyzY: 0.5,       // مرز ضریب تغییرات کلاس‌های X و Y
+    engineUrl: 'http://127.0.0.1:8765',
     theme: 'auto'
   };
 

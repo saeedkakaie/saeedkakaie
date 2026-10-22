@@ -76,10 +76,13 @@
         { key: 'batchSize', label: 'اندازه بچ تولید', type: 'number', min: 0 },
         { key: 'shelfLifeDays', label: 'ماندگاری (روز)', type: 'number', min: 0 },
         { key: 'launchDate', label: 'تاریخ معرفی', type: 'date' },
+        { key: 'phaseOutDate', label: 'تاریخ توقف برنامه‌ریزی‌شده', type: 'date', hint: 'برای محصولاتی که از سبد خارج می‌شوند' },
+        { key: 'successorId', label: 'محصول جایگزین', type: 'ref', ref: 'products', hint: 'تقاضای محصول در حال حذف به این محصول منتقل می‌شود' },
         { key: 'active', label: 'فعال', type: 'bool', default: true }
       ]
     },
     routings: {
+      naturalKey: ['productId', 'resourceId'],
       label: 'مسیر تولید (Routing)', single: 'مسیر تولید', group: 'product', icon: 'route',
       display: function (r, S) { return S.name('products', r.productId) + ' ← ' + S.name('resources', r.resourceId); },
       fields: [
@@ -118,6 +121,7 @@
       ]
     },
     bom: {
+      naturalKey: ['productId', 'materialId'],
       label: 'فهرست مواد (BOM)', single: 'ردیف BOM', group: 'supply', icon: 'list',
       display: function (r, S) { return S.name('products', r.productId) + ' ← ' + S.name('materials', r.materialId); },
       fields: [
@@ -160,6 +164,7 @@
 
     /* ------------------------------ داده‌های عملیاتی ------------------------------ */
     salesActuals: {
+      naturalKey: ['period', 'productId', 'customerId'],
       label: 'فروش واقعی', single: 'رکورد فروش', group: 'txn', icon: 'chart', heavy: true,
       display: function (r, S) { return IBP.jalali.label(r.period) + ' / ' + S.name('products', r.productId); },
       fields: [
@@ -171,6 +176,7 @@
       ]
     },
     forecasts: {
+      naturalKey: ['version', 'cycle', 'period', 'productId'],
       label: 'پیش‌بینی تقاضا', single: 'رکورد پیش‌بینی', group: 'txn', icon: 'trend', heavy: true,
       display: function (r, S) { return IBP.jalali.label(r.period) + ' / ' + S.name('products', r.productId); },
       fields: [
@@ -182,6 +188,7 @@
       ]
     },
     budgets: {
+      naturalKey: ['period', 'productId'],
       label: 'بودجه فروش', single: 'رکورد بودجه', group: 'txn', icon: 'target', heavy: true,
       display: function (r, S) { return IBP.jalali.label(r.period) + ' / ' + S.name('products', r.productId); },
       fields: [
@@ -192,6 +199,7 @@
       ]
     },
     inventory: {
+      naturalKey: ['productId', 'warehouseId'],
       label: 'موجودی محصول', single: 'رکورد موجودی', group: 'txn', icon: 'stack',
       display: function (r, S) { return S.name('products', r.productId) + ' / ' + S.name('warehouses', r.warehouseId); },
       fields: [
@@ -202,6 +210,7 @@
       ]
     },
     materialInventory: {
+      naturalKey: ['materialId', 'warehouseId'],
       label: 'موجودی مواد', single: 'رکورد موجودی مواد', group: 'txn', icon: 'stack',
       display: function (r, S) { return S.name('materials', r.materialId) + ' / ' + S.name('warehouses', r.warehouseId); },
       fields: [
@@ -215,6 +224,7 @@
 
     /* ------------------------------ چرخه IBP ------------------------------ */
     cycleSteps: {
+      naturalKey: ['cycle', 'order'],
       label: 'مراحل چرخه IBP', single: 'مرحله چرخه', group: 'process', icon: 'cycle',
       display: function (r) { return IBP.jalali.label(r.cycle) + ' / ' + r.name; },
       fields: [
@@ -238,7 +248,12 @@
     { id: 'process', label: 'فرایند' }
   ];
 
-  Object.keys(ENTITIES).forEach(function (k) { ENTITIES[k].key = k; });
+  Object.keys(ENTITIES).forEach(function (k) {
+    var e = ENTITIES[k];
+    e.key = k;
+    // کلید طبیعی برای تشخیص رکورد تکراری هنگام ورود داده (پیش‌فرض: کد)
+    if (!e.naturalKey && e.fields.some(function (f) { return f.key === 'code'; })) e.naturalKey = ['code'];
+  });
 
   IBP.schema = {
     ENTITIES: ENTITIES,
@@ -256,6 +271,18 @@
         });
       });
       return out;
+    },
+    /** ترتیب موجودیت‌ها بر اساس وابستگی (ابتدا موجودیت‌هایی که دیگران به آن‌ها ارجاع می‌دهند) */
+    order: function () {
+      var done = [], seen = {};
+      function visit(k) {
+        if (seen[k]) return;
+        seen[k] = true;
+        ENTITIES[k].fields.forEach(function (f) { if (f.type === 'ref' && f.ref !== k) visit(f.ref); });
+        done.push(k);
+      }
+      Object.keys(ENTITIES).forEach(visit);
+      return done;
     },
     defaults: function (k) {
       var o = {};
