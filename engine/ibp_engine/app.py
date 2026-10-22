@@ -17,7 +17,7 @@ from fastapi import Body, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 
-from . import __version__, portfolio, reports
+from . import __version__, demand, portfolio, reports
 
 app = FastAPI(title="IBP Analysis Engine", version=__version__)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -48,13 +48,23 @@ def health() -> dict[str, Any]:
             "numpy": numpy.__version__, "pandas": pandas.__version__,
             "statsmodels": statsmodels.__version__, "scikit-learn": sklearn.__version__,
         },
-        "capabilities": ["portfolio.analyze", "reports.xlsx"],
+        "capabilities": ["portfolio.analyze", "reports.xlsx", "demand.forecast", "demand.event-effects"],
     }
 
 
 @app.post("/portfolio/analyze")
 def portfolio_analyze(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
     return portfolio.analyze(payload)
+
+
+@app.post("/demand/forecast")
+def demand_forecast(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    return demand.forecast(payload)
+
+
+@app.post("/demand/event-effects")
+def demand_event_effects(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
+    return demand.event_effects(payload)
 
 
 @app.post("/reports/xlsx")

@@ -6,7 +6,7 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.2.0', phase: 2 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.3.0', phase: 3 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
@@ -18,14 +18,14 @@
     },
     {
       group: 'داده', items: [
-        { route: 'datahub', label: 'مرکز داده', icon: 'cloud', badge: 'جدید' },
+        { route: 'datahub', label: 'مرکز داده', icon: 'cloud' },
         { route: 'masterdata', label: 'داده‌های پایه', icon: 'database' }
       ]
     },
     {
       group: 'برنامه‌ریزی', items: [
-        { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers', badge: 'جدید' },
-        { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend', phase: 3 },
+        { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers' },
+        { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend', badge: 'جدید' },
         { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory', phase: 4 },
         { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse', phase: 4 },
         { route: 'finance', label: 'تطبیق مالی', icon: 'coins', phase: 5 },
@@ -69,7 +69,7 @@
     var side = h('aside.sidebar', { 'aria-label': 'منوی اصلی' });
     side.appendChild(h('div.brand',
       h('div.brand-logo', 'IBP'),
-      h('div.brand-text', h('div.brand-name', 'Integrated Business Planning'), h('div.brand-sub', 'برنامه‌ریزی یکپارچه کسب‌وکار'))
+      h('div.brand-text', h('div.brand-name', 'Integrated Business Planning'), els.brandSub = h('div.brand-sub', 'برنامه‌ریزی یکپارچه کسب‌وکار'))
     ));
     var nav = h('nav');
     NAV.forEach(function (g) {
@@ -90,6 +90,7 @@
     els.title = h('h1');
     els.crumb = h('div.crumb');
     els.cycleChip = h('a.cycle-chip', { href: '#/cycle', title: 'چرخه برنامه‌ریزی' });
+    els.companyChip = h('button.company-chip', { type: 'button', title: 'تغییر شرکت', onclick: switchCompany });
     els.theme = h('button.tb-btn', { type: 'button', 'aria-label': 'تغییر پوسته روشن و تیره', onclick: toggleTheme });
     els.bell = h('button.tb-btn', { type: 'button', 'aria-label': 'اعلان‌ها', onclick: function () { showNotifications(); } });
     var search = h('button.search-trigger', { type: 'button', 'aria-label': 'جستجو و فرمان', onclick: function () { IBP.palette.open(); },
@@ -97,7 +98,7 @@
     var top = h('header.topbar',
       h('button.tb-btn.menu-btn', { type: 'button', 'aria-label': 'منو', html: icon('menu'), onclick: function () { app.classList.toggle('nav-open'); } }),
       h('div', els.crumb, els.title),
-      h('div.topbar-actions', search, els.cycleChip, h('span.today-chip', J.longDate()), els.bell, els.theme)
+      h('div.topbar-actions', els.companyChip, search, els.cycleChip, h('span.today-chip', J.longDate()), els.bell, els.theme)
     );
     els.content = h('main.content', { id: 'content', tabindex: '-1' });
     main.appendChild(top); main.appendChild(els.content);
@@ -113,8 +114,16 @@
     pref('ibp-collapsed', els.app.classList.contains('collapsed') ? '1' : '0');
   }
 
+  function switchCompany() {
+    IBP.ui.closePopover();
+    IBP.holding.leave().then(function () { IBP.gate.show(); });
+  }
+
   function updateChrome() {
     var st = S.settings();
+    var co = IBP.holding.current();
+    els.companyChip.innerHTML = '<span class="cc-code">' + F.escape(co ? co.code : (st.companyCode || '—')) + '</span><span class="cc-name">' + F.escape(co ? co.name : st.companyName) + '</span>' + icon('chevronDown', 15);
+    els.brandSub.textContent = IBP.holding.holdingName();
     els.cycleChip.innerHTML = icon('calendar', 16) + '<span class="cc-label">چرخه</span><strong>' + J.label(st.cyclePeriod) + '</strong>';
     var kind = S.adapterKind();
     els.storeLine.innerHTML = '<span class="dot ' + (kind === 'memory' ? 'warn' : 'on') + '"></span><span class="status-text">' + (kind === 'memory' ? 'ذخیره موقت' : 'پایگاه داده محلی') + '</span>';
@@ -191,7 +200,8 @@
     els.content.classList.remove('enter');
     if (!keepScroll) { void els.content.offsetWidth; els.content.classList.add('enter'); }
     els.title.textContent = mod.title ? (typeof mod.title === 'function' ? mod.title(r.params, nav) : mod.title) : (nav ? nav.label : '');
-    els.crumb.innerHTML = F.escape(S.settings().companyName || '') + (navGroup(r.route) ? '<span class="sep">/</span>' + F.escape(navGroup(r.route)) : '');
+    var co = IBP.holding.current();
+    els.crumb.innerHTML = F.escape(co ? co.code + ' · ' + co.name : (S.settings().companyName || '')) + (navGroup(r.route) ? '<span class="sep">/</span>' + F.escape(navGroup(r.route)) : '');
     document.querySelectorAll('.nav-item').forEach(function (a) { a.classList.toggle('active', a.getAttribute('data-route') === r.route); });
     els.app.classList.remove('nav-open');
     document.title = (nav ? nav.label + ' — ' : '') + 'Integrated Business Planning';
@@ -215,34 +225,49 @@
   };
 
   /* ---------------- راه‌اندازی ---------------- */
+  var started = false;
+  /** پس از ورود به شرکت (از صفحه ورود هلدینگ) */
+  function enterCompany() {
+    updateChrome();
+    if (!location.hash || location.hash === '#/' ) location.hash = '#/dashboard';
+    render();
+    if (!started) startListeners();
+  }
+  IBP.app.enterCompany = enterCompany;
+  IBP.app.switchCompany = switchCompany;
+
+  var saveSummarySoon = IBP.ui.debounce(function () { IBP.holding.saveSummary(); }, 4000);
+  function startListeners() {
+    started = true;
+    window.addEventListener('hashchange', function () { if (IBP.holding.current()) render(); });
+    S.on(function (evt) {
+      if (['settings', 'import', 'clear', 'bulk', 'replace'].indexOf(evt.type) >= 0) updateChrome();
+      saveSummarySoon();
+    });
+    IBP.engine.on(function (es) {
+      updateEngine();
+      if (['dashboard', 'portfolio', 'settings', 'demand'].indexOf(current.route) >= 0 && es.status !== 'unknown' && !document.querySelector('.modal-overlay') && IBP.holding.current()) render(true);
+    });
+    document.addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK') && IBP.holding.current()) { e.preventDefault(); IBP.palette.open(); }
+    });
+    if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyThemeIcon(); if (IBP.holding.current()) render(true); });
+    window.addEventListener('beforeunload', function () { IBP.holding.saveSummary(); });
+  }
+
   function boot() {
     applyTheme(pref('ibp-theme') || 'auto');
     buildShell();
     var bootEl = document.getElementById('boot');
-    S.init().then(function (r) {
-      if (r.empty) {
-        return IBP.seed.load({ templateId: 'food', cyclePeriod: J.currentPeriod() }).then(function () {
-          IBP.ui.toast('داده تستی «صنایع غذایی» بارگذاری شد. از «مرکز داده» می‌توانید الگوی صنعت دیگر یا داده خودتان را بارگذاری کنید.', 'success');
-        });
-      }
+    var bootText = bootEl ? bootEl.querySelector('.boot-text') : null;
+    IBP.engine.startWatch();
+    IBP.holding.init(function (msg) { if (bootText) bootText.textContent = msg; }).then(function () {
+      var sid = IBP.holding.sessionCompany();
+      if (sid && IBP.holding.get(sid)) return IBP.holding.enter(sid).then(function () { enterCompany(); });
+      IBP.gate.show();
+      if (!started) startListeners();
     }).then(function () {
-      updateChrome();
-      render();
       if (bootEl) { bootEl.style.transition = 'opacity .3s'; bootEl.style.opacity = '0'; setTimeout(function () { bootEl.remove(); }, 300); }
-      window.addEventListener('hashchange', function () { render(); });
-      S.on(function (evt) {
-        if (['settings', 'import', 'clear', 'bulk', 'replace'].indexOf(evt.type) >= 0) updateChrome();
-      });
-      IBP.engine.on(function (es) {
-        updateEngine();
-        // صفحه‌هایی که از تحلیل پایتون استفاده می‌کنند با تغییر وضعیت موتور به‌روز می‌شوند
-        if (['dashboard', 'portfolio', 'settings'].indexOf(current.route) >= 0 && es.status !== 'unknown' && !document.querySelector('.modal-overlay')) render(true);
-      });
-      IBP.engine.startWatch();
-      document.addEventListener('keydown', function (e) {
-        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K' || e.code === 'KeyK')) { e.preventDefault(); IBP.palette.open(); }
-      });
-      if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyThemeIcon(); render(true); });
     }).catch(function (e) {
       console.error(e);
       if (bootEl) bootEl.querySelector('.boot-inner').textContent = 'خطا در راه‌اندازی: ' + e.message;

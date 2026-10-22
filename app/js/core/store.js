@@ -24,7 +24,8 @@
   var DB_VERSION = 1;
 
   /* ------------------------------ IndexedDB ------------------------------ */
-  function IndexedDBAdapter() { this.db = null; this.kind = 'indexeddb'; }
+  /** هر شرکت هلدینگ پایگاه داده جداگانه خود را دارد (dbName) */
+  function IndexedDBAdapter(dbName) { this.db = null; this.kind = 'indexeddb'; this.name = dbName || DB_NAME; }
 
   function req2p(req) {
     return new Promise(function (res, rej) {
@@ -44,7 +45,7 @@
     var self = this;
     return new Promise(function (res, rej) {
       if (!window.indexedDB) return rej(new Error('IndexedDB در دسترس نیست'));
-      var req = window.indexedDB.open(DB_NAME, DB_VERSION);
+      var req = window.indexedDB.open(self.name, DB_VERSION);
       req.onupgradeneeded = function () {
         var db = req.result;
         if (!db.objectStoreNames.contains('records')) {
@@ -88,6 +89,7 @@
     tx.objectStore('meta').put({ key: key, value: value });
     return tx2p(tx);
   };
+  IndexedDBAdapter.prototype.close = function () { if (this.db) { this.db.close(); this.db = null; } };
   IndexedDBAdapter.prototype.clearAll = function () {
     var tx = this.db.transaction(['records', 'meta'], 'readwrite');
     tx.objectStore('records').clear();
@@ -98,6 +100,7 @@
   /* ------------------------------ Memory ------------------------------ */
   function MemoryAdapter() { this.kind = 'memory'; }
   MemoryAdapter.prototype.open = function () { return Promise.resolve(); };
+  MemoryAdapter.prototype.close = function () {};
   MemoryAdapter.prototype.loadAll = function () { return Promise.resolve({ records: {}, meta: {} }); };
   MemoryAdapter.prototype.put = MemoryAdapter.prototype.remove = MemoryAdapter.prototype.clearEntity =
     MemoryAdapter.prototype.setMeta = MemoryAdapter.prototype.clearAll = function () { return Promise.resolve(); };
@@ -110,7 +113,7 @@
     currency: 'ریال',
     displayScale: 1e9,
     cyclePeriod: null,          // ماه جاری چرخه برنامه‌ریزی (yyyymm)
-    historyMonths: 24,
+    historyMonths: 36,
     horizonMonths: 18,
     fiscalStartMonth: 1,
     frozenMonths: 1,            // افق منجمد برنامه
@@ -150,8 +153,10 @@
     codeIndex[entity] = null;
   }
   function queue(fn) {
-    // نوشتن‌ها به ترتیب انجام می‌شوند تا ترتیب تغییرات در پایگاه داده حفظ شود
-    pending = pending.then(fn).catch(function (e) {
+    // نوشتن‌ها به ترتیب انجام می‌شوند تا ترتیب تغییرات در پایگاه داده حفظ شود؛
+    // آداپتور همان لحظه ثبت می‌شود تا با تعویض شرکت، نوشتن به پایگاه داده شرکت دیگر نرود
+    var a = adapter;
+    pending = pending.then(function () { return fn(a); }).catch(function (e) {
       console.error(e);
       if (IBP.ui) IBP.ui.toast('خطا در ذخیره داده: ' + (e && e.message ? e.message : e), 'error');
     });
@@ -166,13 +171,16 @@
     version: 0,
     adapterKind: function () { return adapter ? adapter.kind : null; },
 
+    LEGACY_DB: DB_NAME,
+    dbName: function () { return adapter ? adapter.name : null; },
     init: function (customAdapter) {
+      if (adapter && adapter.close) { var old = adapter; pending = pending.then(function () { old.close(); }); }
       adapter = customAdapter || new IndexedDBAdapter();
       return adapter.open().catch(function (e) {
         console.warn('IndexedDB unavailable, using memory store', e);
         adapter = new MemoryAdapter();
         return adapter.open();
-      }).then(function () { return adapter.loadAll(); }).then(function (loaded) {
+      }).then(function () { return pending; }).then(function () { return adapter.loadAll(); }).then(function (loaded) {
         data = {}; index = {}; codeIndex = {};
         IBP.schema.keys().forEach(ensure);
         Object.keys(loaded.records).forEach(function (e) { data[e] = loaded.records[e]; rebuild(e); });
@@ -216,7 +224,7 @@
       data[entity].push(rec);
       index[entity].set(rec.id, rec);
       codeIndex[entity] = null;
-      queue(function () { return adapter.put(entity, [rec]); });
+      queue(function (a) { return a.put(entity, [rec]); });
       emit({ type: 'insert', entity: entity, id: rec.id });
       return rec;
     },
@@ -225,7 +233,7 @@
       if (!r) throw new Error('رکورد یافت نشد');
       Object.assign(r, patch, { id: id });
       codeIndex[entity] = null;
-      queue(function () { return adapter.put(entity, [r]); });
+      queue(function (a) { return a.put(entity, [r]); });
       emit({ type: 'update', entity: entity, id: id });
       return r;
     },
@@ -234,7 +242,7 @@
       var set = new Set(ids);
       data[entity] = data[entity].filter(function (r) { return !set.has(r.id); });
       rebuild(entity);
-      queue(function () { return adapter.remove(entity, ids); });
+      queue(function (a) { return a.remove(entity, ids); });
       emit({ type: 'remove', entity: entity, ids: ids });
     },
     /** درج یا جایگزینی گروهی (برای ورود داده و تولید داده تستی) */
@@ -247,7 +255,7 @@
       });
       codeIndex[entity] = null;
       var stored = recs.map(function (r) { return index[entity].get(r.id); });
-      queue(function () { return adapter.put(entity, stored); });
+      queue(function (a) { return a.put(entity, stored); });
       if (!opts || !opts.silent) emit({ type: 'bulk', entity: entity });
       return stored;
     },
@@ -256,14 +264,14 @@
       recs.forEach(function (r) { if (!r.id) r.id = uid(); });
       data[entity] = recs;
       rebuild(entity);
-      queue(function () { return adapter.clearEntity(entity).then(function () { return recs.length ? adapter.put(entity, recs) : null; }); });
+      queue(function (a) { return a.clearEntity(entity).then(function () { return recs.length ? a.put(entity, recs) : null; }); });
       if (!opts || !opts.silent) emit({ type: 'replace', entity: entity });
     },
     clearAll: function () {
       data = {}; index = {}; codeIndex = {};
       IBP.schema.keys().forEach(ensure);
       meta = { settings: Object.assign({}, DEFAULT_SETTINGS, { cyclePeriod: IBP.jalali.currentPeriod() }) };
-      queue(function () { return adapter.clearAll(); });
+      queue(function (a) { return a.clearAll(); });
       emit({ type: 'clear' });
     },
     touch: function () { emit({ type: 'bulk' }); },
@@ -273,14 +281,14 @@
     saveSettings: function (patch) {
       meta.settings = Object.assign({}, S.settings(), patch);
       var v = meta.settings;
-      queue(function () { return adapter.setMeta('settings', v); });
+      queue(function (a) { return a.setMeta('settings', v); });
       emit({ type: 'settings' });
       return v;
     },
     meta: function (key) { return meta[key]; },
     setMeta: function (key, value) {
       meta[key] = value;
-      queue(function () { return adapter.setMeta(key, value); });
+      queue(function (a) { return a.setMeta(key, value); });
     },
     defaultSettings: function () { return Object.assign({}, DEFAULT_SETTINGS); },
 

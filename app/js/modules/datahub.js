@@ -6,12 +6,6 @@
   'use strict';
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, F = IBP.fmt, S = IBP.store, SC = IBP.schema, UI = IBP.ui, C = IBP.charts;
-  var TPL_STYLE = {
-    food: { icon: 'flask', grad: 'linear-gradient(135deg,#f59e0b,#ef4444)' },
-    appliance: { icon: 'gear', grad: 'linear-gradient(135deg,#3b82f6,#6366f1)' },
-    pharma: { icon: 'sparkles', grad: 'linear-gradient(135deg,#10b981,#06b6d4)' },
-    auto: { icon: 'truck', grad: 'linear-gradient(135deg,#64748b,#0f172a)' }
-  };
   var pending = null; // { file, plan, mode }
 
   /* ======================= کیفیت داده ======================= */
@@ -162,10 +156,10 @@
     root.appendChild(grid);
 
     /* الگوهای صنعت */
-    var tplCard = UI.card({ title: 'الگوهای آماده صنعت', sub: 'هر الگو یک شرکت تولیدی کامل با ۲۴ ماه فروش، پیش‌بینی، بودجه، موجودی، BOM و ظرفیت خطوط است', icon: 'sparkles', span: 12 });
+    var tplCard = UI.card({ title: 'الگوهای آماده شرکت‌های غذایی', sub: 'داده نمونه کامل برای همین شرکت (' + (st.companyCode || '') + '): ۲۴ ماه فروش با اثر رمضان و محرم، پیش‌بینی، بودجه، موجودی، BOM، ظرفیت و جریان‌های درون‌گروهی', icon: 'sparkles', span: 12 });
     var tg = h('div.tpl-grid');
     IBP.templates.list.forEach(function (t) {
-      var sty = TPL_STYLE[t.id] || TPL_STYLE.food;
+      var sty = { icon: t.icon, grad: t.grad };
       var nProd = t.families.reduce(function (a, f) { return a + f.items.length; }, 0);
       tg.appendChild(h('div.card.tpl-card.hoverable' + (st.templateId === t.id && S.count('products') ? '.current' : ''),
         h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, h('div.tpl-icon', { style: { background: sty.grad }, html: icon(sty.icon, 22) }),
@@ -174,7 +168,7 @@
         h('div.tpl-meta', { html: UI.statusBadge('neutral', F.num(t.plants.length) + ' کارخانه') + UI.statusBadge('neutral', F.num(nProd) + ' محصول') + UI.statusBadge('neutral', F.num(t.channels.length) + ' کانال') + (st.templateId === t.id && S.count('products') ? UI.statusBadge('info', 'فعال') : '') }),
         h('div.tpl-actions',
           h('button.btn.btn-sm.btn-primary', { type: 'button', html: icon('play', 14) + '<span>بارگذاری</span>', onclick: function () {
-            UI.confirm('همه داده‌های فعلی حذف و داده نمونه «' + t.name + '» جایگزین می‌شود. ادامه می‌دهید؟', { danger: true, ok: 'بارگذاری' }).then(function (ok) {
+            UI.confirm('همه داده‌های فعلی شرکت «' + st.companyName + '» حذف و داده نمونه «' + t.name + '» جایگزین می‌شود. داده شرکت‌های دیگر هلدینگ تغییری نمی‌کند. ادامه می‌دهید؟', { danger: true, ok: 'بارگذاری' }).then(function (ok) {
               if (!ok) return;
               IBP.seed.load({ templateId: t.id, cyclePeriod: st.cyclePeriod || J.currentPeriod(), fiscalStartMonth: st.fiscalStartMonth }).then(function () { UI.toast('داده نمونه «' + t.name + '» بارگذاری شد', 'success'); IBP.app.refresh(); });
             });

@@ -700,3 +700,71 @@ th.num .th-sort { justify-content: flex-end; }
   .app { display: block; }
   .card { box-shadow: none; break-inside: avoid; }
 }
+
+/* ---------------- ورود هلدینگ ---------------- */
+body.gate-open { overflow: hidden; }
+.gate { position: fixed; inset: 0; z-index: 80; overflow-y: auto; background: var(--page-glow), var(--page); transition: opacity .25s, transform .25s; }
+.gate.hidden { display: none; }
+.gate.leaving { opacity: 0; transform: scale(1.01); pointer-events: none; }
+.gate-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 28px 40px; animation: rise .45s var(--ease) both; }
+.gate-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
+.gate-title { font-size: 24px; font-weight: 700; }
+.gate-sub { font-size: 13px; color: var(--muted); }
+.gate-actions { margin-inline-start: auto; display: flex; gap: 8px; }
+.gate-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+.gate-card { padding: 18px; display: flex; flex-direction: column; gap: 14px; cursor: pointer; text-align: right; font: inherit; color: inherit; }
+.gate-card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.gate-card.last { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring), var(--shadow); }
+.gc-head { display: flex; gap: 12px; align-items: center; }
+.gc-head .tpl-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: #fff; flex: none; }
+.gc-name { font-weight: 700; font-size: 16px; }
+.gc-sub { font-size: 12px; color: var(--muted); }
+.gc-code { margin-inline-start: auto; font-weight: 700; font-size: 12px; direction: ltr; padding: 3px 9px; border-radius: 8px; background: var(--accent-soft); color: var(--accent-strong); letter-spacing: .5px; }
+.gc-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+.gc-stats > div { display: flex; flex-direction: column; gap: 2px; }
+.gc-stats b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gc-stats span { font-size: 11px; color: var(--muted); }
+.gc-spark { color: var(--spark); }
+.gc-spark .spark { width: 100%; }
+.gc-foot { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 12px; }
+.gate-add { align-items: center; justify-content: center; border-style: dashed; background: var(--grad-soft); min-height: 230px; }
+.gate-foot { margin-top: 28px; text-align: center; font-size: 12px; color: var(--muted); }
+.company-chip { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 6px 0 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; font-size: 13px; white-space: nowrap; }
+.company-chip:hover { border-color: var(--border-strong); }
+.company-chip .cc-code { font-weight: 700; direction: ltr; font-size: 11px; padding: 1px 7px; border-radius: 7px; background: var(--grad); color: #fff; }
+@media (max-width: 640px) {
+  .gate-wrap { padding: 20px 16px; }
+  .gc-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .company-chip .cc-name { display: none; }
+}
+
+/* ---------------- برنامه‌ریزی تقاضا ---------------- */
+.tabbar { display: flex; gap: 4px; padding: 4px; margin-bottom: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow-x: auto; box-shadow: var(--shadow-sm); }
+.tab { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 10px; color: var(--text-2); font-size: 13.5px; white-space: nowrap; text-decoration: none !important; transition: background .15s, color .15s; }
+.tab:hover { background: var(--surface-2); color: var(--text); }
+.tab.on { background: var(--grad); color: #fff; box-shadow: 0 6px 16px -8px rgba(37, 99, 235, 0.7); font-weight: 500; }
+.plan-wrap { max-height: 640px; overflow: auto; }
+.plan-table th { position: sticky; top: 0; z-index: 2; vertical-align: top; padding: 8px 10px !important; line-height: 1.5; }
+.plan-table th.frozen, .plan-table td.frozen { background: var(--surface-2); color: var(--muted); }
+.plan-table .pt-name { position: sticky; right: 0; z-index: 1; background: var(--surface); min-width: 260px; cursor: pointer; white-space: nowrap; }
+.plan-table thead .pt-name { z-index: 3; background: var(--surface-2); }
+.plan-table td.pt-cell { min-width: 74px; padding: 8px 10px; }
+.plan-table td.ed { cursor: text; }
+.plan-table td.ed:hover { box-shadow: inset 0 0 0 2px var(--accent-ring); }
+.plan-table td.dev { background: var(--warning-soft); }
+.plan-table td.pt-total { font-weight: 700; background: var(--surface-2); }
+.plan-table tr.pt-d0 td { font-weight: 700; background: var(--accent-soft); }
+.plan-table tr.pt-d0 .pt-name { background: var(--accent-soft); }
+.plan-table tr.pt-d1 td { font-weight: 500; }
+.plan-table tr.sel .pt-name { box-shadow: inset -3px 0 0 var(--accent); color: var(--accent-strong); }
+.plan-table tbody tr:hover .pt-name { background: var(--surface-2); }
+.pt-tog { border: none; background: transparent; color: var(--muted); cursor: pointer; padding: 0 2px; display: inline-grid; vertical-align: middle; }
+.pt-label { vertical-align: middle; }
+.ev-tag { display: inline-block; font-size: 10px; font-weight: 700; color: #7c3aed; background: rgba(124, 58, 237, 0.10); border-radius: 6px; padding: 0 5px; margin-top: 2px; }
+:root[data-theme="dark"] .ev-tag { color: #c4b5fd; }
+.cell-input { width: 100%; min-width: 70px; height: 30px !important; padding: 0 6px !important; text-align: left; font-variant-numeric: tabular-nums; }
+.fva-track { height: 14px; position: relative; display: flex; justify-content: flex-start; direction: ltr; }
+.fva-track::before { content: ''; position: absolute; top: -3px; bottom: -3px; left: 50%; width: 1px; background: var(--axis); }
+.fva-bar { height: 100%; margin-left: 50%; background: var(--good); border-radius: 0 4px 4px 0; }
+.fva-bar.neg { margin-left: auto; margin-right: 50%; background: var(--critical); border-radius: 4px 0 0 4px; }
+.heat th.cur { color: var(--accent-strong); font-weight: 700; }

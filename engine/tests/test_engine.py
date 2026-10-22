@@ -79,3 +79,7 @@ def test_http_endpoints_and_report():
     wb = load_workbook(io.BytesIO(x.content))
     ws = wb["پورتفوی"]
     assert ws.sheet_view.rightToLeft and len(ws._charts) == 2 and ws.cell(5, 1).value == "الف"
+    # بخش drawing با پیشوند استاندارد Excel تا برنامه (ExcelJS) هم بتواند فایل را بخواند
+    import zipfile
+    drawing = zipfile.ZipFile(io.BytesIO(x.content)).read("xl/drawings/drawing1.xml")
+    assert b"<xdr:wsDr" in drawing

@@ -15,6 +15,9 @@
 from __future__ import annotations
 
 import io
+import re
+import xml.etree.ElementTree as ET
+import zipfile
 from typing import Any
 
 from openpyxl import Workbook
@@ -141,6 +144,34 @@ def _add_chart(ws, chart_spec: dict[str, Any], nrows: int) -> None:
     ws.add_chart(chart, chart_spec.get("anchor") or f"{get_column_letter(len(ws[HEADER_ROW]) + 2)}{HEADER_ROW}")
 
 
+DRAWING_NS = {
+    "xdr": "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing",
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+    "c": "http://schemas.openxmlformats.org/drawingml/2006/chart",
+}
+
+
+def _normalize_drawings(data: bytes) -> bytes:
+    """بازنویسی بخش‌های drawing با پیشوندهای استاندارد Excel (xdr:، a:).
+
+    openpyxl این بخش‌ها را با فضای نام پیش‌فرض می‌نویسد؛ Excel آن را می‌پذیرد اما برخی کتابخانه‌ها
+    (از جمله ExcelJS که برنامه برای خواندن فایل‌ها به کار می‌برد) فقط شکل پیشونددار را می‌شناسند.
+    """
+    for prefix, uri in DRAWING_NS.items():
+        ET.register_namespace(prefix, uri)
+    src = zipfile.ZipFile(io.BytesIO(data))
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            content = src.read(item.filename)
+            if re.match(r"xl/drawings/drawing\d+\.xml$", item.filename):
+                root = ET.fromstring(content)
+                content = b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + ET.tostring(root, encoding="utf-8")
+            dst.writestr(item, content)
+    return out.getvalue()
+
+
 def build_report(spec: dict[str, Any]) -> bytes:
     wb = Workbook()
     wb.remove(wb.active)
@@ -155,4 +186,4 @@ def build_report(spec: dict[str, Any]) -> bytes:
         wb.create_sheet("خالی")
     buf = io.BytesIO()
     wb.save(buf)
-    return buf.getvalue()
+    return _normalize_drawings(buf.getvalue())

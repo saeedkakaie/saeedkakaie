@@ -56,6 +56,8 @@
       };
       var cycleChanged = patch.cyclePeriod !== st.cyclePeriod;
       S.saveSettings(patch);
+      var co = IBP.holding.current();
+      if (co && co.name !== patch.companyName) IBP.holding.update(co.id, { name: patch.companyName });
       IBP.ui.toast('تنظیمات ذخیره شد', 'success');
       if (cycleChanged) IBP.ui.toast('چرخه برنامه‌ریزی تغییر کرد. برای داشتن پیش‌بینی این چرخه، داده تستی را دوباره بسازید یا پیش‌بینی وارد کنید.', 'info');
       IBP.app.refresh();

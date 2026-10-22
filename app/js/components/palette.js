@@ -24,12 +24,13 @@
       { group: 'فرمان‌ها', icon: 'excel', title: 'خروجی Excel داشبورد مدیریتی', run: function () { return IBP.dashboardExport && IBP.dashboardExport(); } },
       { group: 'فرمان‌ها', icon: 'excel', title: 'خروجی Excel تحلیل پورتفوی', run: function () { return IBP.portfolioExport && IBP.portfolioExport(); } },
       { group: 'فرمان‌ها', icon: 'upload', title: 'بارگذاری فایل Excel داده', run: function () { IBP.app.navigate('#/datahub'); } },
+      { group: 'فرمان‌ها', icon: 'factory', title: 'تغییر شرکت (بازگشت به صفحه هلدینگ)', run: function () { IBP.app.switchCompany(); } },
       { group: 'فرمان‌ها', icon: 'moon', title: 'تغییر پوسته روشن / تیره', run: function () { IBP.app.toggleTheme(); } },
       { group: 'فرمان‌ها', icon: 'sidebar', title: 'جمع / باز کردن منوی کناری', run: function () { IBP.app.toggleCollapse(); } },
       { group: 'فرمان‌ها', icon: 'python', title: 'بررسی اتصال موتور پایتون', run: function () { return IBP.engine.check().then(function (ok) { IBP.ui.toast(ok ? 'موتور پایتون متصل است' : 'موتور پایتون در دسترس نیست', ok ? 'success' : 'warning'); }); } }
     );
     IBP.templates.list.forEach(function (t) {
-      out.push({ group: 'الگوهای صنعت', icon: 'sparkles', title: 'بارگذاری داده نمونه: ' + t.name, sub: t.company, run: function () { IBP.app.navigate('#/datahub'); } });
+      out.push({ group: 'الگوهای شرکت', icon: 'sparkles', title: 'داده نمونه: ' + t.name, sub: t.company, run: function () { IBP.app.navigate('#/datahub'); } });
     });
     S.all('products').forEach(function (p) {
       out.push({ group: 'محصولات', icon: 'box', title: p.name, sub: p.code + ' · ' + S.name('families', p.familyId), search: p.code, run: function () { IBP.form.editRecord('products', p); } });
