@@ -6,7 +6,7 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.4.0', phase: 4 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.5.0', phase: 5 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
@@ -26,10 +26,10 @@
       group: 'برنامه‌ریزی', items: [
         { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers' },
         { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend' },
-        { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory', badge: 'جدید' },
-        { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse', badge: 'جدید' },
-        { route: 'finance', label: 'تطبیق مالی', icon: 'coins', phase: 5 },
-        { route: 'scenarios', label: 'سناریوها', icon: 'scenario', phase: 5 }
+        { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory' },
+        { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse' },
+        { route: 'finance', label: 'تطبیق مالی', icon: 'coins', badge: 'جدید' },
+        { route: 'scenarios', label: 'سناریوها', icon: 'scenario', badge: 'جدید' }
       ]
     },
     {

@@ -8,7 +8,7 @@
   'use strict';
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, F = IBP.fmt, S = IBP.store, A = IBP.analytics, C = IBP.charts, UI = IBP.ui;
-  var TABS = [['mps', 'برنامه تولید (MPS)', 'factory'], ['capacity', 'ظرفیت و گلوگاه‌ها', 'gear']];
+  var TABS = [['mps', 'برنامه تولید (MPS)', 'factory'], ['capacity', 'ظرفیت سرانگشتی (RCCP)', 'gear']];
   var state = { months: 12, sel: null, res: null, family: 'all' };
 
   function plan() { return IBP.supply.current().plan; }
@@ -202,7 +202,7 @@
     var grid = h('div.dash-grid');
     root.appendChild(grid);
     var warn = S.settings().utilizationWarn || 0.85;
-    var c1 = UI.card({ title: 'نقشه بار خطوط تولید', sub: 'درصد بهره‌برداری از ظرفیت عادی بر اساس برنامه تولید · برای تفکیک بار روی خط کلیک کنید', icon: 'gear', span: 12, exportFn: function () { return exportCapacity(pl); } });
+    var c1 = UI.card({ title: 'RCCP: بار برنامه تولید (MPS) بر خطوط', sub: 'برنامه‌ریزی ظرفیت سرانگشتی · درصد بهره‌برداری از ظرفیت عادی هر خط در هر ماه · برای تفکیک بار روی خط کلیک کنید', icon: 'gear', span: 12, exportFn: function () { return exportCapacity(pl); } });
     C.heatmap(c1.body, {
       corner: 'خط / ماه',
       rows: pl.resources.map(function (r) { return { id: r.resource.id, label: r.resource.name, sub: F.num(r.cap, 0) + ' ساعت · ' + F.num(r.resource.shifts) + ' شیفت', r: r }; }),
@@ -231,6 +231,20 @@
       C.columns(box, { labels: per.map(J.shortLabel), tipTitles: per.map(J.label), stacked: true, series: series, refLine: { value: resSel.cap, label: 'ظرفیت ' + F.num(resSel.cap, 0) + ' ساعت' }, format: function (v) { return F.num(v, 0); }, tipFormat: function (v) { return F.num(v, 0) + ' ساعت'; }, height: 290 });
       grid.appendChild(c2.el);
     }
+
+    // RCCP به تفکیک خانواده (Bill of Resources): ساعت لازم هر خانواده در برابر ظرفیت کل خطوط
+    var famOf = {};
+    S.all('products').forEach(function (p) { famOf[p.id] = p.familyId; });
+    var fams = S.all('families'), capTot = A.sum(pl.resources, function (r) { return r.cap; });
+    var fh = {};
+    pl.resources.forEach(function (r) { Object.keys(r.byProduct).forEach(function (pid) { var f = famOf[pid]; fh[f] = fh[f] || per.map(function () { return 0; }); per.forEach(function (_, i) { fh[f][i] += r.byProduct[pid][i] || 0; }); }); });
+    var cR = UI.card({ title: 'RCCP به تفکیک خانواده محصول', sub: 'ساعت تولید لازم برای برنامه هر خانواده · خط‌چین = ظرفیت عادی کل خطوط (' + F.num(capTot, 0) + ' ساعت)', icon: 'layers', span: 12 });
+    var rb = h('div'); cR.body.appendChild(rb);
+    C.columns(rb, { labels: per.map(J.shortLabel), tipTitles: per.map(J.label), stacked: true, height: 260,
+      series: fams.filter(function (f) { return fh[f.id]; }).map(function (f, i) { return { name: f.name, values: fh[f.id], color: f.color || C.seriesColor(i) }; }),
+      lines: [{ name: 'ظرفیت با اضافه‌کاری', values: per.map(function () { return capTot * (1 + (pl.options.overtimePct || 0)); }), color: 'var(--critical)', dash: true }],
+      refLine: { value: capTot, label: 'ظرفیت عادی' }, format: function (v) { return F.num(v, 0); }, tipFormat: function (v) { return F.num(v, 0) + ' ساعت'; } });
+    grid.appendChild(cR.el);
 
     var bn = bottlenecks(pl);
     var c3 = UI.card({ title: 'گلوگاه‌ها و راهکار', sub: 'ماه‌هایی که بار بیش از ' + F.pct(warn, 0) + ' ظرفیت است', icon: 'alert', span: 4, flush: true });

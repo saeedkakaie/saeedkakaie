@@ -484,6 +484,48 @@
     responsive(container, draw);
   }
 
+  /* ================= گردبادی (تحلیل حساسیت) ================= */
+  /**
+   * opts: { items:[{label, low, high}], lowLabel, highLabel, format, height }
+   * هر ردیف دو میله دارد: اثر تغییر منفی و مثبت محرک بر شاخص؛ محور صفر در وسط.
+   */
+  function tornado(container, opts) {
+    var draw = function (animate) {
+      container.textContent = '';
+      container.classList.add('chart');
+      var cLo = 'var(--series-2)', cHi = 'var(--series-1)';
+      container.appendChild(legend([{ label: opts.lowLabel || 'کاهش', color: cLo, shape: 'rect' }, { label: opts.highLabel || 'افزایش', color: cHi, shape: 'rect' }]));
+      toolbar(container, function () { draw(false); });
+      var items = opts.items, fmt = opts.format || IBP.fmt.compact;
+      var W = Math.max(300, container.clientWidth), rowH = 34, m = { t: 8, r: 150, b: 26, l: 16 };
+      var H = m.t + m.b + items.length * rowH, iw = W - m.l - m.r;
+      var mx = Math.max.apply(null, items.map(function (it) { return Math.max(Math.abs(it.low), Math.abs(it.high)); }).concat([1]));
+      var ticks = niceTicks(-mx * 1.15, mx * 1.15, 4), x0 = ticks[0], x1 = ticks[ticks.length - 1];
+      var X = function (v) { return m.l + ((v - x0) / (x1 - x0)) * iw; };
+      var root = svg('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, class: 'chart-svg', role: 'img' });
+      ticks.forEach(function (t) {
+        root.appendChild(svg('line', { x1: X(t), x2: X(t), y1: m.t, y2: H - m.b, class: t === 0 ? 'axis' : 'grid' }));
+        root.appendChild(text(X(t), H - 8, fmt(t), { class: 'tick', 'text-anchor': 'middle' }));
+      });
+      items.forEach(function (it, i) {
+        var y = m.t + i * rowH + 6, bh = rowH - 12;
+        root.appendChild(text(W - 6, y + bh / 2 + 4, it.label, { class: 'tick tornado-label', 'text-anchor': 'end' }));
+        [['low', cLo, opts.lowLabel || 'کاهش'], ['high', cHi, opts.highLabel || 'افزایش']].forEach(function (k) {
+          var v = it[k[0]], a = X(Math.min(0, v)), b = X(Math.max(0, v));
+          var r = svg('rect', { x: a, y: y, width: Math.max(1, b - a), height: bh, rx: 3, fill: k[1], class: 'col-bar' + (animate ? ' tor-grow' : ''), tabindex: 0 });
+          r.style.transformOrigin = X(0) + 'px center';
+          if (animate) r.style.animationDelay = (i * 0.06) + 's';
+          r.addEventListener('pointermove', function (e) { showTip(e, it.label + ' — ' + k[2], [{ label: opts.valueLabel || 'اثر', value: (v >= 0 ? '+' : '') + fmt(v), color: k[1] }].concat(it.rows ? it.rows[k[0]] || [] : [])); });
+          r.addEventListener('pointerleave', hideTip);
+          root.appendChild(r);
+          if (labelsOn() && Math.abs(v) > 0) root.appendChild(dataLabel(v >= 0 ? b + 4 : a - 4, y + bh / 2 + 4, (v >= 0 ? '+' : '') + fmt(v), v >= 0 ? 'start' : 'end'));
+        });
+      });
+      container.appendChild(root);
+    };
+    responsive(container, draw);
+  }
+
   /* ================= نقشه حرارتی ================= */
   /**
    * opts: { rows:[{id,label,sub}], cols:[{id,label}], value(row,col) → number|null, format, color(v,row,col) → css,
@@ -681,5 +723,5 @@
       '</svg><div class="ring-v" style="font-size:' + (opts.fontSize || Math.round(size / 4.4)) + 'px">' + (opts.label || IBP.fmt.pct(v, 0)) + '</div></div>';
   }
 
-  IBP.charts = { line: line, hbars: hbars, columns: columns, waterfall: waterfall, heatmap: heatmap, scaleColor: scaleColor, labelsOn: labelsOn, scatter: scatter, donut: donut, sparkline: sparkline, ring: ring, showTip: showTip, hideTip: hideTip, niceTicks: niceTicks, seriesColor: seriesColor, resolveColor: resolveColor };
+  IBP.charts = { line: line, hbars: hbars, columns: columns, waterfall: waterfall, tornado: tornado, heatmap: heatmap, scaleColor: scaleColor, labelsOn: labelsOn, scatter: scatter, donut: donut, sparkline: sparkline, ring: ring, showTip: showTip, hideTip: hideTip, niceTicks: niceTicks, seriesColor: seriesColor, resolveColor: resolveColor };
 })(window.IBP = window.IBP || {});

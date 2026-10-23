@@ -50,7 +50,9 @@
       prebuildMonths: o.prebuildMonths !== undefined ? o.prebuildMonths : (st.prebuildMonths !== undefined ? st.prebuildMonths : 3),
       productionLeadDays: o.productionLeadDays || st.productionLeadDays || 7,
       version: o.version || st.supplyVersion || 'اجماعی',
-      overrides: o.overrides || S.meta('mpsOverrides') || {}
+      overrides: o.overrides || S.meta('mpsOverrides') || {},
+      demandFactor: o.demandFactor || null,     // سناریو: ضریب تقاضا (عدد یا {familyId: ضریب})
+      capacityFactor: o.capacityFactor || 1     // سناریو: ضریب ظرفیت همه خطوط
     };
   }
 
@@ -71,7 +73,8 @@
     Object.keys(routes).forEach(function (k) { routes[k].sort(function (a, b) { return (a.priority || 1) - (b.priority || 1); }); });
 
     var items = products.map(function (p) {
-      var dem = periods.map(function (per) { var m = fmap.get(p.id); return m ? (m.get(per) || 0) : 0; });
+      var df = !o.demandFactor ? 1 : typeof o.demandFactor === 'number' ? o.demandFactor : (o.demandFactor[p.familyId] !== undefined ? o.demandFactor[p.familyId] : (o.demandFactor.all || 1));
+      var dem = periods.map(function (per) { var m = fmap.get(p.id); return (m ? (m.get(per) || 0) : 0) * df; });
       // σ نسبی خطای پیش‌بینی: بک‌تست روش منتخب، در غیر این صورت ضریب تغییرات فروش ۱۲ ماه
       var rel = null, rp = run && run.cycle === cycle && run.products ? run.products[p.id] : null;
       if (rp) { var mt = rp.metrics && rp.metrics[rp.method]; rel = mt && mt.rmse !== null && mt.rmse !== undefined ? mt.rmse : rp.score; }
@@ -93,7 +96,7 @@
         maxCarry: Math.max(0, Math.min(o.prebuildMonths, Math.floor(shelfM * 0.6)))
       };
     });
-    var resources = S.all('resources').map(function (r) { return { resource: r, cap: A.resourceCapacity(r) }; });
+    var resources = S.all('resources').map(function (r) { return { resource: r, cap: A.resourceCapacity(r) * (o.capacityFactor || 1) }; });
     return { o: o, cycle: cycle, periods: periods, items: items, resources: resources, z: z };
   }
 
@@ -360,5 +363,11 @@
   }
   function clearOptimized() { S.setMeta('supplyRun', null); cache = { v: -1 }; }
 
-  IBP.supply = { zOf: zOf, options: options, inputs: inputs, planLocal: planLocal, project: project, mrp: mrp, compute: compute, current: current, optimize: optimize, enginePayload: enginePayload, clearOptimized: clearOptimized };
+  /** محاسبه مستقل (بدون کش) برای سناریوها */
+  function scenario(opts) {
+    var plan = planLocal(inputs(Object.assign({ overrides: {} }, opts || {})));
+    return { plan: plan, mrp: mrp(plan) };
+  }
+
+  IBP.supply = { scenario: scenario, zOf: zOf, options: options, inputs: inputs, planLocal: planLocal, project: project, mrp: mrp, compute: compute, current: current, optimize: optimize, enginePayload: enginePayload, clearOptimized: clearOptimized };
 })(window.IBP = window.IBP || {});

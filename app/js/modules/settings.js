@@ -44,6 +44,7 @@
     var ssMethod = h('select', h('option', { value: 'statistical' }, 'آماری (سطح خدمت × خطای پیش‌بینی)'), h('option', { value: 'days' }, 'روز ثابت هر محصول'));
     ssMethod.value = st.ssMethod || 'statistical';
     var overtime = pctInput(st.overtimePct !== undefined ? st.overtimePct : 0.1), prebuild = numInput(st.prebuildMonths !== undefined ? st.prebuildMonths : 3), prodLead = numInput(st.productionLeadDays || 7);
+    var costInfl = pctInput(st.costInflation !== undefined ? st.costInflation : 0.02), holdR = pctInput(st.holdingRate !== undefined ? st.holdingRate : 0.015), otPrem = pctInput(st.overtimePremium !== undefined ? st.overtimePremium : 0.5), dpo = numInput(st.dpoDays !== undefined ? st.dpoDays : 45);
     var fcOrigins = numInput(st.fcOrigins || 12), fcLead = numInput(st.fcLead || 3);
     var fcMetric = h('select');
     Object.keys(IBP.forecast.METRICS).forEach(function (k) { fcMetric.appendChild(h('option', { value: k }, IBP.forecast.METRICS[k])); });
@@ -61,6 +62,7 @@
         abcA: readPct(abcA) || 0.8, abcB: readPct(abcB) || 0.95, xyzX: F.parseNumber(xyzX.value) || 0.2, xyzY: F.parseNumber(xyzY.value) || 0.5,
         engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765',
         ssMethod: ssMethod.value, overtimePct: readPct(overtime) || 0, prebuildMonths: Math.max(0, F.parseNumber(prebuild.value) || 0), productionLeadDays: F.parseNumber(prodLead.value) || 7,
+        costInflation: readPct(costInfl) || 0, holdingRate: readPct(holdR) || 0, overtimePremium: readPct(otPrem) || 0, dpoDays: F.parseNumber(dpo.value) || 0,
         fcOrigins: Math.max(3, Math.min(24, F.parseNumber(fcOrigins.value) || 12)), fcLead: Math.max(1, Math.min(12, F.parseNumber(fcLead.value) || 3)), fcMetric: fcMetric.value
       };
       if (IBP.supply) IBP.supply.clearOptimized();
@@ -102,7 +104,11 @@
           field('روش ذخیره اطمینان', ssMethod),
           field('سقف اضافه‌کاری', overtime, 'نسبت به ظرفیت عادی هر خط'),
           field('حداکثر پیش‌ساخت (ماه)', prebuild, 'تولید زودتر از ماه تقاضا با رعایت ماندگاری'),
-          field('زمان تولید و آزادسازی (روز)', prodLead, 'برای محاسبه ذخیره اطمینان')),
+          field('زمان تولید و آزادسازی (روز)', prodLead, 'برای محاسبه ذخیره اطمینان'),
+          field('تورم ماهانه هزینه‌ها', costInfl, 'بهای مواد و تبدیل در سود و زیان برنامه'),
+          field('هزینه نگهداری ماهانه موجودی', holdR, 'نسبت به ارزش موجودی'),
+          field('صرف اضافه‌کاری', otPrem, 'نسبت به هزینه ساعت عادی'),
+          field('دوره پرداخت به تأمین‌کنندگان (روز)', dpo)),
         h('div', { style: { marginTop: '16px' } }, saveBtn)), 'gear'));
 
     /* ---------------- موتور تحلیل پایتون ---------------- */

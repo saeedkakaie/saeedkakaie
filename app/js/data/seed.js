@@ -271,10 +271,20 @@
         });
         var raw = bomLines.reduce(function (a, l) { return a + l.q * l.m.unitCost; }, 0);
         var k = raw > 0 ? (p.unitCost * R.range(0.55, 0.7)) / raw : 1;
+        var matCost = 0;
         bomLines.forEach(function (l) {
           var q = l.m.uom === 'عدد' && !l.fixed ? 1 : Math.round(l.q * (l.fixed ? 1 : Math.min(1.6, Math.max(0.6, k))) * 10000) / 10000;
-          out.bom.push({ id: nid('bm'), productId: p.id, materialId: l.m.id, qtyPer: q, scrap: R.pick([0.01, 0.02, 0.03]) });
+          var sc = R.pick([0.01, 0.02, 0.03]);
+          matCost += q * (1 + sc) * l.m.unitCost;
+          out.bom.push({ id: nid('bm'), productId: p.id, materialId: l.m.id, qtyPer: q, scrap: sc });
         });
+        // بهای تمام‌شده از BOM (سهم مواد از بهای تمام‌شده: صنایع غذایی B2C حدود ۶۰ تا ۷۲٪، کالاهای B2B حدود ۷۸ تا ۸۸٪)
+        // و قیمت فروش با حاشیه متناسب مدل کسب‌وکار؛ قیمت درون‌گروهی با حاشیه انتقال کم
+        if (withRatio && matCost > p.unitCost * 0.2) {
+          p.unitCost = roundTo(matCost / (b2c ? R.range(0.6, 0.72) : R.range(0.78, 0.88)), 1000);
+          var markup = f.intercompany ? R.range(1.05, 1.1) : b2c ? R.range(1.28, 1.5) : R.range(1.1, 1.24);
+          p.unitPrice = roundTo(p.unitCost * markup, p.unitCost > 1e8 ? 1e6 : 1e4);
+        }
       });
     });
 
