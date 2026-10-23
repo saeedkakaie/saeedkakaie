@@ -109,7 +109,8 @@
   var DEFAULT_SETTINGS = {
     companyName: 'شرکت نمونه',
     industry: '',
-    templateId: 'food',
+    templateId: '',
+    businessModel: 'B2C',       // B2C: فروش مصرفی از راه شعب و زنجیره‌ای؛ B2B: فروش صنعتی
     currency: 'ریال',
     displayScale: 1e9,
     cyclePeriod: null,          // ماه جاری چرخه برنامه‌ریزی (yyyymm)
@@ -124,6 +125,14 @@
     excessMonths: 3,            // پوشش بیش از این مقدار = مازاد
     abcA: 0.8, abcB: 0.95,      // مرز سهم تجمعی کلاس‌های A و B
     xyzX: 0.2, xyzY: 0.5,       // مرز ضریب تغییرات کلاس‌های X و Y
+    ssMethod: 'statistical',    // روش ذخیره اطمینان: statistical (سطح خدمت × خطای پیش‌بینی) | days
+    overtimePct: 0.1,           // سقف اضافه‌کاری نسبت به ظرفیت عادی
+    prebuildMonths: 3,          // حداکثر ماه‌های پیش‌ساخت پیش از تقاضا
+    productionLeadDays: 7,      // زمان تولید و آزادسازی محصول
+    fcOrigins: 12,              // تعداد مبدأهای بک‌تست (ماه‌های آخر)
+    fcLead: 3,                  // افق ارزیابی بک‌تست (ماه)
+    fcMetric: 'wmape',          // معیار انتخاب روش: wmape | rmse | wmapeBias
+    fcEnsemble: true,           // ترکیب سه روش برتر در رقابت روش‌ها
     engineUrl: 'http://127.0.0.1:8765',
     theme: 'auto'
   };

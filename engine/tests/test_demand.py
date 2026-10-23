@@ -47,4 +47,43 @@ def test_intermittent_uses_croston_family():
     y[::2] = 0
     p["products"][0]["qty"] = y.tolist()
     out = demand.forecast(p)["products"]["p1"]
-    assert out["method"] in ("croston", "tsb", "ma3", "snaive", "ensemble") and out["zeroShare"] >= 0.5
+    assert out["method"] in demand.INTERMITTENT + ["ensemble"] and out["zeroShare"] >= 0.5
+
+
+def _multi_payload(n_products=6, seed=3):
+    rng = np.random.default_rng(seed)
+    xh, xf = _ramadan(PERIODS), _ramadan(FUTURE)
+    mo = np.array([p % 100 for p in PERIODS]) - 1
+    t = np.arange(len(PERIODS))
+    prods = []
+    for i in range(n_products):
+        y = (500 + 200 * i) * (1.015 ** t) * SEASON[mo] * (1 + 1.5 * xh[:, 0]) * (1 + 0.06 * rng.standard_normal(len(PERIODS)))
+        prods.append({"id": f"p{i}", "familyId": "f1", "from": 0, "qty": y.tolist()})
+    return {"periods": PERIODS, "future": FUTURE, "events": {"hist": xh.tolist(), "future": xf.tolist()}, "products": prods,
+            "options": {"origins": 12, "lead": 3, "metric": "wmape", "ensemble": True}}
+
+
+def test_backtest_compares_many_methods_including_global_gbm():
+    res = demand.forecast(_multi_payload())
+    out = res["products"]["p0"]
+    assert out["origins"] == 12 and out["lead"] == 3
+    tested = set(out["metrics"])
+    # روش‌های پایه، هموارسازی، هولت-وینترز، تتا، ARIMA، رگرسیون و مدل سراسری یادگیری ماشین
+    for m in ("snaive", "drift", "ses", "holt", "hwMul", "theta", "arima", "reg", "gbm"):
+        assert m in tested, m
+    assert len(tested) >= 14
+    # برنده کمترین خطا را دارد و lag-1 بک‌تست برای هر روش ۱۲ نقطه دارد
+    best = out["method"]
+    assert out["metrics"][best]["wmape"] == min(v["wmape"] for v in out["metrics"].values())
+    assert len(out["backtest"]["idx"]) == 12 and all(len(v) == 12 for v in out["backtest"]["fc"].values())
+    # روش منتخب روی داده با روند، فصل و رمضان باید دقیق باشد
+    assert out["metrics"][best]["wmape"] < 0.12
+    assert all(lo <= f <= hi for lo, f, hi in zip(out["lo"], out["forecast"], out["hi"]))
+
+
+def test_metric_option_changes_selection_basis():
+    p = _multi_payload(n_products=3)
+    p["options"]["metric"] = "rmse"
+    out = demand.forecast(p)["products"]["p1"]
+    assert out["metric"] == "rmse"
+    assert out["scores"][out["method"]] == min(out["scores"].values())

@@ -41,6 +41,13 @@
     var service = pctInput(st.serviceLevelTarget), accT = pctInput(st.forecastAccuracyTarget);
     var uWarn = pctInput(st.utilizationWarn), uMax = pctInput(st.utilizationMax), excess = numInput(st.excessMonths);
     var abcA = pctInput(st.abcA || 0.8), abcB = pctInput(st.abcB || 0.95), xyzX = numInput(st.xyzX || 0.2), xyzY = numInput(st.xyzY || 0.5);
+    var ssMethod = h('select', h('option', { value: 'statistical' }, 'آماری (سطح خدمت × خطای پیش‌بینی)'), h('option', { value: 'days' }, 'روز ثابت هر محصول'));
+    ssMethod.value = st.ssMethod || 'statistical';
+    var overtime = pctInput(st.overtimePct !== undefined ? st.overtimePct : 0.1), prebuild = numInput(st.prebuildMonths !== undefined ? st.prebuildMonths : 3), prodLead = numInput(st.productionLeadDays || 7);
+    var fcOrigins = numInput(st.fcOrigins || 12), fcLead = numInput(st.fcLead || 3);
+    var fcMetric = h('select');
+    Object.keys(IBP.forecast.METRICS).forEach(function (k) { fcMetric.appendChild(h('option', { value: k }, IBP.forecast.METRICS[k])); });
+    fcMetric.value = st.fcMetric || 'wmape';
     var engineUrl = h('input', { type: 'url', dir: 'ltr', value: st.engineUrl || 'http://127.0.0.1:8765' });
 
     var saveBtn = h('button.btn.btn-primary', { type: 'button', html: icon('check', 16) + '<span>ذخیره تنظیمات</span>', onclick: save });
@@ -52,8 +59,11 @@
         priceInflation: readPct(inflation) || 0, serviceLevelTarget: readPct(service) || 0.95, forecastAccuracyTarget: readPct(accT) || 0.8,
         utilizationWarn: readPct(uWarn) || 0.85, utilizationMax: readPct(uMax) || 1, excessMonths: F.parseNumber(excess.value) || 3,
         abcA: readPct(abcA) || 0.8, abcB: readPct(abcB) || 0.95, xyzX: F.parseNumber(xyzX.value) || 0.2, xyzY: F.parseNumber(xyzY.value) || 0.5,
-        engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765'
+        engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765',
+        ssMethod: ssMethod.value, overtimePct: readPct(overtime) || 0, prebuildMonths: Math.max(0, F.parseNumber(prebuild.value) || 0), productionLeadDays: F.parseNumber(prodLead.value) || 7,
+        fcOrigins: Math.max(3, Math.min(24, F.parseNumber(fcOrigins.value) || 12)), fcLead: Math.max(1, Math.min(12, F.parseNumber(fcLead.value) || 3)), fcMetric: fcMetric.value
       };
+      if (IBP.supply) IBP.supply.clearOptimized();
       var cycleChanged = patch.cyclePeriod !== st.cyclePeriod;
       S.saveSettings(patch);
       var co = IBP.holding.current();
@@ -85,7 +95,14 @@
           field('مرز کلاس A (سهم تجمعی فروش)', abcA),
           field('مرز کلاس B (سهم تجمعی فروش)', abcB),
           field('مرز کلاس X (ضریب تغییرات)', xyzX, 'مثلاً ۰٫۲'),
-          field('مرز کلاس Y (ضریب تغییرات)', xyzY, 'مثلاً ۰٫۵')),
+          field('مرز کلاس Y (ضریب تغییرات)', xyzY, 'مثلاً ۰٫۵'),
+          field('مبدأهای بک‌تست پیش‌بینی (ماه)', fcOrigins, 'تعداد ماه‌های اخیر که هر روش از آن‌ها آزموده می‌شود'),
+          field('افق ارزیابی بک‌تست (ماه)', fcLead),
+          field('معیار انتخاب روش پیش‌بینی', fcMetric),
+          field('روش ذخیره اطمینان', ssMethod),
+          field('سقف اضافه‌کاری', overtime, 'نسبت به ظرفیت عادی هر خط'),
+          field('حداکثر پیش‌ساخت (ماه)', prebuild, 'تولید زودتر از ماه تقاضا با رعایت ماندگاری'),
+          field('زمان تولید و آزادسازی (روز)', prodLead, 'برای محاسبه ذخیره اطمینان')),
         h('div', { style: { marginTop: '16px' } }, saveBtn)), 'gear'));
 
     /* ---------------- موتور تحلیل پایتون ---------------- */

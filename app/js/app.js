@@ -6,7 +6,7 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.3.0', phase: 3 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.4.0', phase: 4 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
@@ -25,9 +25,9 @@
     {
       group: 'برنامه‌ریزی', items: [
         { route: 'portfolio', label: 'پورتفوی محصول', icon: 'layers' },
-        { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend', badge: 'جدید' },
-        { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory', phase: 4 },
-        { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse', phase: 4 },
+        { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend' },
+        { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory', badge: 'جدید' },
+        { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse', badge: 'جدید' },
         { route: 'finance', label: 'تطبیق مالی', icon: 'coins', phase: 5 },
         { route: 'scenarios', label: 'سناریوها', icon: 'scenario', phase: 5 }
       ]
@@ -67,9 +67,10 @@
   function buildShell() {
     var app = h('div.app' + (pref('ibp-collapsed') === '1' ? '.collapsed' : ''));
     var side = h('aside.sidebar', { 'aria-label': 'منوی اصلی' });
-    side.appendChild(h('div.brand',
-      h('div.brand-logo', 'IBP'),
-      h('div.brand-text', h('div.brand-name', 'Integrated Business Planning'), els.brandSub = h('div.brand-sub', 'برنامه‌ریزی یکپارچه کسب‌وکار'))
+    side.appendChild(h('div.brand.with-flag',
+      IBP.flag({ width: 92, height: 62, title: 'گروه زر' }),
+      h('img.brand-crown', { src: 'assets/img/zar-crown.png', alt: 'گروه زر' }),
+      h('div.brand-text', els.brandSub = h('div.brand-title', 'گروه زر'), h('div.brand-name', 'Integrated Business Planning'))
     ));
     var nav = h('nav');
     NAV.forEach(function (g) {
@@ -122,7 +123,7 @@
   function updateChrome() {
     var st = S.settings();
     var co = IBP.holding.current();
-    els.companyChip.innerHTML = '<span class="cc-code">' + F.escape(co ? co.code : (st.companyCode || '—')) + '</span><span class="cc-name">' + F.escape(co ? co.name : st.companyName) + '</span>' + icon('chevronDown', 15);
+    els.companyChip.innerHTML = '<span class="cc-code">' + F.escape(co ? co.code : (st.companyCode || '—')) + '</span><span class="cc-name">' + F.escape(co ? co.name : st.companyName) + '</span><span class="model-badge ' + ((st.businessModel || 'B2C') === 'B2B' ? 'b2b' : 'b2c') + '">' + F.escape(st.businessModel || 'B2C') + '</span>' + icon('chevronDown', 15);
     els.brandSub.textContent = IBP.holding.holdingName();
     els.cycleChip.innerHTML = icon('calendar', 16) + '<span class="cc-label">چرخه</span><strong>' + J.label(st.cyclePeriod) + '</strong>';
     var kind = S.adapterKind();

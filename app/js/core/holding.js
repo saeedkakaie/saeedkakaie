@@ -76,9 +76,9 @@
 
     init: function (progress) {
       return openReg().then(function () { return Promise.all([readKV('holding'), readKV('companies')]); }).then(function (r) {
-        state.holding = r[0] || { name: IBP.templates.HOLDING.name };
+        state.holding = r[0] || { name: IBP.templates.HOLDING.name, version: IBP.templates.VERSION };
         state.companies = r[1] || [];
-        if (state.companies.length) return;
+        if (state.companies.length) return (state.holding.version || 1) < IBP.templates.VERSION ? H.upgrade(progress) : null;
         // نخستین اجرا: داده نسخه قبلی (در صورت وجود) و شرکت‌های نمونه هلدینگ
         var legacy = new IBP.store.adapters.IndexedDBAdapter(IBP.store.LEGACY_DB);
         return legacy.open().then(function () { return legacy.loadAll(); }).then(function (data) {
@@ -93,7 +93,23 @@
       });
     },
 
-    /** ساخت شرکت‌های نمونه هلدینگ غذایی (هر کدام با داده الگوی خودش) */
+    /**
+     * ارتقای هلدینگ نمونه نسخه قبل: شرکت‌های نمونه قدیمی حذف و شرکت‌های هلدینگ زر ساخته می‌شوند.
+     * شرکت‌هایی که کاربر خودش ساخته یا نامشان را تغییر داده دست نمی‌خورند.
+     */
+    upgrade: function (progress) {
+      var T = IBP.templates;
+      var old = state.companies.filter(function (c) { return T.LEGACY_DEMO[c.code] && T.LEGACY_DEMO[c.code] === c.name; });
+      var chain = Promise.resolve();
+      old.forEach(function (c) { chain = chain.then(function () { return H.remove(c.id); }); });
+      return chain.then(function () {
+        if (!state.holding.name || state.holding.name === T.LEGACY_HOLDING) state.holding.name = T.HOLDING.name;
+        state.holding.version = T.VERSION;
+        return H.createDemo(progress);
+      });
+    },
+
+    /** ساخت شرکت‌های نمونه هلدینگ (هر کدام با داده الگوی خودش) */
     createDemo: function (progress) {
       var list = IBP.templates.list.slice();
       var chain = Promise.resolve();
@@ -113,12 +129,13 @@
       var code = String(info.code || '').trim().toUpperCase();
       if (!code) return Promise.reject(new Error('کد شرکت الزامی است'));
       if (H.byCode(code)) return Promise.reject(new Error('کد «' + code + '» تکراری است'));
-      var c = { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, name: info.name || code, templateId: info.templateId || '', activity: info.activity || '', dbName: dbNameFor(code), createdAt: new Date().toISOString() };
+      var tplInfo = info.templateId ? IBP.templates.find(info.templateId) : null;
+      var c = { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, name: info.name || code, templateId: info.templateId || '', activity: info.activity || '', model: info.businessModel || (tplInfo ? tplInfo.model : '') || 'B2C', dbName: dbNameFor(code), createdAt: new Date().toISOString() };
       state.companies.push(c);
       var S = IBP.store;
       return S.init(adapterFor(c)).then(function () {
         var tpl = info.templateId ? IBP.templates.get(info.templateId) : null;
-        S.saveSettings({ companyName: c.name, companyCode: c.code, industry: tpl ? tpl.name : (info.activity || ''), templateId: info.templateId || '' });
+        S.saveSettings({ companyName: c.name, companyCode: c.code, industry: tpl ? tpl.name : (info.activity || ''), templateId: info.templateId || '', businessModel: info.businessModel || (tpl ? tpl.model : '') || 'B2C' });
         if (opts.seed && tpl) return IBP.seed.load({ templateId: tpl.id, companyName: c.name, companyCode: c.code, cyclePeriod: IBP.jalali.currentPeriod() });
         S.setMeta('seeded', { at: new Date().toISOString(), empty: true });
         return S.flush();
@@ -126,7 +143,10 @@
         c.summary = summarize();
         c.industry = S.settings().industry;
         return persist();
-      }).then(function () { return c; });
+      }).then(function () { return c; }, function (err) {
+        state.companies = state.companies.filter(function (x) { return x.id !== c.id; });
+        return persist().then(function () { throw err; });
+      });
     },
 
     update: function (id, patch) {
@@ -134,7 +154,7 @@
       if (!c) return Promise.reject(new Error('شرکت یافت نشد'));
       if (patch.code && patch.code.toUpperCase() !== c.code && H.byCode(patch.code)) return Promise.reject(new Error('کد تکراری است'));
       Object.assign(c, patch, patch.code ? { code: patch.code.toUpperCase() } : {});
-      if (state.current && state.current.id === id) IBP.store.saveSettings({ companyName: c.name, companyCode: c.code });
+      if (state.current && state.current.id === id) IBP.store.saveSettings({ companyName: c.name, companyCode: c.code, businessModel: c.model || 'B2C' });
       return persist().then(function () { return c; });
     },
     remove: function (id) {
@@ -154,7 +174,8 @@
       return IBP.store.init(adapterFor(c)).then(function () {
         state.current = c;
         var st = IBP.store.settings();
-        if (st.companyName !== c.name || st.companyCode !== c.code) IBP.store.saveSettings({ companyName: c.name, companyCode: c.code });
+        if (!c.model) c.model = st.businessModel || 'B2C';
+        if (st.companyName !== c.name || st.companyCode !== c.code || st.businessModel !== c.model) IBP.store.saveSettings({ companyName: c.name, companyCode: c.code, businessModel: c.model });
         try { sessionStorage.setItem('ibp-company', c.id); localStorage.setItem('ibp-last-company', c.id); } catch (e) { /* اختیاری */ }
         return c;
       });
@@ -164,6 +185,7 @@
       if (!state.current) return Promise.resolve();
       state.current.summary = summarize();
       state.current.industry = IBP.store.settings().industry;
+      state.current.model = IBP.store.settings().businessModel || state.current.model;
       return persist();
     },
     leave: function () {
@@ -182,13 +204,13 @@
       if (state.current && state.current.id === c.id) {
         var data = {};
         IBP.schema.keys().forEach(function (k) { data[k] = IBP.store.all(k); });
-        return Promise.resolve({ company: c, records: data, settings: IBP.store.settings() });
+        return Promise.resolve({ company: c, records: data, settings: IBP.store.settings(), meta: { icRequests: IBP.store.meta('icRequests') } });
       }
       if (memoryOnly) return Promise.resolve(null);
       var a = new IBP.store.adapters.IndexedDBAdapter(c.dbName);
       return a.open().then(function () { return a.loadAll(); }).then(function (d) {
         a.close();
-        return { company: c, records: d.records, settings: Object.assign(IBP.store.defaultSettings(), d.meta.settings || {}) };
+        return { company: c, records: d.records, settings: Object.assign(IBP.store.defaultSettings(), d.meta.settings || {}), meta: d.meta || {} };
       });
     },
     summarize: summarize

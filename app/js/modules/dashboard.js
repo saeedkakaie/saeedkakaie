@@ -235,6 +235,22 @@
     var M = model(), st = M.st, scale = M.scale, unit = M.unit;
     function rerender() { root.textContent = ''; render(root); }
 
+    /* ---------------- بنر با شاخص‌های حلقه‌ای متحرک ---------------- */
+    function heroGauges(M, done, crit) {
+      var sp = null;
+      try { sp = IBP.supply.current().plan; } catch (e) { sp = null; }
+      var g = function (v, label, sub, from, to, href) {
+        return h(href ? 'a.hero-gauge' : 'div.hero-gauge', href ? { href: href } : {}, h('div', { html: C.ring(v, { size: 62, stroke: 6, track: 'rgba(255,255,255,0.14)', from: from, to: to, fontSize: 14, label: v === null || v === undefined ? '—' : F.pct(v, 0) }) }),
+          h('div', h('div.hg-l', label), h('div.hg-s', sub)));
+      };
+      return h('div.hero-gauges',
+        g(M.steps.length ? done / M.steps.length : null, 'پیشرفت چرخه', F.num(done) + ' از ' + F.num(M.steps.length) + ' مرحله', '#60a5fa', '#22d3ee', '#/cycle'),
+        g(M.acc3.accuracy, 'دقت پیش‌بینی', 'هدف ' + F.pct(M.accTarget, 0), '#a78bfa', '#60a5fa', '#/demand/accuracy'),
+        g(sp ? sp.kpi.fillRate : null, 'سطح خدمت برنامه', sp ? F.num(sp.kpi.bottlenecks) + ' ماه گلوگاه' : '', '#34d399', '#22d3ee', '#/supply'),
+        h('a.hero-gauge.count', { href: '#/dashboard', onclick: function (e) { e.preventDefault(); var el = document.querySelector('.alerts'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); } },
+          h('div.hg-n', F.num(crit)), h('div', h('div.hg-l', 'استثنای بحرانی'), h('div.hg-s', F.num(M.alerts.length - crit) + ' هشدار دیگر'))));
+    }
+
     /* ---------------- بنر ---------------- */
     var done = M.steps.filter(function (s) { return s.status === 'تکمیل'; }).length;
     var crit = M.alerts.filter(function (a) { return a.level === 'critical'; }).length;
@@ -246,11 +262,7 @@
           h('a.btn.btn-sm', { href: '#/datahub', html: icon('cloud', 15) + '<span>مرکز داده</span>' }),
           h('a.btn.btn-sm', { href: '#/portfolio', html: icon('layers', 15) + '<span>تحلیل پورتفوی</span>' }),
           UI.excelButton('خروجی Excel کامل داشبورد', exportAll, { small: true }))),
-      h('div.hero-stats',
-        h('div.hero-stat', h('div.v', M.steps.length ? F.pct(done / M.steps.length, 0) : '—'), h('div.l', 'پیشرفت چرخه')),
-        h('div.hero-stat', h('div.v', F.num(crit)), h('div.l', 'استثنای بحرانی')),
-        h('div.hero-stat', h('div.v', F.num(S.count('products'))), h('div.l', 'محصول فعال')),
-        h('div.hero-stat', h('div.v', IBP.engine.online() ? 'متصل' : 'پایه'), h('div.l', 'موتور تحلیل پایتون')))
+      heroGauges(M, done, crit)
     ));
 
     /* ---------------- فیلترها ---------------- */
@@ -406,6 +418,17 @@
       '<span>کم</span><i style="background:var(--seq-1)"></i><i style="background:var(--seq-2)"></i><i style="background:var(--seq-3)"></i><i style="background:var(--seq-4)"></i><i style="background:var(--seq-5)"></i><span>' + F.pct(max, 0) + '</span>' +
       '<span style="margin-inline-start:12px">' + UI.statusBadge('critical', 'بالای ظرفیت') + '</span>' }));
     grid.appendChild(capCard.el);
+    var supplyCard = null;
+    try {
+      var SP = IBP.supply.current().plan, p12 = SP.periods.slice(0, 12);
+      supplyCard = UI.card({ title: 'برنامه تولید و موجودی ۱۲ ماه آینده', sub: 'تن · تقاضای اجماعی، تولید با محدودیت ظرفیت و موجودی پایان ماه · سطح خدمت برنامه ' + F.pct(SP.kpi.fillRate, 1), icon: 'factory', span: 12,
+        tools: [h('a.btn.btn-sm', { href: '#/supply', html: '<span>برنامه تولید</span>' + icon('chevronLeft', 14) })] });
+      var sb = h('div'); supplyCard.body.appendChild(sb);
+      C.columns(sb, { labels: p12.map(J.shortLabel), tipTitles: p12.map(J.label), height: 250,
+        series: [{ name: 'تقاضا', values: SP.demTons.slice(0, 12), color: 'var(--series-2)' }, { name: 'تولید', values: SP.prodTons.slice(0, 12), color: 'var(--series-1)' }],
+        lines: [{ name: 'موجودی پایان ماه', values: SP.invTons.slice(0, 12), color: 'var(--series-3)' }],
+        format: function (v) { return F.num(v, 0); }, tipFormat: function (v) { return F.num(v, 0) + ' تن'; }, onClick: function () { IBP.app.navigate('#/supply'); } });
+    } catch (e) { supplyCard = null; }
 
     /* ---------------- هشدارها ---------------- */
     var alCard = UI.card({ title: 'هشدارها و استثناها', sub: 'مواردی که در جلسات بازنگری باید بررسی شوند', icon: 'alert', span: 5, flush: true, exportFn: exportOne(sheetAlerts, 'هشدارها و استثناها') });
@@ -420,6 +443,8 @@
     });
     alCard.body.appendChild(al);
     grid.appendChild(alCard.el);
+
+    if (supplyCard) grid.appendChild(supplyCard.el);
 
     /* ---------------- محصولات ---------------- */
     var prodCard = UI.card({ title: 'عملکرد محصولات', sub: 'فروش ۱۲ ماه، روند، دقت پیش‌بینی و پوشش موجودی', icon: 'box', span: 12, flush: true, exportFn: exportOne(sheetProducts, 'عملکرد محصولات') });

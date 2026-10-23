@@ -2,7 +2,7 @@
  * برنامه‌ریزی تقاضا (فاز ۳):
  *   plan      برنامه اجماعی: جدول ماهانه شرکت ← خانواده ← محصول، ویرایش در هر سطح با تفکیک خودکار،
  *             واحد مقدار/تن/مبلغ، افق منجمد، سوابق تغییر، بازگشت، ورود و خروج Excel
- *   stat      اجرای پیش‌بینی آماری (پایتون یا موتور داخلی)، روش منتخب و خطای اعتبارسنجی هر محصول
+ *   stat      پیش‌بینی آماری با رقابت بک‌تست روش‌ها (پایتون یا موتور داخلی)، ماتریس خطا و بک‌تست lag-1
  *   accuracy  دقت و ارزش افزوده پیش‌بینی (FVA): ساده، آماری و اجماعی
  *   events    تقویم مناسبت‌ها (رمضان و محرم قمری، کمپین‌ها) و اثر آن‌ها بر هر خانواده؛ برآورد آماری اثر
  *   ic        تقاضای درون‌گروهی: دریافت نیاز شرکت‌های خریدار هلدینگ از برنامه آن‌ها
@@ -422,45 +422,101 @@
   }
 
   /* ======================= پیش‌بینی آماری ======================= */
+  function metricOf(rp, m, key) {
+    if (!rp) return null;
+    var mm = rp.metrics && rp.metrics[m];
+    if (mm && mm[key] !== undefined && mm[key] !== null) return mm[key];
+    return key === 'wmape' && rp.scores ? rp.scores[m] : null;
+  }
+  function btControls(b) {
+    var st = S.settings(), FC = IBP.forecast;
+    var save = function (patch) { S.saveSettings(patch); UI.toast('تنظیم بک‌تست ذخیره شد؛ برای اعمال، پیش‌بینی را دوباره اجرا کنید', 'info'); IBP.app.render(true); };
+    var sel = function (label, key, opts, val, cast) {
+      var el = h('select', { 'aria-label': label });
+      opts.forEach(function (o) { el.appendChild(h('option', { value: o[0] }, o[1])); });
+      el.value = String(val);
+      el.addEventListener('change', function () { var p = {}; p[key] = cast ? cast(el.value) : el.value; save(p); });
+      return h('label.bt-ctl', h('span', label), el);
+    };
+    var ens = h('input', { type: 'checkbox' });
+    ens.checked = st.fcEnsemble !== false;
+    ens.addEventListener('change', function () { save({ fcEnsemble: ens.checked }); });
+    return h('div.bt-controls',
+      sel('مبدأهای بک‌تست', 'fcOrigins', [[6, '۶ ماه آخر'], [9, '۹ ماه آخر'], [12, '۱۲ ماه آخر'], [18, '۱۸ ماه آخر']], st.fcOrigins || 12, Number),
+      sel('افق ارزیابی', 'fcLead', [[1, '۱ ماه'], [3, '۳ ماه'], [6, '۶ ماه']], st.fcLead || 3, Number),
+      sel('معیار انتخاب', 'fcMetric', Object.keys(FC.METRICS).map(function (k) { return [k, FC.METRICS[k]]; }), st.fcMetric || 'wmape'),
+      h('label.bt-ctl.chk', ens, h('span', 'ترکیب سه روش برتر')));
+  }
+
   function renderStat(root) {
-    var b = base(), run = S.meta('statRun'), engineOn = IBP.engine.online();
+    var b = base(), run = S.meta('statRun'), engineOn = IBP.engine.online(), FC = IBP.forecast;
     var valid = run && run.cycle === b.cycle;
-    var panel = h('div.engine-panel', { style: { marginBottom: '16px' } },
+    var key = (valid && run.metric) || S.settings().fcMetric || 'wmape';
+    var nMethods = Object.keys(FC.METHODS).length - (engineOn ? 1 : 4);
+    var panel = h('div.engine-panel', { style: { marginBottom: '16px', flexWrap: 'wrap' } },
       h('div.ep-icon', { html: icon(engineOn ? 'python' : 'cpu', 22) }),
       h('div', { style: { flex: 1, minWidth: '260px' } },
-        h('div.ep-t', engineOn ? 'موتور پایتون متصل: هولت-وینترز، رگرسیون با مناسبت‌ها، کراستون/TSB و ترکیب مدل‌ها' : 'موتور داخلی برنامه: روش‌های فصلی، روند میرا، رگرسیون مناسبت‌ها و کراستون'),
-        h('div.ep-d', valid ? 'آخرین اجرا: ' + J.isoToJalaliStr(run.at.slice(0, 10)) + ' ' + run.at.slice(11, 16) + ' · ' + (run.engine === 'python' ? 'موتور پایتون' : 'موتور داخلی') + ' · ' + F.num(run.history) + ' ماه سابقه · ' + F.num(Object.keys(run.products).length) + ' محصول'
-          : 'پیش‌بینی آماری این چرخه با داده تاریخی ساخته شده است. برای انتخاب خودکار بهترین روش هر محصول، پیش‌بینی را اجرا کنید.')),
-      h('button.btn.btn-primary', { type: 'button', html: icon('play', 15) + '<span>اجرای پیش‌بینی آماری</span>', onclick: function () {
+        h('div.ep-t', (engineOn ? 'موتور پایتون: ' : 'موتور داخلی: ') + F.num(nMethods) + ' روش پیش‌بینی در رقابت بک‌تست' + (engineOn ? ' (شامل ARIMA و یادگیری ماشین سراسری)' : '')),
+        h('div.ep-d', valid ? 'آخرین اجرا: ' + J.isoToJalaliStr(run.at.slice(0, 10)) + ' ' + run.at.slice(11, 16) + ' · ' + (run.engine === 'python' ? 'موتور پایتون' : 'موتور داخلی') + ' · ' + F.num(run.history) + ' ماه سابقه · ' + F.num(Object.keys(run.products).length) + ' محصول' + (run.origins ? ' · بک‌تست ' + F.num(run.origins) + ' مبدأ، افق ' + F.num(run.lead) + ' ماه، معیار ' + (FC.METRICS[run.metric] || run.metric) : '')
+          : 'هر روش با داده تا هر یک از ماه‌های اخیر برازش و ماه‌های بعد پیش‌بینی می‌شود؛ روشی که کمترین خطای واقعی را داشته برای هر محصول انتخاب می‌شود.')),
+      h('button.btn.btn-primary', { type: 'button', html: icon('play', 15) + '<span>اجرای پیش‌بینی و بک‌تست</span>', onclick: function () {
         var btn = this;
-        btn.disabled = true; btn.querySelector('span').textContent = 'در حال محاسبه…';
-        IBP.forecast.run().then(function (r) {
-          UI.toast('پیش‌بینی آماری ' + F.num(Object.keys(r.results).length) + ' محصول با ' + (r.engine === 'python' ? 'موتور پایتون' : 'موتور داخلی') + ' انجام شد', 'success');
-          IBP.app.render(true);
-        }, function (e) { UI.toast(e.message, 'error'); btn.disabled = false; });
-      } }));
+        btn.disabled = true; btn.querySelector('span').textContent = 'در حال بک‌تست روش‌ها…';
+        setTimeout(function () {
+          FC.run().then(function (r) {
+            UI.toast('پیش‌بینی آماری ' + F.num(Object.keys(r.results).length) + ' محصول با ' + (r.engine === 'python' ? 'موتور پایتون' : 'موتور داخلی') + ' انجام شد', 'success');
+            IBP.app.render(true);
+          }, function (e) { UI.toast(e.message, 'error'); btn.disabled = false; });
+        }, 30);
+      } }),
+      btControls(b));
     root.appendChild(panel);
     var prods = activeProducts(), stat = vmap('آماری', b.cycle), cons = vmap('اجماعی', b.cycle);
     var grid = h('div.dash-grid');
     root.appendChild(grid);
 
+    /* --- شاخص‌های بک‌تست --- */
+    var rps = valid ? prods.map(function (p) { return { p: p, r: run.products[p.id] }; }).filter(function (x) { return x.r; }) : [];
+    var wSum = 0, wBest = 0, wNaive = 0, tested = {}, ensN = 0;
+    rps.forEach(function (x) {
+      var vol = A.sum(b.hist12, function (per) { return actual(x.p.id, per); }) || 1;
+      var bw = metricOf(x.r, x.r.method, 'wmape'), nw = metricOf(x.r, 'snaive', 'wmape');
+      if (bw !== null && bw !== undefined) { wSum += vol; wBest += vol * bw; wNaive += vol * (nw !== null && nw !== undefined ? nw : bw); }
+      Object.keys(x.r.metrics || x.r.scores || {}).forEach(function (m) { tested[m] = 1; });
+      if (x.r.method === 'ensemble') ensN++;
+    });
+    var accBest = wSum ? 1 - wBest / wSum : null, gain = wSum && wNaive ? 1 - wBest / wNaive : null;
+    var kp = h('div.kpis.k4', { style: { gridColumn: 'span 12', marginBottom: '0' } });
+    kp.appendChild(UI.kpi({ icon: 'cpu', label: 'روش‌های آزموده‌شده', value: Object.keys(tested).length, format: F.num, foot: valid ? 'در ' + F.num(run.origins || 3) + ' مبدأ بک‌تست' : 'پس از اجرا' }));
+    kp.appendChild(UI.kpi({ icon: 'target', label: 'دقت بک‌تست روش‌های منتخب', value: accBest, format: function (v) { return v === null ? '—' : F.pct(v, 0); }, foot: '۱ − WMAPE وزنی با حجم فروش' }));
+    kp.appendChild(UI.kpi({ icon: 'trend', label: 'کاهش خطا نسبت به فصلی ساده', value: gain, format: function (v) { return v === null ? '—' : F.pct(v, 0); }, foot: 'ارزش افزوده انتخاب خودکار روش' }));
+    kp.appendChild(UI.kpi({ icon: 'layers', label: 'محصولات با ترکیب مدل‌ها', value: ensN, format: F.num, foot: 'از ' + F.num(rps.length) + ' محصول' }));
+    grid.appendChild(kp);
+
+    /* --- روش‌های برنده --- */
     var methods = {};
-    if (valid) Object.keys(run.products).forEach(function (pid) { var l = run.products[pid].label; methods[l] = (methods[l] || 0) + 1; });
-    var mCard = UI.card({ title: 'روش‌های انتخاب‌شده', sub: valid ? 'انتخاب خودکار با کمترین خطای اعتبارسنجی چرخشی' : 'پس از اجرا نمایش داده می‌شود', icon: 'cpu', span: 4 });
-    if (valid) C.hbars(mCard.body, { items: Object.keys(methods).sort(function (a, c) { return methods[c] - methods[a]; }).map(function (k, i) { return { label: k, value: methods[k], color: C.seriesColor(i) }; }), format: function (v) { return F.num(v); }, valueLabel: 'تعداد محصول' });
+    rps.forEach(function (x) { var m = x.r.method; methods[m] = (methods[m] || 0) + 1; });
+    var mCard = UI.card({ title: 'روش‌های برنده بک‌تست', sub: valid ? 'تعداد محصول به تفکیک روش منتخب · برای فیلتر جدول کلیک کنید' : 'پس از اجرا نمایش داده می‌شود', icon: 'cpu', span: 4 });
+    if (valid) C.hbars(mCard.body, {
+      items: Object.keys(methods).sort(function (a, c) { return methods[c] - methods[a]; }).map(function (k, i) { return { id: k, label: FC.METHODS[k] || k, value: methods[k], color: C.seriesColor(i) }; }),
+      format: function (v) { return F.num(v); }, valueLabel: 'تعداد محصول', active: state.statMethod,
+      onClick: function (it) { state.statMethod = state.statMethod === it.id ? null : it.id; IBP.app.render(true); }
+    });
     else mCard.body.appendChild(h('div.cell-sub', 'هنوز اجرا نشده است.'));
     grid.appendChild(mCard.el);
 
+    /* --- نمودار محصول --- */
     var selId = state.statSel && S.get('products', state.statSel) ? state.statSel : (prods[0] && prods[0].id);
     var p = S.get('products', selId);
     var hist = J.range(J.addMonths(b.cycle, -24), 24), fut = b.fut.slice(0, 12);
     var lo = new Map(), hi = new Map();
     S.all('forecasts').forEach(function (f) { if (f.version === 'آماری' && f.cycle === b.cycle && f.productId === selId) { lo.set(f.period, f.lo); hi.set(f.period, f.hi); } });
-    var pc = UI.card({ title: p ? p.name : '—', sub: 'فروش ۲۴ ماه، پیش‌بینی آماری با بازه ۸۰٪ و اجماعی', icon: 'trend', span: 8 });
+    var rp = valid && p ? run.products[p.id] : null;
+    var pc = UI.card({ title: p ? p.name : '—', sub: (rp ? 'روش منتخب: ' + rp.label + ' · ' : '') + 'فروش ۲۴ ماه، پیش‌بینی آماری با بازه ۸۰٪ و اجماعی · برای بزرگ‌نمایی روی نمودار بکشید', icon: 'trend', span: 8 });
     var psel = h('select', { 'aria-label': 'محصول' });
     prods.forEach(function (x) { psel.appendChild(h('option', { value: x.id }, x.code + ' — ' + x.name)); });
     psel.value = selId || '';
-    psel.addEventListener('change', function () { state.statSel = psel.value; IBP.app.render(true); });
+    psel.addEventListener('change', function () { state.statSel = psel.value; state.btCompare = null; IBP.app.render(true); });
     pc.tools.appendChild(psel);
     var box = h('div');
     pc.body.appendChild(box);
@@ -473,37 +529,97 @@
           { name: 'آماری', values: hist.map(function (_, i) { return i === hist.length - 1 ? act[i] : null; }).concat(fut.map(function (per) { return q(stat, p.id, per); })), color: 'var(--series-3)' },
           { name: 'حد بالا ۸۰٪', values: hist.map(function () { return null; }).concat(fut.map(function (per) { var v = hi.get(per); return v === null || v === undefined ? null : v; })), color: 'var(--series-3)', dash: true, endDot: false },
           { name: 'حد پایین ۸۰٪', values: hist.map(function () { return null; }).concat(fut.map(function (per) { var v = lo.get(per); return v === null || v === undefined ? null : v; })), color: 'var(--series-3)', dash: true, endDot: false },
-          { name: 'اجماعی', values: hist.map(function () { return null; }).concat(fut.map(function (per) { return q(cons, p.id, per); })), color: 'var(--series-2)' }
+          { name: 'اجماعی', values: hist.map(function () { return null; }).concat(fut.map(function (per) { return q(cons, p.id, per); })), color: 'var(--series-2)', noLabels: true }
         ],
         format: F.compact, tipFormat: function (v) { return F.num(v) + ' ' + (p.uom || ''); }, height: 280, markIndex: hist.length, markLabel: 'افق'
       });
-      var rp = valid ? run.products[p.id] : null;
-      if (rp && rp.scores) {
-        var sc = Object.keys(rp.scores).filter(function (k) { return rp.scores[k] !== null && rp.scores[k] !== undefined; });
-        pc.body.appendChild(h('div', { style: { display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }, html: sc.map(function (k) { return UI.statusBadge(k === rp.method ? 'good' : 'neutral', (IBP.forecast.METHODS[k] || k) + ': ' + F.pct(rp.scores[k])); }).join('') }));
-      }
     }
     grid.appendChild(pc.el);
 
-    var tCard = UI.card({ title: 'نتایج پیش‌بینی آماری محصولات', sub: 'خطای اعتبارسنجی = WMAPE پیش‌بینی ۱ تا ۳ ماهه در سه مبدأ گذشته', icon: 'list', span: 12, flush: true,
+    /* --- رقابت روش‌ها برای محصول منتخب --- */
+    var ranked = rp ? Object.keys(rp.metrics && Object.keys(rp.metrics).length ? rp.metrics : rp.scores).filter(function (m) { return metricOf(rp, m, key) !== null && metricOf(rp, m, key) !== undefined; })
+      .sort(function (a, c) { return metricOf(rp, a, key) - metricOf(rp, c, key); }) : [];
+    var cmp = state.btCompare && ranked.indexOf(state.btCompare) >= 0 ? state.btCompare : (ranked[1] || null);
+    var lb = UI.card({ title: 'رقابت روش‌ها', sub: rp ? 'خطای بک‌تست (' + (FC.METRICS[key] || key) + ') · روش برنده سبز · برای مقایسه روی روش کلیک کنید' : 'پس از اجرا', icon: 'target', span: 5 });
+    if (rp && ranked.length) {
+      C.hbars(lb.body, {
+        items: ranked.map(function (m) {
+          var mt = (rp.metrics || {})[m] || {};
+          return {
+            id: m, label: FC.METHODS[m] || m, value: metricOf(rp, m, key), color: m === rp.method ? 'var(--good)' : m === cmp ? 'var(--series-2)' : 'var(--series-1)',
+            sub: [{ label: 'WMAPE', value: mt.wmape !== undefined && mt.wmape !== null ? F.pct(mt.wmape) : '—' }, { label: 'سوگیری', value: mt.bias !== undefined && mt.bias !== null ? F.signedPct(mt.bias) : '—' }, { label: 'RMSE نسبی', value: mt.rmse !== undefined && mt.rmse !== null ? F.pct(mt.rmse) : '—' }]
+              .concat(mt.members ? [{ label: 'اجزای ترکیب', value: mt.members.map(function (x) { return FC.METHODS[x] || x; }).join('، ') }] : [])
+          };
+        }),
+        format: function (v) { return F.pct(v); }, valueLabel: FC.METRICS[key] || key, active: cmp,
+        onClick: function (it) { state.btCompare = it.id; IBP.app.render(true); }
+      });
+    } else lb.body.appendChild(h('div.cell-sub', 'برای مشاهده رقابت روش‌ها، پیش‌بینی را اجرا کنید.'));
+    grid.appendChild(lb.el);
+
+    var bc = UI.card({ title: 'بک‌تست یک ماه جلوتر (lag-1)', sub: 'پیش‌بینی هر ماه فقط با داده تا ماه قبل؛ مقایسه با فروش واقعی', icon: 'chart', span: 7 });
+    if (rp && rp.backtest && rp.backtest.periods && rp.backtest.periods.length) {
+      var bt = rp.backtest, ser = [{ name: 'فروش واقعی', values: bt.actual, color: 'var(--series-1)', area: true }];
+      if (bt.fc[rp.method]) ser.push({ name: 'برنده: ' + (FC.METHODS[rp.method] || rp.method), values: bt.fc[rp.method], color: 'var(--series-3)' });
+      if (cmp && cmp !== rp.method && bt.fc[cmp]) ser.push({ name: FC.METHODS[cmp] || cmp, values: bt.fc[cmp], color: 'var(--series-2)' });
+      if (bt.fc.snaive && rp.method !== 'snaive' && cmp !== 'snaive') ser.push({ name: 'فصلی ساده (مبنا)', values: bt.fc.snaive, color: 'var(--series-7)', dash: true });
+      var bbox = h('div'); bc.body.appendChild(bbox);
+      C.line(bbox, { labels: bt.periods.map(J.shortLabel), tipLabels: bt.periods.map(J.label), series: ser, format: F.compact, tipFormat: function (v) { return F.num(v) + ' ' + (p.uom || ''); }, height: 250, dataLabels: 'auto' });
+    } else bc.body.appendChild(h('div.cell-sub', 'پس از اجرای پیش‌بینی نمایش داده می‌شود.'));
+    grid.appendChild(bc.el);
+
+    /* --- ماتریس خطای بک‌تست --- */
+    if (valid && rps.length) {
+      var colsM = Object.keys(tested).sort(function (a, c) {
+        var order = Object.keys(FC.METHODS);
+        return order.indexOf(a) - order.indexOf(c);
+      });
+      var hmCard = UI.card({ title: 'ماتریس خطای بک‌تست', sub: 'خطای هر روش برای هر محصول (' + (FC.METRICS[key] || key) + ') · قاب سبز = روش منتخب · برای انتخاب محصول کلیک کنید', icon: 'table', span: 12 });
+      var vals = [];
+      rps.forEach(function (x) { colsM.forEach(function (m) { var v = metricOf(x.r, m, key); if (v !== null && v !== undefined) vals.push(v); }); });
+      vals.sort(function (a, c) { return a - c; });
+      var qlo = vals[Math.floor(vals.length * 0.05)] || 0, qhi = vals[Math.floor(vals.length * 0.9)] || 1;
+      C.heatmap(hmCard.body, {
+        corner: 'محصول / روش',
+        rows: rps.filter(function (x) { return !state.statMethod || x.r.method === state.statMethod; }).map(function (x) { return { id: x.p.id, label: x.p.name, sub: x.p.code, r: x.r }; }),
+        cols: colsM.map(function (m) { return { id: m, label: FC.METHODS[m] || m }; }),
+        value: function (r, c) { var v = metricOf(r.r, c.id, key); return v === null || v === undefined ? null : v; },
+        format: function (v) { return F.pct(v, 0); }, valueLabel: FC.METRICS[key] || key,
+        color: function (v) { return C.scaleColor(v, qlo, qhi); },
+        best: function (r) { return r.r.method; },
+        onClick: function (r, c) { state.statSel = r.id; state.btCompare = c.id; IBP.app.render(true); window.scrollTo(0, 0); }
+      });
+      grid.appendChild(hmCard.el);
+    }
+
+    /* --- جدول نتایج --- */
+    var tProds = state.statMethod && valid ? prods.filter(function (x) { return run.products[x.id] && run.products[x.id].method === state.statMethod; }) : prods;
+    var tCard = UI.card({ title: 'نتایج پیش‌بینی آماری محصولات', sub: (state.statMethod ? 'فیلتر: ' + (FC.METHODS[state.statMethod] || state.statMethod) + ' · ' : '') + 'خطای بک‌تست = ' + (FC.METRICS[key] || key) + ' پیش‌بینی ۱ تا ' + F.num((valid && run.lead) || 3) + ' ماهه', icon: 'list', span: 12, flush: true,
       exportFn: function () {
+        var mlist = Object.keys(tested);
         return IBP.excel.exportTables({ filename: 'پیش‌بینی آماری ' + J.label(b.cycle), sheets: [wideSheet('آماری', 'پیش‌بینی آماری', 'آماری', b, prods), {
-          name: 'روش‌ها', title: 'روش منتخب و خطای اعتبارسنجی', columns: [{ header: 'کد', value: function (x) { return x.code; }, type: 'code' }, { header: 'محصول', value: function (x) { return x.name; }, type: 'text' },
+          name: 'روش‌ها', title: 'روش منتخب و خطای بک‌تست', columns: [{ header: 'کد', value: function (x) { return x.code; }, type: 'code' }, { header: 'محصول', value: function (x) { return x.name; }, type: 'text' },
             { header: 'روش منتخب', value: function (x) { return valid && run.products[x.id] ? run.products[x.id].label : ''; }, type: 'text' },
-            { header: 'خطای اعتبارسنجی', value: function (x) { return valid && run.products[x.id] ? run.products[x.id].score : null; }, type: 'pct' },
-            { header: 'سهم ماه‌های بدون فروش', value: function (x) { return valid && run.products[x.id] ? run.products[x.id].zeroShare : null; }, type: 'pct' }], rows: prods }] });
+            { header: 'WMAPE بک‌تست', value: function (x) { return valid ? metricOf(run.products[x.id], (run.products[x.id] || {}).method, 'wmape') : null; }, type: 'pct' },
+            { header: 'سوگیری بک‌تست', value: function (x) { return valid ? metricOf(run.products[x.id], (run.products[x.id] || {}).method, 'bias') : null; }, type: 'pct' },
+            { header: 'سهم ماه‌های بدون فروش', value: function (x) { return valid && run.products[x.id] ? run.products[x.id].zeroShare : null; }, type: 'pct' }], rows: prods }, {
+          name: 'بک‌تست', title: 'خطای بک‌تست همه روش‌ها (' + (FC.METRICS[key] || key) + ')',
+          columns: [{ header: 'کد', value: function (x) { return x.code; }, type: 'code' }, { header: 'محصول', value: function (x) { return x.name; }, type: 'text' }]
+            .concat(mlist.map(function (m) { return { header: FC.METHODS[m] || m, value: function (x) { return valid ? metricOf(run.products[x.id], m, key) : null; }, type: 'pct', width: 12 }; })),
+          rows: prods, freezeCols: 2 }] });
       } });
     IBP.grid(tCard.body, {
-      rows: function () { return prods; }, pageSize: 15,
-      onRowClick: function (x) { state.statSel = x.id; IBP.app.render(true); window.scrollTo(0, 0); },
+      rows: function () { return tProds; }, pageSize: 15,
+      onRowClick: function (x) { state.statSel = x.id; state.btCompare = null; IBP.app.render(true); window.scrollTo(0, 0); },
       columns: [
         { key: 'name', label: 'محصول', value: function (x) { return x.name; }, render: function (x) { return F.escape(x.name) + '<div class="cell-sub code">' + F.escape(x.code) + '</div>'; }, text: function (x) { return x.name + ' ' + x.code; } },
         { key: 'fam', label: 'خانواده', value: function (x) { return S.name('families', x.familyId); } },
         { key: 'm', label: 'روش منتخب', value: function (x) { return valid && run.products[x.id] ? run.products[x.id].label : ''; }, render: function (x) { var r = valid && run.products[x.id]; return r ? UI.statusBadge('ai', r.label) : '<span class="muted">—</span>'; } },
-        { key: 's', label: 'خطای اعتبارسنجی', align: 'num', value: function (x) { var r = valid && run.products[x.id]; return r ? r.score : null; }, render: function (x) { var r = valid && run.products[x.id]; return r && r.score !== null && r.score !== undefined ? F.pct(r.score) : '—'; } },
+        { key: 's', label: 'خطای بک‌تست', align: 'num', value: function (x) { var r = valid && run.products[x.id]; return r ? metricOf(r, r.method, key) : null; }, render: function (x) { var r = valid && run.products[x.id], v = r ? metricOf(r, r.method, key) : null; return v !== null && v !== undefined ? F.pct(v) : '—'; } },
+        { key: 'bias', label: 'سوگیری', align: 'num', value: function (x) { var r = valid && run.products[x.id]; return r ? metricOf(r, r.method, 'bias') : null; }, render: function (x) { var r = valid && run.products[x.id], v = r ? metricOf(r, r.method, 'bias') : null; return v !== null && v !== undefined ? '<span class="delta ' + (Math.abs(v) > 0.1 ? 'up-bad' : 'flat') + '">' + F.signedPct(v) + '</span>' : '—'; } },
+        { key: 'gain', label: 'بهبود نسبت به فصلی ساده', align: 'num', value: function (x) { var r = valid && run.products[x.id]; if (!r) return null; var bw = metricOf(r, r.method, 'wmape'), nw = metricOf(r, 'snaive', 'wmape'); return nw ? 1 - bw / nw : null; }, render: function (x) { var r = valid && run.products[x.id]; if (!r) return '—'; var bw = metricOf(r, r.method, 'wmape'), nw = metricOf(r, 'snaive', 'wmape'); return nw ? F.pct(1 - bw / nw, 0) : '—'; } },
         { key: 'n12', label: 'آماری ۱۲ ماه', align: 'num', value: function (x) { return A.sum(fut, function (per) { return q(stat, x.id, per); }); }, render: function (x) { return F.num(A.sum(fut, function (per) { return q(stat, x.id, per); })); } },
         { key: 'c12', label: 'اجماعی ۱۲ ماه', align: 'num', value: function (x) { return A.sum(fut, function (per) { return q(cons, x.id, per); }); }, render: function (x) { return F.num(A.sum(fut, function (per) { return q(cons, x.id, per); })); } },
-        { key: 'gap', label: 'فاصله اجماعی', align: 'num', value: function (x) { var s = A.sum(fut, function (per) { return q(stat, x.id, per); }); return s ? A.sum(fut, function (per) { return q(cons, x.id, per); }) / s - 1 : null; }, render: function (x) { var s = A.sum(fut, function (per) { return q(stat, x.id, per); }); var g = s ? A.sum(fut, function (per) { return q(cons, x.id, per); }) / s - 1 : null; return g === null ? '—' : '<span class="delta ' + (Math.abs(g) > 0.2 ? 'up-bad' : 'flat') + '">' + F.signedPct(g) + '</span>'; } },
         { key: 'sp', label: 'روند ۲۴ ماه', sortable: false, render: function (x) { return C.sparkline(hist.map(function (per) { return actual(x.id, per); }), { width: 90, height: 24 }); } }
       ]
     });
@@ -722,13 +838,18 @@
         if (!mats.length) return;
         var consMap = new Map();
         (rec.forecasts || []).forEach(function (f) { if (f.version === 'اجماعی' && f.cycle === cyc) consMap.set(f.productId + '|' + f.period, f.qty); });
+        // اگر شرکت خریدار درخواست‌های MRP خود را منتشر کرده باشد، همان مبنا است؛ وگرنه برآورد از BOM × برنامه اجماعی
+        var pub = d.meta && d.meta.icRequests, mine = pub && pub.cycle === cyc && pub.byCompany ? pub.byCompany[String(me).toUpperCase()] || pub.byCompany[me] : null;
         mats.forEach(function (m) {
           var target = S.byCode('products', m.internalProductCode);
-          var kg = {};
-          (rec.bom || []).filter(function (x) { return x.materialId === m.id; }).forEach(function (bl) {
-            b.fut.forEach(function (per) { kg[per] = (kg[per] || 0) + (consMap.get(bl.productId + '|' + per) || 0) * bl.qtyPer * (1 + (bl.scrap || 0)); });
-          });
-          rows.push({ buyer: d.company, material: m, target: target, kg: kg, units: b.fut.map(function (per) { return target && target.unitWeightKg ? (kg[per] || 0) / target.unitWeightKg : null; }), buyerCycle: cyc });
+          var kg = {}, source = 'BOM';
+          if (mine && mine[m.internalProductCode]) { kg = Object.assign({}, mine[m.internalProductCode]); source = 'MRP'; }
+          else {
+            (rec.bom || []).filter(function (x) { return x.materialId === m.id; }).forEach(function (bl) {
+              b.fut.forEach(function (per) { kg[per] = (kg[per] || 0) + (consMap.get(bl.productId + '|' + per) || 0) * bl.qtyPer * (1 + (bl.scrap || 0)); });
+            });
+          }
+          rows.push({ buyer: d.company, material: m, target: target, kg: kg, source: source, units: b.fut.map(function (per) { return target && target.unitWeightKg ? (kg[per] || 0) / target.unitWeightKg : null; }), buyerCycle: cyc });
         });
       });
       return { at: Date.now(), rows: rows };
@@ -766,7 +887,7 @@
         var t = S.get('products', tid), list = byTarget[tid];
         var need = months.map(function (_, i) { return list.reduce(function (s, r) { return s + (r.units[i] || 0); }, 0); });
         list.forEach(function (r) {
-          var tr = h('tr', h('td', { html: F.escape(r.buyer.name) + ' <span class="code">' + F.escape(r.buyer.code) + '</span><div class="cell-sub">' + F.escape(r.material.name) + ' · چرخه ' + J.label(r.buyerCycle) + '</div>' }));
+          var tr = h('tr', h('td', { html: F.escape(r.buyer.name) + ' <span class="code">' + F.escape(r.buyer.code) + '</span><div class="cell-sub">' + F.escape(r.material.name) + ' · چرخه ' + J.label(r.buyerCycle) + ' · ' + (r.source === 'MRP' ? 'درخواست منتشرشده MRP' : 'برآورد از BOM') + '</div>' }));
           months.forEach(function (_, i) { tr.appendChild(h('td.num', F.num(r.units[i] || 0, 1))); });
           tr.appendChild(h('td.num', F.num(r.units.slice(0, 12).reduce(function (s, v) { return s + (v || 0); }, 0), 1)));
           tb.appendChild(tr);

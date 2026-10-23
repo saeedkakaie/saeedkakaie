@@ -8,26 +8,32 @@
   var h = IBP.ui.h, icon = IBP.ui.icon, F = IBP.fmt, J = IBP.jalali, UI = IBP.ui, C = IBP.charts;
   var el = null;
 
-  function tplOf(c) { return c.templateId ? IBP.templates.get(c.templateId) : null; }
+  function tplOf(c) { return c.templateId ? IBP.templates.find(c.templateId) : null; }
+  function modelOf(c) { var t = tplOf(c); return c.model || (t && t.model) || 'B2C'; }
+  function modelBadge(m) { return '<span class="model-badge ' + (m === 'B2B' ? 'b2b' : 'b2c') + '">' + m + '</span>'; }
 
   function companyForm(c, onSave) {
     var name = h('input', { type: 'text', value: c ? c.name : '' });
-    var code = h('input', { type: 'text', dir: 'ltr', value: c ? c.code : '', placeholder: 'مثلاً PAS' });
+    var code = h('input', { type: 'text', dir: 'ltr', value: c ? c.code : '', placeholder: 'مثلاً ZMC' });
     var tpl = h('select');
     tpl.appendChild(h('option', { value: '' }, 'بدون داده (شروع با داده‌های خودم)'));
-    IBP.templates.list.forEach(function (t) { tpl.appendChild(h('option', { value: t.id }, 'داده نمونه: ' + t.name)); });
+    IBP.templates.list.forEach(function (t) { tpl.appendChild(h('option', { value: t.id }, 'داده نمونه: ' + t.company + ' — ' + t.name + ' (' + t.model + ')')); });
+    var model = h('select', h('option', { value: 'B2C' }, IBP.templates.MODELS.B2C), h('option', { value: 'B2B' }, IBP.templates.MODELS.B2B));
+    model.value = c ? modelOf(c) : 'B2C';
+    tpl.addEventListener('change', function () { var t = IBP.templates.find(tpl.value); if (t) model.value = t.model; });
     var body = h('div.form-grid',
       h('div.field.wide', h('label', 'نام شرکت'), name),
       h('div.field', h('label', 'کد شرکت (کد پلنت)'), code, h('div.hint', 'یکتا؛ حروف و عدد لاتین')),
-      c ? null : h('div.field', h('label', 'نوع فعالیت و داده اولیه'), tpl));
+      c ? null : h('div.field', h('label', 'نوع فعالیت و داده اولیه'), tpl),
+      h('div.field', h('label', 'مدل کسب‌وکار'), model, h('div.hint', 'B2C: شعب، زنجیره‌ای و نمایندگان · B2B: مشتریان صنعتی و قراردادی')));
     UI.modal({
       title: c ? 'ویرایش شرکت' : 'افزودن شرکت به هلدینگ', body: body,
       actions: [{ label: 'انصراف' }, {
         label: c ? 'ذخیره' : 'ایجاد شرکت', primary: true, onClick: function (close) {
-          var v = { name: name.value.trim(), code: code.value.trim() };
+          var v = { name: name.value.trim(), code: code.value.trim(), model: model.value };
           if (!v.name || !/^[A-Za-z0-9_-]{2,12}$/.test(v.code)) { UI.toast('نام و کد معتبر (۲ تا ۱۲ نویسه لاتین) وارد کنید', 'warning'); return false; }
           var t = tpl.value ? IBP.templates.get(tpl.value) : null;
-          var p = c ? IBP.holding.update(c.id, v) : IBP.holding.create({ name: v.name, code: v.code, templateId: t ? t.id : '', activity: t ? t.name : '' }, { seed: !!t });
+          var p = c ? IBP.holding.update(c.id, v) : IBP.holding.create({ name: v.name, code: v.code, templateId: t ? t.id : '', activity: t ? t.name : '', businessModel: v.model }, { seed: !!t });
           p.then(function () { close(); UI.toast(c ? 'شرکت به‌روزرسانی شد' : 'شرکت «' + v.name + '» ایجاد شد', 'success'); onSave(); }, function (e) { UI.toast(e.message, 'error'); });
           return false;
         }
@@ -48,7 +54,7 @@
 
     var wrap = h('div.gate-wrap');
     wrap.appendChild(h('header.gate-head',
-      h('div.brand-logo', { style: { width: '52px', height: '52px', fontSize: '15px' } }, 'IBP'),
+      IBP.flag({ width: 104, height: 72, title: 'گروه زر' }),
       h('div', h('div.gate-title', H.holdingName()), h('div.gate-sub', 'Integrated Business Planning · برنامه‌ریزی یکپارچه شرکت‌های هلدینگ')),
       h('div.gate-actions',
         h('button.btn', { type: 'button', html: icon('edit', 16) + '<span>نام هلدینگ</span>', onclick: function () {
@@ -72,7 +78,7 @@
       var card = h('article.card.gate-card.hoverable' + (c.id === last ? '.last' : ''), { tabindex: 0 },
         h('div.gc-head',
           h('div.tpl-icon', { style: { background: t ? t.grad : 'linear-gradient(135deg,#64748b,#334155)' }, html: icon(t ? t.icon : 'factory', 22) }),
-          h('div', { style: { minWidth: 0 } }, h('div.gc-name', c.name), h('div.gc-sub', (c.industry || (t ? t.name : 'شرکت تولیدی')))),
+          h('div', { style: { minWidth: 0 } }, h('div.gc-name', { html: F.escape(c.name) + ' ' + modelBadge(modelOf(c)) }), h('div.gc-sub', (c.industry || (t ? t.name : 'شرکت تولیدی')))),
           h('span.gc-code', c.code)),
         h('div.gc-stats',
           h('div', h('b', s.revenue ? F.compact(s.revenue) : '—'), h('span', 'فروش ۱۲ ماه')),

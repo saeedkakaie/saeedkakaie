@@ -156,14 +156,14 @@
     root.appendChild(grid);
 
     /* الگوهای صنعت */
-    var tplCard = UI.card({ title: 'الگوهای آماده شرکت‌های غذایی', sub: 'داده نمونه کامل برای همین شرکت (' + (st.companyCode || '') + '): ۲۴ ماه فروش با اثر رمضان و محرم، پیش‌بینی، بودجه، موجودی، BOM، ظرفیت و جریان‌های درون‌گروهی', icon: 'sparkles', span: 12 });
+    var tplCard = UI.card({ title: 'الگوهای آماده شرکت‌های هلدینگ', sub: 'داده نمونه کامل برای همین شرکت (' + (st.companyCode || '') + '): ۳۶ ماه فروش با اثر رمضان و محرم، پیش‌بینی، بودجه، موجودی، BOM، ظرفیت و جریان‌های درون‌گروهی', icon: 'sparkles', span: 12 });
     var tg = h('div.tpl-grid');
     IBP.templates.list.forEach(function (t) {
       var sty = { icon: t.icon, grad: t.grad };
       var nProd = t.families.reduce(function (a, f) { return a + f.items.length; }, 0);
       tg.appendChild(h('div.card.tpl-card.hoverable' + (st.templateId === t.id && S.count('products') ? '.current' : ''),
         h('div', { style: { display: 'flex', gap: '12px', alignItems: 'center' } }, h('div.tpl-icon', { style: { background: sty.grad }, html: icon(sty.icon, 22) }),
-          h('div', h('h4', t.name), h('div.cell-sub', t.company))),
+          h('div', h('h4', t.company), h('div.cell-sub', t.name + ' · ' + t.model))),
         h('p', 'خانواده‌ها: ' + t.families.map(function (f) { return f.name; }).join('، ')),
         h('div.tpl-meta', { html: UI.statusBadge('neutral', F.num(t.plants.length) + ' کارخانه') + UI.statusBadge('neutral', F.num(nProd) + ' محصول') + UI.statusBadge('neutral', F.num(t.channels.length) + ' کانال') + (st.templateId === t.id && S.count('products') ? UI.statusBadge('info', 'فعال') : '') }),
         h('div.tpl-actions',

@@ -1,7 +1,7 @@
 /*
  * مولد داده تستی برای شرکت‌های هلدینگ غذایی.
- * از روی الگوی یک شرکت (ماکارونی، آرد، بیسکویت، لبنیات، روغن) داده کامل همان شرکت را می‌سازد:
- * داده پایه + ۲۴ ماه فروش واقعی (با اثر واقعی رمضان و محرم) + پیش‌بینی ۱۸ ماه آینده
+ * از روی الگوی یک شرکت هلدینگ زر داده کامل همان شرکت را می‌سازد:
+ * داده پایه + ۳۶ ماه فروش واقعی (با اثر واقعی رمضان و محرم) + پیش‌بینی ۱۸ ماه آینده
  * + سوابق پیش‌بینی آماری و اجماعی برای سنجش دقت + بودجه + موجودی + مناسبت‌ها و اثرها
  * + جریان‌های درون‌گروهی (مشتری و تأمین‌کننده شرکت‌های دیگر هلدینگ).
  * مولد تصادفی با seed ثابت است تا هر بار همان داده تولید شود.
@@ -11,19 +11,17 @@
 
   var J = IBP.jalali;
   var COLORS = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'];
-  var REGIONS = [
-    { code: 'R1', name: 'تهران و البرز', manager: 'مهندس رضایی' },
-    { code: 'R2', name: 'شمال', manager: 'خانم احمدی' },
-    { code: 'R3', name: 'شرق', manager: 'مهندس کریمی' },
-    { code: 'R4', name: 'غرب', manager: 'خانم محمدی' },
-    { code: 'R5', name: 'جنوب', manager: 'مهندس حسینی' },
-    { code: 'R6', name: 'مرکز', manager: 'خانم نوری' }
-  ];
+  var MANAGERS = ['مهندس رضایی', 'خانم احمدی', 'مهندس کریمی', 'خانم محمدی', 'مهندس حسینی', 'خانم نوری', 'مهندس اکبری', 'خانم موسوی'];
   var EXPORT_REGION = { code: 'R9', name: 'بازارهای صادراتی', manager: 'مهندس صادقی' };
   var NAMES = ['آریا', 'سپهر', 'البرز', 'کوثر', 'مهرگان', 'پارسیان', 'آفتاب', 'نگین', 'ستاره شرق', 'زاگرس', 'دماوند', 'خلیج فارس',
     'کاسپین', 'آرمان', 'بهار', 'نوین', 'پیشگام', 'اطلس', 'سپید', 'رهآورد', 'افق', 'کیمیا', 'آوند', 'تابان', 'مروارید',
     'ارغوان', 'سهند', 'سبلان', 'هامون', 'آرین', 'پرشین', 'یاس', 'شایان', 'بامداد', 'فراز', 'ماهان'];
-  var SUPPLIER_NAMES = ['تأمین‌گستر', 'بسپار', 'فراورده‌های کشاورزی', 'پویا', 'آسیا', 'صنایع بسته‌بندی', 'غله', 'بازرگانی خارجی'];
+  // تأمین‌کنندگان نمونه به تفکیک نوع: مواد اولیه داخلی، بسته‌بندی، واردات
+  var SUPPLIERS = [
+    { prefix: 'شرکت غله و فراورده‌های کشاورزی', cat: 'raw' }, { prefix: 'بازرگانی نهاده', cat: 'raw' }, { prefix: 'تأمین‌گستر مواد غذایی', cat: 'raw' },
+    { prefix: 'صنایع بسته‌بندی', cat: 'pack' }, { prefix: 'چاپ و لفاف', cat: 'pack' },
+    { prefix: 'بازرگانی خارجی', cat: 'import' }, { prefix: 'واردات کالای اساسی', cat: 'import' }
+  ];
   var SUPPLIER_CITIES = ['تهران', 'اصفهان', 'تبریز', 'شیراز', 'مشهد', 'قزوین', 'دبی', 'استانبول'];
 
   function rng(seed) {
@@ -66,7 +64,8 @@
    */
   function generate(opts) {
     opts = opts || {};
-    var tpl = IBP.templates.get(opts.templateId || 'pasta');
+    var tpl = IBP.templates.get(opts.templateId || 'zarmacaron');
+    var b2c = tpl.model !== 'B2B';
     var R = rng(opts.seed || hash(tpl.id + '1405'));
     var cycle = opts.cyclePeriod || J.currentPeriod();
     var H = opts.historyMonths || 36, F = opts.horizonMonths || 18;
@@ -87,25 +86,32 @@
     /* ---------- کارخانه (کد پلنت = کد شرکت) و انبار ---------- */
     var plantWh = {};
     tpl.plants.forEach(function (p, pi) {
-      var rec = { id: nid('pl'), code: pi === 0 ? companyCode : p.code, name: p.name, city: p.city, workingDays: 25, active: true };
+      var rec = { id: nid('pl'), code: pi === 0 ? companyCode : p.code, name: p.name, city: p.city || '', workingDays: 25, active: true };
       out.plants.push(rec);
-      var fg = { id: nid('wh'), code: 'FG-' + rec.code, name: 'انبار محصول ' + p.city, plantId: rec.id, type: 'محصول نهایی', capacity: R.int(3, 8) * 1000 };
-      var rm = { id: nid('wh'), code: 'RM-' + rec.code, name: 'انبار مواد ' + p.city, plantId: rec.id, type: 'مواد اولیه', capacity: R.int(2, 5) * 1000 };
+      var site = p.site || p.city || rec.code;
+      var fg = { id: nid('wh'), code: 'FG-' + rec.code, name: 'انبار محصول ' + site, plantId: rec.id, type: 'محصول نهایی', capacity: R.int(3, 8) * 1000 };
+      var rm = { id: nid('wh'), code: 'RM-' + rec.code, name: 'انبار مواد ' + site, plantId: rec.id, type: 'مواد اولیه', capacity: R.int(2, 5) * 1000 };
       out.warehouses.push(fg, rm);
       plantWh[rec.id] = { fg: fg, rm: rm };
     });
-    var dc = { id: nid('wh'), code: 'DC-01', name: 'مرکز توزیع تهران', plantId: out.plants[0].id, type: 'توزیع', capacity: 6000 };
-    out.warehouses.push(dc);
+    var dc = b2c ? { id: nid('wh'), code: 'DC-01', name: 'مرکز توزیع تهران', plantId: out.plants[0].id, type: 'توزیع', capacity: 6000 } : null;
+    if (dc) out.warehouses.push(dc);
 
     /* ---------- بازار ---------- */
     var hasExport = tpl.channels.some(function (c) { return c.export; });
-    REGIONS.concat(hasExport ? [EXPORT_REGION] : []).forEach(function (r) {
-      out.regions.push({ id: nid('rg'), code: r.code, name: r.name, manager: r.manager });
+    (tpl.regions || []).concat(hasExport ? [EXPORT_REGION] : []).forEach(function (r, ri) {
+      out.regions.push({ id: nid('rg'), code: r.code, name: r.name, manager: r.manager || MANAGERS[ri % MANAGERS.length] });
     });
     var domesticRegions = out.regions.filter(function (r) { return r.code !== 'R9'; });
     var exportRegion = out.regions.filter(function (r) { return r.code === 'R9'; })[0];
+    // خریداران درون‌گروهی: شرکت‌هایی که کالای درون‌گروهی این شرکت در BOM آن‌ها آمده است
     var buyers = [];
-    tpl.families.forEach(function (f) { (f.buyers || []).forEach(function (b) { if (buyers.indexOf(b) < 0) buyers.push(b); }); });
+    tpl.families.forEach(function (f) {
+      if (!f.intercompany) return;
+      f.items.forEach(function (item, ii) {
+        IBP.templates.buyersOf(tpl.code, f.code + '-' + (101 + ii)).forEach(function (b) { if (buyers.indexOf(b) < 0) buyers.push(b); });
+      });
+    });
 
     var names = R.shuffle(NAMES), ni = 0;
     tpl.channels.forEach(function (c) {
@@ -121,17 +127,29 @@
         });
         return;
       }
-      var n = Math.max(2, Math.round(c.weight * 1.2));
+      if (c.perBranch) {
+        // B2C: هر شعبه پخش یک مشتری (فروش شعبه به خرده‌فروشان منطقه)
+        domesticRegions.forEach(function (rg) {
+          out.customers.push({
+            id: nid('cu'), code: 'C' + pad3(out.customers.length + 1), name: c.prefix + ' ' + rg.name, channelId: ch.id, regionId: rg.id, tier: 'کلیدی',
+            creditLimit: 0, paymentDays: 0, _w: 2.2 * R.range(0.6, 1.6), _disc: c.discount
+          });
+        });
+        return;
+      }
+      var n = c.count || 3;
       for (var i = 0; i < n; i++) {
         var nm = names[ni % names.length] + (ni >= names.length ? ' ' + (Math.floor(ni / names.length) + 1) : '');
         ni++;
         var region = c.export ? exportRegion : (i < domesticRegions.length ? domesticRegions[i] : R.pick(domesticRegions));
         var tier = R() < 0.2 ? 'کلیدی' : (R() < 0.45 ? 'مهم' : 'عادی');
+        // B2B: تمرکز بالای مشتریان (چند مشتری بزرگ با قرارداد)
+        var w = b2c ? (tier === 'کلیدی' ? 1.6 : tier === 'مهم' ? 1.1 : 0.7) * R.range(0.5, 1.5) : Math.pow(R.range(0.2, 1), 2.5) * 6;
         out.customers.push({
           id: nid('cu'), code: 'C' + pad3(out.customers.length + 1), name: c.prefix + ' ' + nm + (c.export ? ' (' + R.pick(['عراق', 'افغانستان', 'ارمنستان', 'تاجیکستان', 'عمان']) + ')' : ''),
           channelId: ch.id, regionId: region.id, tier: tier,
-          creditLimit: roundTo(R.range(5, 80) * 1e9, 1e9), paymentDays: R.pick([0, 15, 30, 45, 60, 90]),
-          _w: (tier === 'کلیدی' ? 3 : tier === 'مهم' ? 1.6 : 1) * R.range(0.5, 1.5), _disc: c.discount
+          creditLimit: roundTo(R.range(5, 80) * 1e9 * (b2c ? 1 : 4), 1e9), paymentDays: b2c ? R.pick([0, 15, 30, 45, 60]) : R.pick([30, 45, 60, 90, 120]),
+          _w: w, _disc: c.discount
         });
       }
     });
@@ -139,19 +157,19 @@
     var externalCustomers = out.customers.filter(function (c) { return !c._internal; });
 
     /* ---------- تأمین‌کنندگان و مواد ---------- */
-    var supNames = R.shuffle(SUPPLIER_NAMES);
-    for (var s = 0; s < 7; s++) {
-      var imp = s >= 5;
+    // تأمین‌کنندگان بیرونی
+    for (var s = 0; s < SUPPLIERS.length; s++) {
+      var imp = SUPPLIERS[s].cat === 'import';
       out.suppliers.push({
-        id: nid('sp'), code: 'S' + pad3(s + 1),
-        name: (imp ? 'شرکت ' : 'گروه ') + supNames[s % supNames.length] + ' ' + names[(s + 7) % names.length],
+        id: nid('sp'), code: 'S' + pad3(s + 1), _cat: SUPPLIERS[s].cat,
+        name: SUPPLIERS[s].prefix + ' ' + names[(s + 7) % names.length],
         city: imp ? R.pick(['دبی', 'استانبول']) : R.pick(SUPPLIER_CITIES.slice(0, 6)),
         leadTimeDays: imp ? R.int(45, 90) : R.int(7, 30), reliability: Math.round(R.range(imp ? 0.7 : 0.82, 0.98) * 100) / 100, isImport: imp
       });
     }
     var internalSupplier = {};
     function supplierFor(m) {
-      if (!m.internal) return R.pick(out.suppliers.filter(function (x) { return x.code.indexOf('IC-') !== 0; }));
+      if (!m.internal) return R.pick(out.suppliers.filter(function (x) { return x._cat === (m.type === 'بسته‌بندی' ? 'pack' : 'raw'); }));
       var c = m.internal.company;
       if (!internalSupplier[c]) {
         internalSupplier[c] = { id: nid('sp'), code: 'IC-' + c, name: IBP.templates.companyName(c) + ' (درون‌گروهی)', city: 'هلدینگ', leadTimeDays: 7, reliability: 0.96, isImport: false };
@@ -163,6 +181,8 @@
     function material(m) {
       if (matByName[m.name]) return matByName[m.name];
       var sup = supplierFor(m);
+      var imported = /وارداتی|پالم|سویا|کاکائو|دوروم|ذرت دانه|آنزیم/.test(m.name);
+      if (imported && !m.internal) sup = R.pick(out.suppliers.filter(function (x) { return x._cat === 'import'; })) || sup;
       var rec = {
         id: nid('mt'), code: (m.type === 'بسته‌بندی' ? 'PK-' : 'RM-') + pad3(out.materials.length + 1),
         name: m.name, type: m.type, uom: m.uom, unitCost: m.cost, supplierId: sup.id,
@@ -189,7 +209,7 @@
           id: nid('rs'), code: companyCode + '-L' + (Object.keys(linesByName).length + 1), name: ln, plantId: plant.id,
           type: /بسته‌بندی/.test(ln) ? 'بسته‌بندی' : 'خط تولید', shifts: R.pick([2, 3, 3]), hoursPerShift: 8,
           efficiency: Math.round(R.range(0.72, 0.9) * 100) / 100, costPerHour: roundTo(R.range(8, 40) * 1e6, 1e5),
-          _target: R.pick([0.62, 0.74, 0.82, 0.9, 0.97, 1.06])
+          _target: R.pick([0.62, 0.7, 0.76, 0.82, 0.88, 0.95])
         };
         linesByName[ln] = res;
         out.resources.push(res);
@@ -213,13 +233,15 @@
           safetyStockDays: R.pick([7, 10, 15, 20]), intercompany: !!f.intercompany,
           batchSize: roundTo(R.range(0.05, 0.25) * f.volume[1], 10), shelfLifeDays: f.shelfLife || null,
           active: true,
-          _base: f.volume[0] + (f.volume[1] - f.volume[0]) * volR * volR,
+          _base: f.itemVolume && f.itemVolume[ii] ? f.itemVolume[ii] : f.volume[0] + (f.volume[1] - f.volume[0]) * volR * volR,
           _growth: growth, _noise: R.pick([0.05, 0.06, 0.08, 0.1, 0.12, 0.2]), _season: season, _ev: f.events || {},
           _bias: R.range(-0.04, 0.12), _launch: lifecycle === 'معرفی' ? H - R.int(6, 10) : -999,
           _uph: R.range(f.uph[0], f.uph[1]),
-          _sporadic: !f.intercompany && lifecycle !== 'معرفی' && R() < 0.08
+          _sporadic: !f.intercompany && lifecycle !== 'معرفی' && R() < (b2c ? 0.08 : 0.12)
         };
-        if (ii === 1 && fi < 2 && lifecycle !== 'معرفی' && !f.intercompany) {
+        if (!b2c) p._noise = R.pick([0.06, 0.08, 0.1, 0.14, 0.18]);
+        if (f.intercompany) p._buyers = IBP.templates.buyersOf(tpl.code, p.code);
+        if (b2c && ii === 1 && fi < 2 && lifecycle !== 'معرفی' && !f.intercompany) {
           p._cannibalOf = products[products.length - 1].id; p._sporadic = false;
           products[products.length - 1]._noise = 0.16; products[products.length - 1]._sporadic = false;
         }
@@ -235,9 +257,13 @@
         }
 
         // BOM: مواد خانواده (بر حسب کیلوگرم وزن محصول) + بسته‌بندی
-        var picks = famMats.length <= 2 ? famMats.slice() : R.shuffle(famMats).slice(0, R.int(2, Math.min(3, famMats.length)));
+        var withRatio = f.materials.some(function (m) { return m.ratio || m.perKg; });
+        var picks = withRatio || famMats.length <= 2 ? famMats.slice() : R.shuffle(famMats).slice(0, R.int(2, Math.min(3, famMats.length)));
         var nInternal = picks.filter(function (m) { return m.internalCompany; }).length;
-        var bomLines = picks.concat(shared.slice(0, 1)).map(function (m) {
+        var bomLines = picks.concat(f.bulk ? [] : shared.slice(0, 1)).map(function (m) {
+          var spec = f.materials.filter(function (x) { return x.name === m.name; })[0] || {};
+          if (spec.ratio) return { m: m, q: p.unitWeightKg * spec.ratio * R.range(0.97, 1.03), fixed: true };
+          if (spec.perKg) return { m: m, q: Math.max(1, Math.round(p.unitWeightKg / spec.perKg)), fixed: true };
           // ماده درون‌گروهی: مجموع نسبت وزنی مواد درون‌گروهی حدود ۰٫۹ تا ۱ کیلوگرم به ازای هر کیلوگرم محصول
           if (m.internalCompany) return { m: m, q: p.unitWeightKg * R.range(0.9, 1.0) / nInternal, fixed: true };
           var q = m.uom === 'عدد' ? 1 : m.uom === 'کیلوگرم' && m.type === 'مواد اولیه' ? p.unitWeightKg * R.range(0.2, 0.5) : R.range(0.05, 0.4);
@@ -246,7 +272,7 @@
         var raw = bomLines.reduce(function (a, l) { return a + l.q * l.m.unitCost; }, 0);
         var k = raw > 0 ? (p.unitCost * R.range(0.55, 0.7)) / raw : 1;
         bomLines.forEach(function (l) {
-          var q = l.m.uom === 'عدد' ? 1 : Math.round(l.q * (l.fixed ? 1 : Math.min(1.6, Math.max(0.6, k))) * 10000) / 10000;
+          var q = l.m.uom === 'عدد' && !l.fixed ? 1 : Math.round(l.q * (l.fixed ? 1 : Math.min(1.6, Math.max(0.6, k))) * 10000) / 10000;
           out.bom.push({ id: nid('bm'), productId: p.id, materialId: l.m.id, qtyPer: q, scrap: R.pick([0.01, 0.02, 0.03]) });
         });
       });
@@ -269,11 +295,17 @@
     /* ---------- فروش واقعی (محصول × مشتری × ماه) ---------- */
     var epsBy = {};
     products.forEach(function (p) {
-      var pool = p.intercompany ? internalCustomers : externalCustomers;
-      var custs = p.intercompany ? pool : R.shuffle(pool).slice(0, R.int(4, Math.min(12, pool.length)));
+      var pool = p.intercompany ? internalCustomers.filter(function (c) { return !p._buyers || !p._buyers.length || p._buyers.indexOf(c._buyer) >= 0; }) : externalCustomers;
+      if (!pool.length) pool = p.intercompany ? internalCustomers : externalCustomers;
+      // B2C: هر کالا در بیشتر شعب و فروشگاه‌ها؛ B2B: هر کالا به چند مشتری صنعتی محدود
+      var custs = p.intercompany ? pool : b2c
+        ? R.shuffle(pool).slice(0, Math.max(4, Math.round(pool.length * R.range(0.6, 0.9))))
+        : R.shuffle(pool).slice(0, R.int(2, Math.min(5, pool.length)));
       var ws = custs.map(function (c) { return c._w * R.range(0.5, 1.5); });
-      var wsum = ws.reduce(function (a, b) { return a + b; }, 0);
       histPeriods.forEach(function (per, t) {
+        // B2B: سفارش مشتریان صنعتی پله‌ای است (سهم هر مشتری ماه‌به‌ماه جابه‌جا می‌شود)
+        var wm = b2c ? ws : ws.map(function (w) { return w * Math.exp(0.45 * R.normal()); });
+        var wsum = wm.reduce(function (a, b) { return a + b; }, 0);
         var e = expected(p, t);
         var eps = p._cannibalOf && epsBy[p._cannibalOf] ? -0.9 * epsBy[p._cannibalOf][t] + 0.03 * R.normal() : p._noise * R.normal();
         (epsBy[p.id] = epsBy[p.id] || [])[t] = eps;
@@ -283,7 +315,7 @@
         if (!q) return;
         var price = priceAt(p, per);
         custs.forEach(function (c, ci) {
-          var cq = Math.round(q * ws[ci] / wsum);
+          var cq = Math.round(q * wm[ci] / wsum);
           if (cq <= 0) return;
           out.salesActuals.push({ id: nid('sa'), period: per, productId: p.id, customerId: c.id, qty: cq, revenue: roundTo(cq * price * (1 - c._disc), 1000) });
         });
@@ -317,13 +349,15 @@
     /* ---------- مناسبت‌ها و اثر برآوردشده کارشناسی ---------- */
     var evR = { id: nid('ev'), code: 'E-RAM', name: 'ماه مبارک رمضان', kind: 'رمضان', notes: 'تاریخ از تقویم قمری ام‌القری محاسبه می‌شود' };
     var evM = { id: nid('ev'), code: 'E-MOH', name: 'دهه اول محرم (نذری)', kind: 'محرم', notes: 'روزهای ۱ تا ۱۲ محرم' };
-    var evC = { id: nid('ev'), code: 'E-CMP', name: 'جشنواره فروش پاییزه', kind: 'کمپین', startPeriod: J.addMonths(cycle, 2), endPeriod: J.addMonths(cycle, 2), notes: 'تخفیف و تبلیغات سراسری' };
-    out.events.push(evR, evM, evC);
+    // کمپین و پروموشن فقط در شرکت‌های B2C
+    var evC = b2c ? { id: nid('ev'), code: 'E-CMP', name: 'جشنواره فروش پاییزه', kind: 'کمپین', startPeriod: J.addMonths(cycle, 2), endPeriod: J.addMonths(cycle, 2), notes: 'تخفیف و تبلیغات سراسری' } : null;
+    out.events.push(evR, evM);
+    if (evC) out.events.push(evC);
     out.families.forEach(function (fam, fi) {
       var ev = fam._f.events || {};
       if (ev.ramadan) out.eventImpacts.push({ id: nid('ei'), eventId: evR.id, familyId: fam.id, uplift: Math.round(ev.ramadan * R.range(0.6, 1.3) * 20) / 20, source: 'کارشناسی' });
       if (ev.muharram) out.eventImpacts.push({ id: nid('ei'), eventId: evM.id, familyId: fam.id, uplift: Math.round(ev.muharram * R.range(0.6, 1.3) * 20) / 20, source: 'کارشناسی' });
-      if (fi === 0) out.eventImpacts.push({ id: nid('ei'), eventId: evC.id, familyId: fam.id, uplift: 0.15, source: 'کارشناسی' });
+      if (fi === 0 && evC) out.eventImpacts.push({ id: nid('ei'), eventId: evC.id, familyId: fam.id, uplift: 0.15, source: 'کارشناسی' });
     });
 
     /* ---------- بودجه سال مالی ---------- */
@@ -367,8 +401,8 @@
       if (p.shelfLifeDays && p.shelfLifeDays < 60) cover = Math.min(cover, p.shelfLifeDays / 60);
       var qty = Math.round(next * cover);
       var q1 = Math.round(qty * 0.75), q2 = qty - q1;
-      out.inventory.push({ id: nid('iv'), productId: p.id, warehouseId: plantWh[p.plantId].fg.id, qty: q1, asOf: asOf });
-      if (q2 > 0 && !p.intercompany) out.inventory.push({ id: nid('iv'), productId: p.id, warehouseId: dc.id, qty: q2, asOf: asOf });
+      out.inventory.push({ id: nid('iv'), productId: p.id, warehouseId: plantWh[p.plantId].fg.id, qty: dc ? q1 : qty, asOf: asOf });
+      if (q2 > 0 && dc && !p.intercompany) out.inventory.push({ id: nid('iv'), productId: p.id, warehouseId: dc.id, qty: q2, asOf: asOf });
     });
     out.materials.forEach(function (m) {
       var need = 0;
@@ -392,7 +426,7 @@
 
     return {
       data: out,
-      settings: { companyName: opts.companyName || tpl.company, companyCode: companyCode, industry: tpl.name, templateId: tpl.id, cyclePeriod: cycle, historyMonths: H, horizonMonths: F, priceInflation: inflation, displayScale: 1e9 }
+      settings: { companyName: opts.companyName || tpl.company, companyCode: companyCode, industry: tpl.name, templateId: tpl.id, businessModel: tpl.model || 'B2C', cyclePeriod: cycle, historyMonths: H, horizonMonths: F, priceInflation: inflation, displayScale: 1e9 }
     };
   }
 
