@@ -6,4 +6,6 @@ if not exist .venv (
   python -m venv .venv
   .venv\Scripts\python -m pip install -r requirements.txt
 )
+rem نصب بسته‌های تازه نسخه‌های جدید (مثل anthropic برای دستیار هوشمند)
+.venv\Scripts\python -m pip install -q -r requirements.txt
 .venv\Scripts\python run.py

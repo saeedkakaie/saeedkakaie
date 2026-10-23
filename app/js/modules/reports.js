@@ -24,11 +24,13 @@
         var cu = {}, pr = {};
         S.all('customers').forEach(function (c) { cu[c.id] = c; });
         S.all('products').forEach(function (p) { pr[p.id] = p; });
-        var from = J.addMonths(A.ctx().cycle, -24);
+        var ctx = A.ctx(), from = J.addMonths(ctx.cycle, -24);
         return S.all('salesActuals').filter(function (s) { return s.period >= from; }).map(function (s) {
           var p = pr[s.productId] || {}, c = cu[s.customerId] || {};
           return Object.assign({ month: s.period, year: J.year(s.period), customer: c.name || '—', channel: S.name('channels', c.channelId), region: S.name('regions', c.regionId), tier: c.tier || '—',
-            revenue: s.revenue, qty: s.qty, tons: s.qty * (p.unitWeightKg || 0) / 1000, gross: s.revenue - s.qty * (p.unitCost || 0) }, prodDims(p));
+            revenue: s.revenue, qty: s.qty, tons: s.qty * (p.unitWeightKg || 0) / 1000,
+            // بهای تمام‌شده دوره‌های گذشته با همان نرخ تورم قیمت‌ها به گذشته برده می‌شود تا حاشیه‌ها هم‌سنج باشند
+            gross: s.revenue - s.qty * (p.unitCost || 0) * Math.pow(1 + ctx.inflation, J.diff(ctx.cycle, s.period)) }, prodDims(p));
         });
       }
     },
@@ -84,9 +86,18 @@
   ];
 
   /* ---------------- محاسبه جدول محوری ---------------- */
+  var fcache = { v: -1 };
+  /** ردیف‌های فروش و پیش‌بینی تا تغییر بعدی داده‌ها نگه داشته می‌شوند (برنامه و سودآوری هر بار از برنامه جاری) */
+  function factsOf(key) {
+    if (key !== 'sales' && key !== 'forecast') return DATASETS[key].facts();
+    if (fcache.v !== S.version) fcache = { v: S.version };
+    if (!fcache[key]) fcache[key] = DATASETS[key].facts();
+    return fcache[key];
+  }
   function pivot(cfg) {
-    var ds = DATASETS[cfg.ds], facts = ds.facts();
+    var ds = DATASETS[cfg.ds], facts = factsOf(cfg.ds);
     (cfg.filters || []).forEach(function (f) { facts = facts.filter(function (x) { return String(x[f.dim]) === String(f.value); }); });
+    if (cfg.where) facts = facts.filter(cfg.where);
     var mdef = ds.measures[cfg.measure], ratio = /^ratio:(\w+)\/(\w+)$/.exec(mdef[1]);
     var rows = {}, cols = {}, cells = {}, rt = {}, ct = {}, tot = { a: 0, b: 0 };
     facts.forEach(function (x) {
@@ -101,6 +112,7 @@
     });
     var val = function (o) { return !o ? null : ratio ? (o.b ? o.a / o.b : null) : o.a; };
     var rowKeys = Object.keys(rows).sort(function (x, y) { return (val(rt[y]) || 0) - (val(rt[x]) || 0); });
+    if (cfg.order === 'asc') rowKeys.reverse();
     if (cfg.rows === 'month' || cfg.rows === 'year' || cfg.rows === 'cycle') rowKeys.sort();
     var colKeys = Object.keys(cols);
     if (cfg.cols === 'month' || cfg.cols === 'year' || cfg.cols === 'cycle') colKeys.sort(); else colKeys.sort(function (x, y) { return (val(ct[y]) || 0) - (val(ct[x]) || 0); });
@@ -244,6 +256,6 @@
     }
   }
 
-  IBP.reports = { pivot: pivot, DATASETS: DATASETS, PRESETS: PRESETS };
+  IBP.reports = { pivot: pivot, facts: factsOf, DATASETS: DATASETS, PRESETS: PRESETS, DIM_LABEL: DIM_LABEL };
   IBP.register('reports', { title: 'گزارش‌ها', render: render });
 })(window.IBP = window.IBP || {});

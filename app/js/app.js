@@ -6,13 +6,13 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.6.0', phase: 6 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.7.0', phase: 7 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
     {
       group: 'نمای کلی', items: [
-        { route: 'holding', label: 'نمای تلفیقی هلدینگ', icon: 'map', badge: 'جدید' },
+        { route: 'holding', label: 'نمای تلفیقی هلدینگ', icon: 'map' },
         { route: 'dashboard', label: 'داشبورد مدیریتی', icon: 'dashboard' },
         { route: 'cycle', label: 'چرخه ماهانه IBP', icon: 'cycle' }
       ]
@@ -37,7 +37,7 @@
       group: 'تصمیم‌گیری', items: [
         { route: 'review', label: 'بازنگری مدیریت', icon: 'review', badge: 'جدید' },
         { route: 'reports', label: 'گزارش‌ها', icon: 'report', badge: 'جدید' },
-        { route: 'agent', label: 'دستیار هوشمند', icon: 'bot', phase: 7 }
+        { route: 'agent', label: 'دستیار هوشمند', icon: 'bot', badge: 'AI' }
       ]
     },
     {
