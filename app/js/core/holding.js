@@ -62,8 +62,48 @@
       critical: alerts.filter(function (a) { return a.level === 'critical'; }).length, warnings: alerts.filter(function (a) { return a.level !== 'critical'; }).length,
       cycle: cyc, cycleDone: steps.filter(function (s) { return s.status === 'تکمیل'; }).length, cycleSteps: steps.length,
       spark: ltm.map(function (p) { return A.salesTotal(p).revenue; }),
+      sparkExt: ltm.map(function (p) { return A.salesTotal(p, ext).revenue; }),
+      tonsSeries: ltm.map(function (p) { var t = 0, m = A.salesIndex().get(p); if (m) m.forEach(function (v, pid) { var pr = S.get('products', pid); if (pr) t += v.qty * (pr.unitWeightKg || 0) / 1000; }); return t; }),
+      plan: planSummary(),
       updatedAt: new Date().toISOString()
     };
+  }
+
+  /** خلاصه برنامه تأمین و مالی شرکت (فاز ۴ و ۵) برای نمای تلفیقی هلدینگ */
+  function planSummary() {
+    if (!IBP.supply || !IBP.finance) return null;
+    try {
+      var c = IBP.supply.current(), f = IBP.finance.current(), n = f.months12, per = f.periods.slice(0, n);
+      var ext = { revenue: new Array(n).fill(0), gross: new Array(n).fill(0) };
+      Object.keys(f.byProduct).forEach(function (pid) {
+        var x = f.byProduct[pid];
+        if (x.product.intercompany) return;
+        var r = c.plan.rows.filter(function (rr) { return rr.product.id === pid; })[0];
+        if (!r) return;
+        var u = f.unitCosts[pid];
+        per.forEach(function (p, t) {
+          var sold = Math.max(0, r.demand[t] - r.shortage[t]);
+          var price = IBP.analytics.priceAt(x.product, p) * (1 - IBP.analytics.avgDiscount());
+          ext.revenue[t] += sold * price;
+          ext.gross[t] += sold * price - (x.qty ? x.cogs / x.qty : (u ? u.std : 0)) * sold;
+        });
+      });
+      // درخواست‌های درون‌گروهی این شرکت (تن در ماه) به تفکیک شرکت تأمین‌کننده و کالا
+      var ic = {};
+      Object.keys(c.mrp.ic).forEach(function (code) {
+        var x = c.mrp.ic[code];
+        ic[code] = { tons: x.tons.slice(0, n), total: x.tons.slice(0, n).reduce(function (a, b) { return a + b; }, 0), value: x.value, items: x.items.map(function (it) { return it.material.name; }) };
+      });
+      var k = f.kpi;
+      return {
+        periods: per, revenue: k.revenue, gross: k.gross, gm: k.gm, operating: k.operating, lost: k.lost, tons: k.tons,
+        fillRate: k.fillRate, util: k.util, budgetGap: k.budgetGap, nwcEnd: k.nwcEnd, invEnd: k.invEnd,
+        bottlenecks: c.plan.kpi.bottlenecks, overtime: c.plan.kpi.overtimeHours, prebuildTons: c.plan.kpi.prebuildTons,
+        revenueExt: ext.revenue.reduce(function (a, b) { return a + b; }, 0), grossExt: ext.gross.reduce(function (a, b) { return a + b; }, 0),
+        revenueExtMonthly: ext.revenue, grossMonthly: f.totals.gross.slice(0, n), tonsMonthly: f.totals.tons.slice(0, n),
+        ic: ic, scenario: (IBP.finance.list().filter(function (x) { return x.chosen; })[0] || {}).name || null
+      };
+    } catch (e) { console.error(e); return null; }
   }
 
   var H = {
@@ -213,7 +253,19 @@
         return { company: c, records: d.records, settings: Object.assign(IBP.store.defaultSettings(), d.meta.settings || {}), meta: d.meta || {} };
       });
     },
-    summarize: summarize
+    summarize: summarize,
+
+    /** به‌روزرسانی خلاصه همه شرکت‌ها (هر شرکت در فضای کاری خودش محاسبه می‌شود) و بازگشت به شرکت جاری */
+    refreshAll: function (progress) {
+      var cur = state.current, chain = Promise.resolve();
+      state.companies.forEach(function (c, i) {
+        chain = chain.then(function () {
+          if (progress) progress(c, i, state.companies.length);
+          return IBP.store.init(adapterFor(c)).then(function () { c.summary = summarize(); c.industry = IBP.store.settings().industry; c.model = IBP.store.settings().businessModel || c.model; });
+        });
+      });
+      return chain.then(persist).then(function () { return cur ? H.enter(cur.id) : null; });
+    }
   };
 
   IBP.holding = H;

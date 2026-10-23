@@ -285,6 +285,23 @@
     ]
   };
 
+  ENTITIES.actions = {
+    label: 'تصمیم‌ها و اقدامات', single: 'تصمیم یا اقدام', group: 'process', icon: 'check',
+    naturalKey: ['cycle', 'title'],
+    display: function (r) { return r.title; },
+    fields: [
+      { key: 'cycle', label: 'چرخه (جلسه)', type: 'period', required: true },
+      { key: 'kind', label: 'نوع', type: 'select', options: ['تصمیم', 'اقدام', 'ریسک'], default: 'اقدام', required: true },
+      { key: 'title', label: 'عنوان', type: 'text', required: true },
+      { key: 'area', label: 'حوزه', type: 'select', options: ['تقاضا', 'تأمین', 'مالی', 'پورتفوی', 'عمومی'], default: 'عمومی' },
+      { key: 'owner', label: 'مسئول', type: 'text' },
+      { key: 'dueDate', label: 'سررسید', type: 'date' },
+      { key: 'priority', label: 'اولویت', type: 'select', options: ['بالا', 'متوسط', 'کم'], default: 'متوسط' },
+      { key: 'status', label: 'وضعیت', type: 'select', options: ['باز', 'در حال انجام', 'انجام شد', 'لغو'], default: 'باز' },
+      { key: 'note', label: 'شرح و نتیجه', type: 'textarea' }
+    ]
+  };
+
   var GROUPS = [
     { id: 'org', label: 'ساختار سازمان' },
     { id: 'product', label: 'محصول' },

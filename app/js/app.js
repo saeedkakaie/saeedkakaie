@@ -6,12 +6,13 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.5.0', phase: 5 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.6.0', phase: 6 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
     {
       group: 'نمای کلی', items: [
+        { route: 'holding', label: 'نمای تلفیقی هلدینگ', icon: 'map', badge: 'جدید' },
         { route: 'dashboard', label: 'داشبورد مدیریتی', icon: 'dashboard' },
         { route: 'cycle', label: 'چرخه ماهانه IBP', icon: 'cycle' }
       ]
@@ -28,14 +29,14 @@
         { route: 'demand', label: 'برنامه‌ریزی تقاضا', icon: 'trend' },
         { route: 'supply', label: 'تأمین و ظرفیت', icon: 'factory' },
         { route: 'inventory', label: 'موجودی و MRP', icon: 'warehouse' },
-        { route: 'finance', label: 'تطبیق مالی', icon: 'coins', badge: 'جدید' },
-        { route: 'scenarios', label: 'سناریوها', icon: 'scenario', badge: 'جدید' }
+        { route: 'finance', label: 'تطبیق مالی', icon: 'coins' },
+        { route: 'scenarios', label: 'سناریوها', icon: 'scenario' }
       ]
     },
     {
       group: 'تصمیم‌گیری', items: [
-        { route: 'review', label: 'بازنگری مدیریت', icon: 'review', phase: 6 },
-        { route: 'reports', label: 'گزارش‌ها', icon: 'report', phase: 6 },
+        { route: 'review', label: 'بازنگری مدیریت', icon: 'review', badge: 'جدید' },
+        { route: 'reports', label: 'گزارش‌ها', icon: 'report', badge: 'جدید' },
         { route: 'agent', label: 'دستیار هوشمند', icon: 'bot', phase: 7 }
       ]
     },
@@ -192,6 +193,7 @@
     var nav = navItem(r.route);
     if (!mod && nav && nav.phase) mod = IBP.modules.roadmap;
     if (!mod) { location.hash = '#/dashboard'; return; }
+    if (IBP.motion && IBP.motion.isFocused()) IBP.motion.unfocus();
     if (current.cleanup) { try { current.cleanup(); } catch (e) { console.error(e); } }
     IBP.charts.hideTip();
     IBP.form.closePicker();
@@ -213,6 +215,7 @@
       els.content.appendChild(h('div.card', h('div.card-body', 'خطا در نمایش صفحه: ' + e.message)));
     }
     current.route = r.route;
+    if (!keepScroll && IBP.motion) IBP.motion.enter(els.content);
     updateBell();
     window.scrollTo(0, keepScroll ? y : 0);
   }

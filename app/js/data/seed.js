@@ -80,7 +80,7 @@
       plants: [], warehouses: [], resources: [], families: [], products: [], routings: [],
       suppliers: [], materials: [], bom: [], channels: [], regions: [], customers: [],
       salesActuals: [], forecasts: [], budgets: [], inventory: [], materialInventory: [], cycleSteps: [],
-      events: [], eventImpacts: [], demandAdjustments: []
+      events: [], eventImpacts: [], demandAdjustments: [], actions: []
     };
 
     /* ---------- کارخانه (کد پلنت = کد شرکت) و انبار ---------- */
@@ -424,6 +424,17 @@
         id: nid('mi'), materialId: m.id, warehouseId: plantWh[plant.id].rm.id,
         qty: Math.round(need * R.range(0.2, 2.2)), onOrder: R() < 0.5 ? Math.round(need * R.range(0.3, 1)) : 0, asOf: asOf
       });
+    });
+
+    /* ---------- تصمیم‌ها و اقدامات جلسه ماه قبل (برای پیگیری در بازنگری مدیریت) ---------- */
+    var prevC = J.addMonths(cycle, -1);
+    [
+      { kind: 'تصمیم', title: 'تأیید برنامه اجماعی ' + J.label(prevC) + ' با ' + (b2c ? 'افزایش ۵٪ برای کمپین' : 'لحاظ قراردادهای جدید صنعتی'), area: 'تقاضا', owner: 'مدیر فروش', due: 3, status: 'انجام شد', priority: 'بالا' },
+      { kind: 'اقدام', title: 'بررسی اضافه‌کاری ' + (out.resources[0] ? out.resources[0].name : 'خط اصلی') + ' برای پوشش اوج فصلی', area: 'تأمین', owner: 'مدیر تولید', due: 20, status: 'در حال انجام', priority: 'بالا' },
+      { kind: 'اقدام', title: 'کاهش موجودی مازاد محصولات کم‌گردش', area: 'تأمین', owner: 'مدیر زنجیره تأمین', due: -5, status: 'باز', priority: 'متوسط' },
+      { kind: 'ریسک', title: b2c ? 'افزایش قیمت مواد بسته‌بندی و اثر بر حاشیه' : 'نوسان قیمت نهاده‌های وارداتی', area: 'مالی', owner: 'مدیر مالی', due: 25, status: 'باز', priority: 'متوسط' }
+    ].forEach(function (a) {
+      out.actions.push({ id: nid('ac'), cycle: prevC, kind: a.kind, title: a.title, area: a.area, owner: a.owner, dueDate: a.due < 0 ? iso(prevC, 28 + a.due) : iso(cycle, Math.max(1, Math.min(28, 10 + a.due))), priority: a.priority, status: a.status, note: '' });
     });
 
     /* ---------- چرخه IBP ---------- */

@@ -112,10 +112,10 @@
   }
 
   /** راهنمای سری‌ها؛ با کلیک هر سری پنهان/نمایان می‌شود */
-  function legend(items, onToggle) {
+  function legend(items, onToggle, onHover) {
     var lg = document.createElement('div');
     lg.className = 'chart-legend';
-    items.forEach(function (it) {
+    items.forEach(function (it, ii) {
       var s = document.createElement(onToggle ? 'button' : 'span'); s.className = 'lg-item' + (it.off ? ' off' : '');
       if (onToggle) {
         s.type = 'button';
@@ -123,12 +123,22 @@
         s.setAttribute('aria-pressed', it.off ? 'false' : 'true');
         s.addEventListener('click', function () { onToggle(it.label); });
       }
+      if (onHover && !it.off) {
+        // تمرکز روی یک سری: بقیه کم‌رنگ می‌شوند
+        s.addEventListener('pointerenter', function () { onHover(it.idx !== undefined ? it.idx : ii); });
+        s.addEventListener('pointerleave', function () { onHover(null); });
+        s.addEventListener('focus', function () { onHover(it.idx !== undefined ? it.idx : ii); });
+        s.addEventListener('blur', function () { onHover(null); });
+      }
       var k = document.createElement('span'); k.className = 'lg-key ' + (it.shape || 'line') + (it.dash ? ' dash' : '');
       k.style.setProperty('--c', it.color);
       var l = document.createElement('span'); l.textContent = it.label;
       s.appendChild(k); s.appendChild(l); lg.appendChild(s);
     });
     return lg;
+  }
+  function focuser(container) {
+    return function (idx) { if (idx === null) container.removeAttribute('data-focus'); else container.setAttribute('data-focus', idx); };
   }
   function hiddenSet(container) { return container._hidden || (container._hidden = {}); }
   function toggler(container, redraw) {
@@ -162,7 +172,7 @@
       var hs = hiddenSet(container);
       var allSeries = opts.series.filter(function (s) { return s.values.some(function (v) { return v !== null && v !== undefined; }); });
       var redraw = function () { draw(false); };
-      if (allSeries.length > 1) container.appendChild(legend(allSeries.map(function (s, i) { return { label: s.name, color: s.color || seriesColor(i), dash: s.dash, off: !!hs[s.name] }; }), toggler(container, redraw)));
+      if (allSeries.length > 1) container.appendChild(legend(allSeries.map(function (s, i) { return { label: s.name, color: s.color || seriesColor(i), dash: s.dash, off: !!hs[s.name], idx: i }; }), toggler(container, redraw), focuser(container)));
       var z = container._zoom, zi0 = z ? z[0] : 0, zi1 = z ? z[1] : opts.labels.length - 1;
       var labels = opts.labels.slice(zi0, zi1 + 1), tipLabels = opts.tipLabels ? opts.tipLabels.slice(zi0, zi1 + 1) : null;
       var series = allSeries.map(function (s, si) { return { s: s, si: si }; }).filter(function (x) { return !hs[x.s.name]; })
@@ -226,15 +236,15 @@
             lg.appendChild(svg('stop', { offset: '0%', 'stop-color': rc, 'stop-opacity': 0.2 }));
             lg.appendChild(svg('stop', { offset: '100%', 'stop-color': rc, 'stop-opacity': 0 }));
             defs.appendChild(lg);
-            root.appendChild(svg('path', { d: d + 'L' + pts[pts.length - 1][0] + ' ' + Y(Math.max(0, y0)) + 'L' + pts[0][0] + ' ' + Y(Math.max(0, y0)) + 'Z', fill: 'url(#' + gid + ')', stroke: 'none', class: animate ? 'fade-in' : null }));
+            root.appendChild(svg('path', { d: d + 'L' + pts[pts.length - 1][0] + ' ' + Y(Math.max(0, y0)) + 'L' + pts[0][0] + ' ' + Y(Math.max(0, y0)) + 'Z', fill: 'url(#' + gid + ')', stroke: 'none', class: animate ? 'fade-in' : null, 'data-s': s._ci }));
           }
-          var p = svg('path', { d: d, fill: 'none', stroke: col, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': s.dash ? '5 4' : null });
+          var p = svg('path', { d: d, fill: 'none', stroke: col, 'stroke-width': s.width || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'stroke-dasharray': s.dash ? '5 4' : null, 'data-s': s._ci });
           root.appendChild(p);
           if (!s.dash && animate) paths.push(p);
         });
         var idxs = []; s.values.forEach(function (v, i) { if (v !== null && v !== undefined) idxs.push(i); });
         var last = idxs.length ? idxs[idxs.length - 1] : -1;
-        if (last >= 0 && s.endDot !== false) root.appendChild(svg('circle', { cx: X(last), cy: Y(s.values[last]), r: 4, fill: col, stroke: 'var(--surface)', 'stroke-width': 2, class: animate ? 'fade-in' : null }));
+        if (last >= 0 && s.endDot !== false) root.appendChild(svg('circle', { cx: X(last), cy: Y(s.values[last]), r: 4, fill: col, stroke: 'var(--surface)', 'stroke-width': 2, class: animate ? 'fade-in' : null, 'data-s': s._ci }));
         // برچسب اعداد: همه نقاط (سری کوتاه) یا آخرین نقطه و بیشینه/کمینه
         if (!labelsOn() || mode === false || s.noLabels || s.dash || !idxs.length) return;
         var pick;
@@ -248,7 +258,7 @@
           var v = s.values[i], above = k % 2 === 0, x = X(i), y = Y(v) + (above ? -9 : 17);
           var anchor = i === n - 1 ? 'end' : i === 0 ? 'start' : 'middle';
           var str = lfmt(v);
-          if (place(x, y, str, anchor)) labelLayer.appendChild(dataLabel(x, y, str, anchor));
+          if (place(x, y, str, anchor)) { var dl = dataLabel(x, y, str, anchor); dl.setAttribute('data-s', s._ci); labelLayer.appendChild(dl); }
         });
       });
       root.appendChild(labelLayer);
@@ -341,15 +351,21 @@
       container.textContent = '';
       container.classList.add('chart');
       var hs = hiddenSet(container), redraw = function () { draw(false); };
-      var lgItems = opts.series.map(function (s, i) { return { label: s.name, color: s.color || seriesColor(i), shape: 'rect', off: !!hs[s.name] }; })
-        .concat((opts.lines || []).map(function (l, i) { return { label: l.name, color: l.color || seriesColor(opts.series.length + i), dash: l.dash, off: !!hs[l.name] }; }));
-      if (lgItems.length > 1) container.appendChild(legend(lgItems, toggler(container, redraw)));
-      toolbar(container, redraw);
-      var series = opts.series.map(function (s, i) { return Object.assign({}, s, { _ci: i }); }).filter(function (s) { return !hs[s.name]; });
-      var lines = (opts.lines || []).map(function (l, i) { return Object.assign({}, l, { _ci: opts.series.length + i }); }).filter(function (l) { return !hs[l.name]; });
+      var lgItems = opts.series.map(function (s, i) { return { label: s.name, color: s.color || seriesColor(i), shape: 'rect', off: !!hs[s.name], idx: i }; })
+        .concat((opts.lines || []).map(function (l, i) { return { label: l.name, color: l.color || seriesColor(opts.series.length + i), dash: l.dash, off: !!hs[l.name], idx: opts.series.length + i }; }));
+      if (lgItems.length > 1) container.appendChild(legend(lgItems, toggler(container, redraw), focuser(container)));
+      // بزرگ‌نمایی بازه با کشیدن روی پس‌زمینه نمودار
+      var z = container._zoom, zi0 = z ? z[0] : 0, zi1 = z ? z[1] : opts.labels.length - 1;
+      var zs = function (a) { return a ? a.slice(zi0, zi1 + 1) : a; };
+      var extra = [];
+      if (z) { var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'chart-tool'; rb.textContent = 'کل دوره'; rb.addEventListener('click', function () { container._zoom = null; redraw(); }); extra.push(rb); }
+      toolbar(container, redraw, extra);
+      var series = opts.series.map(function (s, i) { return Object.assign({}, s, { _ci: i, values: zs(s.values), colors: zs(s.colors) }); }).filter(function (s) { return !hs[s.name]; });
+      var lines = (opts.lines || []).map(function (l, i) { return Object.assign({}, l, { _ci: opts.series.length + i, values: zs(l.values) }); }).filter(function (l) { return !hs[l.name]; });
+      var labelsZ = zs(opts.labels), tipTitlesZ = zs(opts.tipTitles);
       var W = Math.max(280, container.clientWidth), H = opts.height || 240;
       var m = { t: 20, r: 12, b: 30, l: 52 };
-      var iw = W - m.l - m.r, ih = H - m.t - m.b, n = opts.labels.length, k = Math.max(1, series.length);
+      var iw = W - m.l - m.r, ih = H - m.t - m.b, n = labelsZ.length, k = Math.max(1, series.length);
       var fmt = opts.format || IBP.fmt.compact, lfmt = opts.labelFormat || fmt;
       var maxV = 0, minV = 0;
       for (var i = 0; i < n; i++) {
@@ -373,10 +389,31 @@
       });
       var labelLayer = svg('g', { class: animate ? 'labels-in' : null }), place = placer();
       var every = Math.max(1, Math.ceil(n / Math.max(2, Math.floor(iw / 56))));
+      var bg = svg('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', class: n >= 6 ? 'zoomable' : null });
+      root.appendChild(bg);
+      var sel = svg('rect', { y: m.t, height: ih, class: 'zoom-sel', visibility: 'hidden' });
+      var jAt = function (e) { var r = root.getBoundingClientRect(); var px = (e.clientX - r.left) * (W / r.width); return Math.max(0, Math.min(n - 1, Math.floor((px - m.l) / band))); };
+      // کشیدن از هر نقطه نمودار (حتی روی ستون‌ها)؛ کشیدن کوتاه همان کلیک است
+      var drag = null;
+      root.addEventListener('pointerdown', function (e) { if (n < 6 || e.button !== 0) return; drag = { j: jAt(e), x: e.clientX }; });
+      root.addEventListener('pointermove', function (e) {
+        if (!drag || Math.abs(e.clientX - drag.x) < 8) return;
+        var j2 = jAt(e), a = Math.min(drag.j, j2), b = Math.max(drag.j, j2);
+        sel.setAttribute('x', m.l + band * a); sel.setAttribute('width', band * (b - a + 1)); sel.setAttribute('visibility', 'visible');
+      });
+      var endDrag = function (e) {
+        if (!drag) return;
+        var moved = Math.abs(e.clientX - drag.x) >= 8, j2 = jAt(e), a = Math.min(drag.j, j2), b = Math.max(drag.j, j2);
+        drag = null; sel.setAttribute('visibility', 'hidden');
+        if (moved && b - a >= 1) { container._zoom = [zi0 + a, zi0 + b]; container._suppressClick = Date.now(); hideTip(); redraw(); }
+      };
+      root.addEventListener('pointerup', endDrag);
+      root.addEventListener('pointerleave', function () { if (drag) { drag = null; sel.setAttribute('visibility', 'hidden'); } });
+      root.addEventListener('dblclick', function () { if (container._zoom) { container._zoom = null; redraw(); } });
       for (var j = 0; j < n; j++) {
         var cx = m.l + band * j + band / 2;
-        if (j % every === 0) root.appendChild(text(cx, H - 8, opts.labels[j], { class: 'tick', 'text-anchor': 'middle' }));
-        if (opts.active !== undefined && opts.active === j) root.appendChild(svg('rect', { x: m.l + band * j, y: m.t, width: band, height: ih, class: 'col-active' }));
+        if (j % every === 0) root.appendChild(text(cx, H - 8, labelsZ[j], { class: 'tick', 'text-anchor': 'middle' }));
+        if (opts.active !== undefined && opts.active === j + zi0) root.appendChild(svg('rect', { x: m.l + band * j, y: m.t, width: band, height: ih, class: 'col-active' }));
         var acc = 0;
         series.forEach(function (s, si) {
           var v = s.values[j] || 0;
@@ -390,21 +427,21 @@
           var d = isTop
             ? 'M' + x + ' ' + (yTop + hgt) + 'V' + (yTop + r) + 'Q' + x + ' ' + yTop + ' ' + (x + r) + ' ' + yTop + 'H' + (x + barW - r) + 'Q' + (x + barW) + ' ' + yTop + ' ' + (x + barW) + ' ' + (yTop + r) + 'V' + (yTop + hgt) + 'Z'
             : 'M' + x + ' ' + (yTop + hgt) + 'V' + yTop + 'H' + (x + barW) + 'V' + (yTop + hgt) + 'Z';
-          var p = svg('path', { d: d, fill: col, class: 'col-bar' + (animate ? ' grow' : '') + (opts.onClick ? ' clickable' : ''), tabindex: 0 });
+          var p = svg('path', { d: d, fill: col, class: 'col-bar' + (animate ? ' grow' : '') + (opts.onClick ? ' clickable' : ''), tabindex: 0, 'data-s': s._ci });
           if (animate) p.style.animationDelay = Math.min(0.5, j * 0.02) + 's';
           (function (jj, vv, nm, cc, sIdx) {
             p.addEventListener('pointermove', function (e) {
               var rows = [{ label: nm, value: (opts.tipFormat || fmt)(vv), color: cc }];
               lines.forEach(function (l) { if (l.values[jj] !== null && l.values[jj] !== undefined) rows.push({ label: l.name, value: (opts.tipFormat || fmt)(l.values[jj]), color: l.color || seriesColor(l._ci), dash: l.dash }); });
-              showTip(e, opts.tipTitles ? opts.tipTitles[jj] : opts.labels[jj], rows);
+              showTip(e, tipTitlesZ ? tipTitlesZ[jj] : labelsZ[jj], rows);
             });
             p.addEventListener('pointerleave', hideTip);
-            if (opts.onClick) p.addEventListener('click', function () { hideTip(); opts.onClick(jj, sIdx); });
+            if (opts.onClick) p.addEventListener('click', function () { if (container._suppressClick && Date.now() - container._suppressClick < 400) return; hideTip(); opts.onClick(jj + zi0, sIdx); });
           })(j, v, s.name, col, s._ci);
           root.appendChild(p);
           if (showLabels && !opts.stacked && (k <= 2 || barW >= 16)) {
             var ly = v >= 0 ? yTop - 4 : yBot + 12, str = lfmt(v);
-            if (place(x + barW / 2, ly, str, 'middle')) labelLayer.appendChild(dataLabel(x + barW / 2, ly, str, 'middle'));
+            if (place(x + barW / 2, ly, str, 'middle')) { var cl = dataLabel(x + barW / 2, ly, str, 'middle'); cl.setAttribute('data-s', s._ci); labelLayer.appendChild(cl); }
           }
           if (opts.stacked) acc += v;
         });
@@ -417,11 +454,11 @@
         var col = l.color || seriesColor(l._ci);
         var pts = l.values.map(function (v, jj) { return v === null || v === undefined ? null : [m.l + band * jj + band / 2, Y(v)]; }).filter(Boolean);
         var d = pts.map(function (p, ii) { return (ii ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join('');
-        var path = svg('path', { d: d, fill: 'none', stroke: col, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-dasharray': l.dash ? '5 4' : null });
+        var path = svg('path', { d: d, fill: 'none', stroke: col, 'stroke-width': 2, 'stroke-linejoin': 'round', 'stroke-dasharray': l.dash ? '5 4' : null, 'data-s': l._ci });
         root.appendChild(path);
         if (animate && !l.dash) setTimeout(function () { animateLine(path); }, 0);
         var lastPt = pts[pts.length - 1];
-        if (lastPt) root.appendChild(svg('circle', { cx: lastPt[0], cy: lastPt[1], r: 4, fill: col, stroke: 'var(--surface)', 'stroke-width': 2 }));
+        if (lastPt) root.appendChild(svg('circle', { cx: lastPt[0], cy: lastPt[1], r: 4, fill: col, stroke: 'var(--surface)', 'stroke-width': 2, 'data-s': l._ci }));
       });
       if (opts.refLine) {
         var ry = Y(opts.refLine.value);
@@ -429,8 +466,10 @@
         if (opts.refLine.label) root.appendChild(text(W - m.r, ry - 5, opts.refLine.label, { class: 'tick', 'text-anchor': 'end' }));
       }
       root.appendChild(labelLayer);
+      root.appendChild(sel);
       container.appendChild(root);
     };
+    container._zoom = null;
     responsive(container, draw);
   }
 
@@ -526,6 +565,81 @@
     responsive(container, draw);
   }
 
+  /* ================= نقشه جریان (درون‌گروهی) ================= */
+  /**
+   * opts: { nodes:[{id, label, sub, color, size}], links:[{from, to, value, label, rows}], format, height, onNode(node), title }
+   * گره‌ها روی دایره چیده می‌شوند؛ ضخامت هر جریان متناسب با مقدار است و ذرات روی آن حرکت می‌کنند.
+   * کلیک روی هر گره فقط جریان‌های همان شرکت را برجسته می‌کند (کلیک دوباره: همه).
+   */
+  function flows(container, opts) {
+    var draw = function (animate) {
+      container.textContent = '';
+      container.classList.add('chart', 'flow-chart');
+      toolbar(container, function () { draw(false); });
+      var W = Math.max(320, container.clientWidth), H = opts.height || 440, cx = W / 2, cy = H / 2, R = Math.min(W, H) / 2 - 70;
+      var fmt = opts.format || IBP.fmt.compact, nodes = opts.nodes, pos = {};
+      nodes.forEach(function (n, i) { var a = -Math.PI / 2 + i * 2 * Math.PI / nodes.length; pos[n.id] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a: a }; });
+      var maxV = Math.max.apply(null, opts.links.map(function (l) { return l.value; }).concat([1]));
+      var maxS = Math.max.apply(null, nodes.map(function (n) { return n.size || 1; }).concat([1]));
+      var rad = function (n) { return 16 + 18 * Math.sqrt((n.size || 0) / maxS); };
+      var root = svg('svg', { width: W, height: H, viewBox: '0 0 ' + W + ' ' + H, class: 'chart-svg', role: 'img', 'aria-label': opts.title || '' });
+      var defs = svg('defs'); root.appendChild(defs);
+      var focus = container._focusNode || null;
+      var gLinks = svg('g'), gNodes = svg('g');
+      root.appendChild(gLinks); root.appendChild(gNodes);
+      opts.links.forEach(function (l, i) {
+        var a = pos[l.from], b = pos[l.to]; if (!a || !b) return;
+        var na = nodes.filter(function (n) { return n.id === l.from; })[0], nb = nodes.filter(function (n) { return n.id === l.to; })[0];
+        var ra = rad(na), rb = rad(nb);
+        var dx = b.x - a.x, dy = b.y - a.y, d = Math.sqrt(dx * dx + dy * dy) || 1;
+        var sx = a.x + dx / d * ra, sy = a.y + dy / d * ra, ex = b.x - dx / d * (rb + 6), ey = b.y - dy / d * (rb + 6);
+        var mx = (sx + ex) / 2 + (cy - (sy + ey) / 2) * 0.25 + (-dy / d) * 30, my = (sy + ey) / 2 + ((sx + ex) / 2 - cx) * -0.25 + (dx / d) * 30;
+        var w = 2 + 14 * Math.sqrt(l.value / maxV), col = resolveColor(na.color || seriesColor(i));
+        var gid = 'fl' + (++gradSeq);
+        var lg = svg('linearGradient', { id: gid, gradientUnits: 'userSpaceOnUse', x1: sx, y1: sy, x2: ex, y2: ey });
+        lg.appendChild(svg('stop', { offset: '0%', 'stop-color': col, 'stop-opacity': 0.85 }));
+        lg.appendChild(svg('stop', { offset: '100%', 'stop-color': resolveColor(nb.color || seriesColor(i + 1)), 'stop-opacity': 0.85 }));
+        defs.appendChild(lg);
+        var dd = 'M' + sx.toFixed(1) + ' ' + sy.toFixed(1) + 'Q' + mx.toFixed(1) + ' ' + my.toFixed(1) + ' ' + ex.toFixed(1) + ' ' + ey.toFixed(1);
+        var dim = focus && l.from !== focus && l.to !== focus;
+        var g = svg('g', { class: 'flow-link' + (dim ? ' dim' : ''), tabindex: 0 });
+        g.appendChild(svg('path', { d: dd, fill: 'none', stroke: 'url(#' + gid + ')', 'stroke-width': w, 'stroke-linecap': 'round', class: 'flow-base' }));
+        var dash = svg('path', { d: dd, fill: 'none', stroke: '#fff', 'stroke-width': Math.max(1.5, w / 3), 'stroke-linecap': 'round', class: 'flow-dash' });
+        dash.style.animationDuration = (3.2 - 1.8 * l.value / maxV).toFixed(2) + 's';
+        g.appendChild(dash);
+        // سر پیکان
+        var ang = Math.atan2(ey - my, ex - mx), ah = 6 + w / 2;
+        g.appendChild(svg('path', { d: 'M' + ex + ' ' + ey + 'L' + (ex - ah * Math.cos(ang - 0.45)) + ' ' + (ey - ah * Math.sin(ang - 0.45)) + 'L' + (ex - ah * Math.cos(ang + 0.45)) + ' ' + (ey - ah * Math.sin(ang + 0.45)) + 'Z', fill: resolveColor(nb.color || col) }));
+        if (labelsOn()) {
+          var lx = (sx + 2 * mx + ex) / 4, ly = (sy + 2 * my + ey) / 4;
+          g.appendChild(dataLabel(lx, ly - 4, fmt(l.value), 'middle', 'flow-label'));
+        }
+        g.addEventListener('pointermove', function (e) { showTip(e, na.label + ' ← ' + nb.label, [{ label: opts.valueLabel || 'مقدار', value: fmt(l.value), color: col }].concat(l.rows || [])); });
+        g.addEventListener('pointerleave', hideTip);
+        if (animate) { g.style.opacity = 0; g.style.animation = 'fadein .6s ' + (0.3 + i * 0.08) + 's both'; g.style.opacity = ''; }
+        gLinks.appendChild(g);
+      });
+      nodes.forEach(function (n, i) {
+        var p = pos[n.id], r = rad(n), col = n.color || seriesColor(i);
+        var dim = focus && focus !== n.id && !opts.links.some(function (l) { return (l.from === focus && l.to === n.id) || (l.to === focus && l.from === n.id); });
+        var g = svg('g', { class: 'flow-node' + (dim ? ' dim' : '') + (focus === n.id ? ' on' : ''), tabindex: 0, transform: 'translate(' + p.x.toFixed(1) + ',' + p.y.toFixed(1) + ')' });
+        g.appendChild(svg('circle', { r: r + 6, fill: col, opacity: 0.16, class: 'flow-halo' }));
+        g.appendChild(svg('circle', { r: r, fill: col, stroke: 'var(--surface)', 'stroke-width': 3, class: animate ? 'pop-in' : null }));
+        g.appendChild(text(0, 4, n.code || '', { class: 'flow-code', 'text-anchor': 'middle' }));
+        var out = Math.cos(p.a) * (r + 14), outY = Math.sin(p.a) * (r + 14);
+        var anchor = Math.abs(Math.cos(p.a)) < 0.3 ? 'middle' : Math.cos(p.a) > 0 ? 'start' : 'end';
+        g.appendChild(text(out, outY + (Math.sin(p.a) > 0.3 ? 12 : Math.sin(p.a) < -0.3 ? -8 : 4), n.label, { class: 'flow-name', 'text-anchor': anchor }));
+        if (n.sub) g.appendChild(text(out, outY + (Math.sin(p.a) > 0.3 ? 27 : Math.sin(p.a) < -0.3 ? 7 : 19), n.sub, { class: 'tick', 'text-anchor': anchor }));
+        g.addEventListener('pointermove', function (e) { showTip(e, n.label, n.rows || []); });
+        g.addEventListener('pointerleave', hideTip);
+        g.addEventListener('click', function () { container._focusNode = container._focusNode === n.id ? null : n.id; hideTip(); draw(false); if (opts.onNode) opts.onNode(container._focusNode ? n : null); });
+        gNodes.appendChild(g);
+      });
+      container.appendChild(root);
+    };
+    responsive(container, draw);
+  }
+
   /* ================= نقشه حرارتی ================= */
   /**
    * opts: { rows:[{id,label,sub}], cols:[{id,label}], value(row,col) → number|null, format, color(v,row,col) → css,
@@ -536,6 +650,14 @@
     container.classList.add('heatmap-wrap');
     var fmt = opts.format || IBP.fmt.num;
     var t = document.createElement('table'); t.className = 'heatmap';
+    // نشانگر متقاطع: سطر و ستون خانه زیر نشانگر برجسته و بقیه کم‌رنگ می‌شوند
+    var cross = function (col, tr) {
+      Array.prototype.forEach.call(t.querySelectorAll('.hm-x'), function (e) { e.classList.remove('hm-x'); });
+      t.classList.toggle('hm-cross', col !== null);
+      if (col === null) return;
+      Array.prototype.forEach.call(t.rows, function (row) { if (row.cells[col]) row.cells[col].classList.add('hm-x'); });
+      Array.prototype.forEach.call(tr.cells, function (cell) { cell.classList.add('hm-x'); });
+    };
     var thead = document.createElement('thead'), hr = document.createElement('tr');
     var th0 = document.createElement('th'); th0.className = 'hm-corner'; th0.textContent = opts.corner || ''; hr.appendChild(th0);
     opts.cols.forEach(function (c) { var th = document.createElement('th'); th.textContent = c.label; th.title = c.title || c.label; hr.appendChild(th); });
@@ -555,7 +677,8 @@
           if (best && best === c.id) td.classList.add('hm-best');
           td.tabIndex = 0;
           td.addEventListener('pointermove', function (e) { showTip(e, opts.title ? opts.title(r, c) : r.label + ' · ' + c.label, [{ label: opts.valueLabel || 'مقدار', value: fmt(v) }]); });
-          td.addEventListener('pointerleave', hideTip);
+          td.addEventListener('pointerenter', function () { cross(ci + 1, tr); });
+          td.addEventListener('pointerleave', function () { hideTip(); cross(null); });
           if (opts.onClick) { td.classList.add('clickable'); td.addEventListener('click', function () { hideTip(); opts.onClick(r, c); }); }
         }
         tr.appendChild(td);
@@ -723,5 +846,5 @@
       '</svg><div class="ring-v" style="font-size:' + (opts.fontSize || Math.round(size / 4.4)) + 'px">' + (opts.label || IBP.fmt.pct(v, 0)) + '</div></div>';
   }
 
-  IBP.charts = { line: line, hbars: hbars, columns: columns, waterfall: waterfall, tornado: tornado, heatmap: heatmap, scaleColor: scaleColor, labelsOn: labelsOn, scatter: scatter, donut: donut, sparkline: sparkline, ring: ring, showTip: showTip, hideTip: hideTip, niceTicks: niceTicks, seriesColor: seriesColor, resolveColor: resolveColor };
+  IBP.charts = { line: line, hbars: hbars, columns: columns, waterfall: waterfall, tornado: tornado, flows: flows, heatmap: heatmap, scaleColor: scaleColor, labelsOn: labelsOn, scatter: scatter, donut: donut, sparkline: sparkline, ring: ring, showTip: showTip, hideTip: hideTip, niceTicks: niceTicks, seriesColor: seriesColor, resolveColor: resolveColor };
 })(window.IBP = window.IBP || {});

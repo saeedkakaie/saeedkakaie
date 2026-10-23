@@ -6,6 +6,7 @@
 
   /* ---------------- آیکون‌ها (خطی ۲۴×۲۴) ---------------- */
   var ICONS = {
+    focus: '<path d="M4 9V5a1 1 0 0 1 1-1h4"/><path d="M15 4h4a1 1 0 0 1 1 1v4"/><path d="M20 15v4a1 1 0 0 1-1 1h-4"/><path d="M9 20H5a1 1 0 0 1-1-1v-4"/><circle cx="12" cy="12" r="2.5"/>',
     dashboard: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     cycle: '<path d="M21 12a9 9 0 0 1-15.5 6.2"/><path d="M3 12A9 9 0 0 1 18.5 5.8"/><path d="M18 2v4h-4"/><path d="M6 22v-4h4"/>',
     database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
@@ -217,6 +218,10 @@
     (opts.tools || []).forEach(function (t) { tools.appendChild(t); });
     if (opts.exportFn) tools.appendChild(excelIconButton(opts.exportFn, opts.exportLabel));
     var el = h('section.card' + (opts.span ? '.span-' + opts.span : '') + (opts.cls ? '.' + opts.cls : ''), head, body);
+    // دکمه تمرکز: نمایش همین تحلیل در صفحه کامل با انیمیشن
+    if (opts.focus !== false && IBP.motion) {
+      tools.appendChild(h('button.icon-btn.focus-btn', { type: 'button', title: 'تمرکز روی این تحلیل', 'aria-label': 'تمرکز روی ' + (opts.title || 'تحلیل'), html: icon('focus', 16), onclick: function () { IBP.motion.focus(el); } }));
+    }
     return { el: el, body: body, tools: tools, head: head };
   }
   function excelIconButton(fn, label) {
