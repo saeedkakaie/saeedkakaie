@@ -172,6 +172,13 @@
   /* ---------------- فایل ---------------- */
   function download(filename, content, mime) {
     var blob = content instanceof Blob ? content : new Blob([content], { type: mime || 'text/plain;charset=utf-8' });
+    // نسخه اندروید: پیوند دانلود در WebView کار نمی‌کند؛ فایل از طریق پل برنامه در پوشه Downloads ذخیره می‌شود
+    if (window.IBPAndroid && window.IBPAndroid.saveFile) {
+      var rd = new FileReader();
+      rd.onload = function () { window.IBPAndroid.saveFile(filename, blob.type || mime || 'application/octet-stream', String(rd.result).split(',')[1] || ''); };
+      rd.readAsDataURL(blob);
+      return;
+    }
     var url = URL.createObjectURL(blob);
     var a = h('a', { href: url, download: filename });
     document.body.appendChild(a); a.click(); a.remove();
