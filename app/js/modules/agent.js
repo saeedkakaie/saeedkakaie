@@ -127,7 +127,7 @@
       C.hbars(box, { items: v.items.map(function (it, i) { return { label: it.label, value: div(it.value) || 0, color: it.value < 0 ? 'var(--critical)' : C.seriesColor(v.items.length > 8 ? 0 : i), sub: [it.share !== undefined && it.share !== null ? { label: 'سهم از کل', value: F.pct(it.share, 1) } : null, it.note ? { label: 'توضیح', value: it.note } : null].filter(Boolean) }; }),
         format: fmt, valueLabel: unit || 'مقدار',
         onClick: v.drill && onAsk ? function (it) { onAsk('روند و فصلی بودن ' + it.label); } : null });
-      if (v.drill) card.body.appendChild(h('div.agent-hint', { html: icon('target', 13) + '<span>روی هر ردیف کلیک کنید تا روند همان مورد تحلیل شود</span>' }));
+      if (v.drill) card.body.appendChild(h('div.agent-hint', { html: icon('target', 13) + '<span>کلیک روی ردیف = روند همان مورد</span>' }));
     } else if (v.type === 'donut') {
       C.donut(box, { items: v.items.map(function (it, i) { return { label: it.label, value: div(it.value), color: C.seriesColor(i) }; }), format: fmt, valueLabel: unit || 'تعداد', size: 170 });
     } else if (v.type === 'waterfall') {
@@ -255,7 +255,7 @@
     main.appendChild(thread);
     var ta = h('textarea', { rows: 1, placeholder: 'مثلاً: چرا فروش فرمی در ۳ ماه اخیر کم شد؟ یا: اگر قیمت مواد ۱۵ درصد بالا برود سود چه می‌شود؟', 'aria-label': 'پرسش' });
     var send = h('button.btn.btn-primary.agent-send', { type: 'submit', html: icon('play', 16) + '<span>بپرس</span>' });
-    var form = h('form.agent-composer', h('div.ac-box', ta, send), h('div.ac-hint', m === 'claude' ? 'Claude نتایج تجمیعی ابزارها را از طریق موتور به سرویس Anthropic می‌فرستد · Enter ارسال، Shift+Enter خط جدید' : 'مدل داخلی بدون اینترنت و درون همین برنامه کار می‌کند · Enter ارسال، Shift+Enter خط جدید'));
+    var form = h('form.agent-composer', h('div.ac-box', ta, send), m === 'claude' ? h('div.ac-hint', 'نتایج تجمیعی تحلیل به Claude (Anthropic) فرستاده می‌شود') : null);
     main.appendChild(form);
     state.els = { thread: thread, ta: ta, send: send };
 
@@ -305,7 +305,6 @@
       var hero = h('div.agent-empty',
         h('div.ae-orb', { html: icon('bot', 34) }),
         h('h3', 'از داده‌های ' + (S.settings().companyName || 'شرکت') + ' بپرسید'),
-        h('p', 'فروش، سود، روند و فصلی بودن، علت تغییرات، دقت پیش‌بینی، ظرفیت و کمبود، موجودی، سناریوهای «اگر…» و مقایسه شرکت‌های هلدینگ.'),
         h('div.ae-groups', EXAMPLES.map(function (g) { return h('div.ae-group', h('div.ae-gt', g.g), g.q.map(function (q) { return h('button.chip', { type: 'button', onclick: function () { ask(q); } }, q); })); })));
       thread.appendChild(hero);
     } else {
@@ -316,7 +315,7 @@
     }
 
     // ستون کناری: بینش‌های سریع
-    var insCard = UI.card({ title: 'بینش‌های سریع', sub: 'پویش خودکار داده‌ها · کلیک = تحلیل بیشتر', icon: 'sparkles', cls: 'agent-insights', focus: false,
+    var insCard = UI.card({ title: 'بینش‌های سریع', icon: 'sparkles', cls: 'agent-insights', focus: false,
       exportFn: function () { return exportViews('بینش‌های سریع', [{ type: 'insights', title: 'بینش‌های سریع', items: ins }]); } });
     var ins = [];
     try { ins = AG.insights(); } catch (e) { console.error(e); }
@@ -324,8 +323,8 @@
     side.appendChild(insCard.el);
     var stCard = UI.card({ title: 'موتور پاسخ', icon: 'cpu', focus: false });
     stCard.body.appendChild(h('div.agent-engines',
-      h('div.ae-row', h('span', { html: icon('cpu', 15) }), h('div', h('b', 'مدل داخلی'), h('div.muted', 'فهم پرسش فارسی، ۱۱ ابزار تحلیلی، روایت و پیشنهاد؛ بدون اینترنت')), h('span', { html: UI.statusBadge('good', 'فعال') })),
-      h('div.ae-row', h('span', { html: icon('sparkles', 15) }), h('div', h('b', 'Claude'), h('div.muted', cs.ok ? 'مدل ' + cs.model + ' با همان ابزارها؛ تحلیل آزادتر و چندمرحله‌ای' : cs.text)), h('span', { html: UI.statusBadge(cs.ok ? 'good' : 'neutral', cs.ok ? 'آماده' : 'غیرفعال') }))));
+      h('div.ae-row', h('span', { html: icon('cpu', 15) }), h('div', h('b', 'مدل داخلی'), h('div.muted', 'بدون اینترنت')), h('span', { html: UI.statusBadge('good', 'فعال') })),
+      h('div.ae-row', h('span', { html: icon('sparkles', 15) }), h('div', h('b', 'Claude'), h('div.muted', cs.ok ? cs.model : cs.text)), h('span', { html: UI.statusBadge(cs.ok ? 'good' : 'neutral', cs.ok ? 'آماده' : 'غیرفعال') }))));
     if (!cs.ok) stCard.body.appendChild(h('button.btn.btn-sm', { type: 'button', html: icon('info', 14) + '<span>راه‌اندازی Claude</span>', onclick: function () { claudeHelp(cs); } }));
     side.appendChild(stCard.el);
 

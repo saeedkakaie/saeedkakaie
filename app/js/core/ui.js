@@ -216,11 +216,13 @@
    */
   function card(opts) {
     opts = opts || {};
+    // توضیح بلند زیر عنوان به‌جای متن، در نشانه ⓘ (با نگه داشتن نشانگر) نمایش داده می‌شود
+    var longSub = !!(opts.sub && String(opts.sub).length > 48);
     var body = h('div.card-body' + (opts.flush ? '.flush' : ''));
     var tools = h('div.card-tools');
     var head = h('div.card-head',
       opts.icon ? h('div.card-icon', { html: icon(opts.icon, 17) }) : null,
-      h('div', h('h3.card-title', opts.title || ''), opts.sub ? h('div.card-sub', opts.sub) : null),
+      h('div', h('h3.card-title', opts.title || '', longSub ? h('span.card-info', { title: opts.sub, 'aria-label': opts.sub, html: icon('info', 14) }) : null), opts.sub && !longSub ? h('div.card-sub', opts.sub) : null),
       tools);
     (opts.tools || []).forEach(function (t) { tools.appendChild(t); });
     if (opts.exportFn) tools.appendChild(excelIconButton(opts.exportFn, opts.exportLabel));
@@ -279,7 +281,7 @@
   /** عنوان صفحه. opts: { title, desc, actions:[elements], badge(html) } */
   function pageHead(opts) {
     return h('div.page-head',
-      h('div', h('h2', { html: IBP.fmt.escape(opts.title) + (opts.badge ? ' ' + opts.badge : '') }), opts.desc ? h('p', opts.desc) : null),
+      h('div', h('h2', { html: IBP.fmt.escape(opts.title) + (opts.badge ? ' ' + opts.badge : '') })),
       h('div.actions', opts.actions || []));
   }
 

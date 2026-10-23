@@ -52,20 +52,22 @@
     });
     var last = H.lastCompany();
 
+    var admin = !IBP.server.active() || IBP.server.isAdmin();
     var wrap = h('div.gate-wrap');
     wrap.appendChild(h('header.gate-head',
       IBP.flag({ width: 104, height: 72, title: 'گروه زر' }),
       h('div', h('div.gate-title', H.holdingName()), h('div.gate-sub', 'Integrated Business Planning · برنامه‌ریزی یکپارچه شرکت‌های هلدینگ')),
       h('div.gate-actions',
-        h('button.btn', { type: 'button', html: icon('edit', 16) + '<span>نام هلدینگ</span>', onclick: function () {
+        IBP.server.user() ? h('button.btn', { type: 'button', html: icon('users', 16) + '<span>' + F.escape(IBP.server.user().name || IBP.server.user().username) + '</span>', title: 'خروج از حساب', onclick: function () { IBP.server.logout(); } }) : null,
+        !admin ? null : h('button.btn', { type: 'button', html: icon('edit', 16) + '<span>نام هلدینگ</span>', onclick: function () {
           var inp = h('input', { type: 'text', value: H.holdingName() });
           UI.modal({ title: 'نام هلدینگ', body: h('div.field', h('label', 'نام'), inp), actions: [{ label: 'انصراف' }, { label: 'ذخیره', primary: true, onClick: function () { H.setHoldingName(inp.value.trim() || H.holdingName()).then(render); } }] });
         } }),
-        h('button.btn', { type: 'button', title: 'بازیابی همه شرکت‌ها از فایل پشتیبان کامل هلدینگ (مثلاً از نسخه مرورگری)', html: icon('upload', 16) + '<span>بازیابی پشتیبان</span>', onclick: function () { restoreHolding().then(function (n) { if (n) render(); }); } }),
-        h('button.btn.btn-primary', { type: 'button', html: icon('plus', 16) + '<span>افزودن شرکت</span>', onclick: function () { companyForm(null, render); } }))));
+        !admin ? null : h('button.btn', { type: 'button', title: 'بازیابی همه شرکت‌ها از فایل پشتیبان کامل هلدینگ', html: icon('upload', 16) + '<span>بازیابی پشتیبان</span>', onclick: function () { restoreHolding().then(function (n) { if (n) render(); }); } }),
+        !admin ? null : h('button.btn.btn-primary', { type: 'button', html: icon('plus', 16) + '<span>افزودن شرکت</span>', onclick: function () { companyForm(null, render); } }))));
 
     wrap.appendChild(h('section.hero', { style: { marginBottom: '22px' } },
-      h('div', h('h2', 'نمای تلفیقی هلدینگ'), h('p', F.num(list.length) + ' شرکت تولیدی · هر شرکت IBP و منطق برنامه‌ریزی خودش را دارد · فروش درون‌گروهی از رقم تلفیقی حذف شده است')),
+      h('div', h('h2', 'نمای تلفیقی هلدینگ'), h('p', F.num(list.length) + ' شرکت')),
       h('div.hero-stats',
         h('div.hero-stat', h('div.v', F.compact(tot.rev)), h('div.l', 'فروش ۱۲ ماه بیرون از گروه (ریال)')),
         h('div.hero-stat', h('div.v', F.num(tot.tons)), h('div.l', 'تناژ فروش ۱۲ ماه (تن)')),
@@ -91,8 +93,8 @@
           s.critical ? h('span', { html: UI.statusBadge('critical', F.num(s.critical) + ' بحرانی') }) : h('span', { html: UI.statusBadge('good', 'بدون استثنای بحرانی') }),
           s.cycleSteps ? h('span.cell-sub', 'چرخه ' + J.label(s.cycle) + ': ' + F.num(s.cycleDone) + '/' + F.num(s.cycleSteps)) : null,
           h('span.spacer'),
-          h('button.icon-btn', { type: 'button', title: 'ویرایش', 'aria-label': 'ویرایش شرکت', html: icon('edit', 16), onclick: function (e) { e.stopPropagation(); companyForm(c, render); } }),
-          h('button.icon-btn.danger', { type: 'button', title: 'حذف', 'aria-label': 'حذف شرکت', html: icon('trash', 16), onclick: function (e) {
+          !admin ? null : h('button.icon-btn', { type: 'button', title: 'ویرایش', 'aria-label': 'ویرایش شرکت', html: icon('edit', 16), onclick: function (e) { e.stopPropagation(); companyForm(c, render); } }),
+          !admin ? null : h('button.icon-btn.danger', { type: 'button', title: 'حذف', 'aria-label': 'حذف شرکت', html: icon('trash', 16), onclick: function (e) {
             e.stopPropagation();
             UI.confirm('شرکت «' + c.name + '» و همه داده‌های آن برای همیشه حذف می‌شود.', { danger: true, ok: 'حذف شرکت', title: 'حذف شرکت' }).then(function (ok) { if (ok) H.remove(c.id).then(render); });
           } }),
@@ -101,10 +103,15 @@
       card.addEventListener('keydown', function (e) { if (e.key === 'Enter') enter(c.id); });
       grid.appendChild(card);
     });
-    grid.appendChild(h('button.card.gate-card.gate-add', { type: 'button', onclick: function () { companyForm(null, render); } },
-      h('div.dz-icon', { html: icon('plus', 26) }), h('div.gc-name', 'افزودن شرکت'), h('div.gc-sub', 'با داده نمونه یکی از الگوها یا بدون داده')));
+    if (admin) grid.appendChild(h('button.card.gate-card.gate-add', { type: 'button', onclick: function () { companyForm(null, render); } },
+      h('div.dz-icon', { html: icon('plus', 26) }), h('div.gc-name', 'افزودن شرکت')));
+    if (admin && !list.length && IBP.server.active()) grid.appendChild(h('button.card.gate-card.gate-add', { type: 'button', onclick: function (e) {
+      var b = e.currentTarget; b.disabled = true; b.querySelector('.gc-name').textContent = 'در حال ساخت…';
+      H.createDemo(function (msg) { b.querySelector('.gc-name').textContent = msg; }).then(render, function (er) { UI.toast(er.message, 'error'); render(); });
+    } }, h('div.dz-icon', { html: icon('sparkles', 26) }), h('div.gc-name', 'شرکت‌های نمونه گروه زر')));
+    if (!admin && !list.length) grid.appendChild(h('div.card', h('div.card-body', 'به هیچ شرکتی دسترسی ندارید؛ با مدیر سیستم تماس بگیرید.')));
     wrap.appendChild(grid);
-    wrap.appendChild(h('div.gate-foot', 'نسخه ' + IBP.APP.version + ' · ' + J.longDate() + ' · داده‌های هر شرکت در پایگاه داده جداگانه روی همین رایانه ذخیره می‌شود'));
+    wrap.appendChild(h('div.gate-foot', 'نسخه ' + IBP.APP.version + ' · ' + J.longDate() + (IBP.server.active() ? ' · ' + IBP.server.base() : '')));
     el.appendChild(wrap);
     var first = el.querySelector('.gate-card.last') || el.querySelector('.gate-card');
     if (first) first.focus();

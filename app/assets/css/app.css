@@ -1153,3 +1153,49 @@ a.score-tile:hover { transform: translateY(-3px); box-shadow: var(--shadow-hover
   .msg-user .bubble { max-width: 92%; }
   .ae-groups { grid-template-columns: 1fr; }
 }
+
+/* ===== سرور مرکزی: ورود، کاربران، سوابق (فاز ۹) ===== */
+.login { position: fixed; inset: 0; z-index: 900; display: grid; place-items: center; padding: 16px; background: radial-gradient(1200px 600px at 80% -10%, rgba(37, 99, 235, .18), transparent), radial-gradient(900px 500px at -10% 110%, rgba(250, 178, 25, .16), transparent), var(--page); overflow: auto; }
+.login-card { width: min(420px, 100%); display: flex; flex-direction: column; gap: 12px; padding: 26px 24px; border-radius: 22px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 30px 60px -30px rgba(15, 23, 42, .45); }
+.login-head { display: flex; align-items: center; gap: 14px; margin-bottom: 6px; }
+.login-title { font-size: 19px; font-weight: 800; }
+.login-sub { font-size: 12px; color: var(--muted); font-family: 'Segoe UI', Tahoma, sans-serif; }
+.login-step { font-weight: 700; font-size: 13.5px; color: var(--accent-strong); }
+.login-field { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--text-2); }
+.login-field input { padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: 14px var(--font); }
+.login-field input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.login-btn { justify-content: center; padding: 11px; border-radius: 12px; font-size: 14px; }
+.login-alt { align-self: center; }
+.login-error { color: var(--critical-text); font-size: 12.5px; min-height: 1em; }
+.login-error:empty { display: none; }
+.login-hint { font-size: 11.5px; color: var(--muted); line-height: 1.9; }
+.login-server { font-size: 11px; color: var(--muted); text-align: center; font-family: 'Segoe UI', Tahoma, sans-serif; }
+.user-chip { display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: 500 12.5px var(--font); cursor: pointer; }
+.user-chip[hidden] { display: none; }
+.user-chip:hover { border-color: var(--accent); color: var(--text); }
+.uc-ro { font-size: 10.5px; padding: 1px 7px; border-radius: 999px; background: var(--warning-soft); color: var(--warning-text); }
+.user-menu { min-width: 240px; display: flex; flex-direction: column; gap: 6px; padding: 4px; font-size: 12.5px; }
+.um-head { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.um-head span { color: var(--muted); font-size: 11.5px; }
+.um-row { display: flex; justify-content: space-between; gap: 10px; color: var(--text-2); }
+.um-item { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 9px; border: 0; background: none; color: var(--text); font: 13px var(--font); cursor: pointer; text-decoration: none; text-align: right; }
+.um-item:hover { background: var(--surface-2); }
+.users-table tr.inactive td { opacity: .55; }
+.role-badge { padding: 2px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; background: var(--surface-2); }
+.role-admin { background: rgba(124, 58, 237, .12); color: #6d28d9; }
+.role-editor { background: var(--accent-soft); color: var(--accent-strong); }
+.role-viewer { background: var(--neutral-soft); color: var(--text-2); }
+.chk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 6px 14px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2); }
+.chk { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; cursor: pointer; }
+.chk.all { grid-column: 1 / -1; font-weight: 600; }
+.user-form { display: flex; flex-direction: column; gap: 12px; }
+.audit-table td { font-size: 12.5px; vertical-align: top; }
+.audit-table td.nowrap { white-space: nowrap; }
+.audit-detail { color: var(--text-2); max-width: 520px; line-height: 1.8; }
+.act { padding: 1px 8px; border-radius: 8px; background: var(--surface-2); font-size: 11.5px; white-space: nowrap; }
+.act-insert { background: var(--good-soft); color: var(--good-text); }
+.act-delete, .act-clear, .act-clear_all, .act-company_delete { background: var(--critical-soft); color: var(--critical-text); }
+.act-update, .act-meta_update { background: var(--accent-soft); color: var(--accent-strong); }
+@media (max-width: 640px) { .user-chip .uc-name { display: none; } }
+.card-info { display: inline-flex; vertical-align: middle; margin-inline-start: 6px; color: var(--muted); cursor: help; opacity: .75; }
+.card-info:hover { opacity: 1; color: var(--accent-strong); }

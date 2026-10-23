@@ -175,6 +175,15 @@
     });
     return pending;
   }
+  /** نگهبان دسترسی (حالت سرور): پیش از هر تغییر؛ پیام خطا یا null */
+  var guardFn = null;
+  function check(kind, name) {
+    var msg = guardFn ? guardFn(kind, name) : null;
+    if (!msg) return;
+    if (IBP.ui) IBP.ui.toast(msg, 'warning');
+    var e = new Error(msg); e.forbidden = true;
+    throw e;
+  }
   function emit(evt) {
     S.version++;
     listeners.forEach(function (cb) { try { cb(evt); } catch (e) { console.error(e); } });
@@ -183,6 +192,9 @@
   var S = {
     version: 0,
     adapterKind: function () { return adapter ? adapter.kind : null; },
+    adapter: function () { return adapter; },
+    setGuard: function (fn) { guardFn = fn; },
+    canWrite: function (kind, name) { return !guardFn || !guardFn(kind, name); },
 
     LEGACY_DB: DB_NAME,
     dbName: function () { return adapter ? adapter.name : null; },
@@ -190,6 +202,7 @@
       if (adapter && adapter.close) { var old = adapter; pending = pending.then(function () { old.close(); }); }
       adapter = customAdapter || new IndexedDBAdapter();
       return adapter.open().catch(function (e) {
+        if (adapter.kind === 'server') throw e;
         console.warn('IndexedDB unavailable, using memory store', e);
         adapter = new MemoryAdapter();
         return adapter.open();
@@ -231,6 +244,7 @@
 
     /* ----- نوشتن ----- */
     insert: function (entity, rec) {
+      check('entity', entity);
       ensure(entity);
       rec = Object.assign({}, rec);
       if (!rec.id) rec.id = uid();
@@ -242,6 +256,7 @@
       return rec;
     },
     update: function (entity, id, patch) {
+      check('entity', entity);
       var r = S.get(entity, id);
       if (!r) throw new Error('رکورد یافت نشد');
       Object.assign(r, patch, { id: id });
@@ -251,6 +266,7 @@
       return r;
     },
     remove: function (entity, ids) {
+      check('entity', entity);
       ids = Array.isArray(ids) ? ids : [ids];
       var set = new Set(ids);
       data[entity] = data[entity].filter(function (r) { return !set.has(r.id); });
@@ -260,6 +276,7 @@
     },
     /** درج یا جایگزینی گروهی (برای ورود داده و تولید داده تستی) */
     bulkUpsert: function (entity, recs, opts) {
+      check('entity', entity);
       ensure(entity);
       recs.forEach(function (rec) {
         if (!rec.id) rec.id = uid();
@@ -273,6 +290,7 @@
       return stored;
     },
     replaceAll: function (entity, recs, opts) {
+      check('entity', entity);
       ensure(entity);
       recs.forEach(function (r) { if (!r.id) r.id = uid(); });
       data[entity] = recs;
@@ -281,6 +299,7 @@
       if (!opts || !opts.silent) emit({ type: 'replace', entity: entity });
     },
     clearAll: function () {
+      check('clearAll');
       data = {}; index = {}; codeIndex = {};
       IBP.schema.keys().forEach(ensure);
       meta = { settings: Object.assign({}, DEFAULT_SETTINGS, { cyclePeriod: IBP.jalali.currentPeriod() }) };
@@ -288,10 +307,32 @@
       emit({ type: 'clear' });
     },
     touch: function () { emit({ type: 'bulk' }); },
+    /** اعمال تغییرات کاربران دیگر (حالت سرور) بدون نوشتن دوباره */
+    applyRemote: function (records, metaChanges) {
+      var byEntity = {};
+      (records || []).forEach(function (x) { (byEntity[x.entity] = byEntity[x.entity] || []).push(x); });
+      Object.keys(byEntity).forEach(function (e) {
+        ensure(e);
+        var del = new Set(byEntity[e].filter(function (x) { return x.deleted; }).map(function (x) { return x.id; }));
+        if (del.size) data[e] = data[e].filter(function (r) { return !del.has(r.id); });
+        byEntity[e].forEach(function (x) {
+          if (x.deleted || !x.data) return;
+          var cur = index[e].get(x.id);
+          if (cur && !del.has(x.id)) { Object.keys(cur).forEach(function (k) { delete cur[k]; }); Object.assign(cur, x.data); }
+          else data[e].push(x.data);
+        });
+        rebuild(e);
+      });
+      Object.keys(metaChanges || {}).forEach(function (k) {
+        meta[k] = k === 'settings' ? Object.assign({}, DEFAULT_SETTINGS, metaChanges[k] || {}) : metaChanges[k];
+      });
+      emit({ type: 'remote' });
+    },
 
     /* ----- تنظیمات و متادیتا ----- */
     settings: function () { return meta.settings || DEFAULT_SETTINGS; },
     saveSettings: function (patch) {
+      check('meta', 'settings');
       meta.settings = Object.assign({}, S.settings(), patch);
       var v = meta.settings;
       queue(function (a) { return a.setMeta('settings', v); });
@@ -300,6 +341,12 @@
     },
     meta: function (key) { return meta[key]; },
     setMeta: function (key, value) {
+      // نتیجه محاسبات (کش) برای کاربر بدون اجازه ویرایش فقط در حافظه می‌ماند
+      if (guardFn && guardFn('meta', key) && !(IBP.server && IBP.server.isCacheMeta(key))) {
+        meta[key] = value;
+        if (IBP.ui) IBP.ui.toast(guardFn('meta', key) + ' (فقط در همین نشست نگه داشته می‌شود)', 'warning');
+        return;
+      }
       meta[key] = value;
       queue(function (a) { return a.setMeta(key, value); });
     },

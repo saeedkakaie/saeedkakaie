@@ -1,6 +1,6 @@
 """موتور تحلیل پایتون Integrated Business Planning."""
 
-__version__ = "0.7.0"
+__version__ = "0.9.0"
 
 import os as _os
 

@@ -120,7 +120,7 @@
         : IBP.ui.statusBadge('neutral', e.status === 'unknown' ? 'در حال بررسی' : 'متصل نیست');
     }
     drawStatus();
-    root.appendChild(section('موتور تحلیل پایتون', 'تحلیل‌های پیشرفته (تجزیه روند و فصل، آزمون روند، خوشه‌بندی) و خروجی Excel همراه با نمودار',
+    root.appendChild(section('موتور تحلیل پایتون', '',
       h('div',
         h('div.settings-grid', field('نشانی موتور', engineUrl, 'پیش‌فرض: http://127.0.0.1:8765'), field('وضعیت اتصال', statusEl)),
         h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '14px' } },
@@ -128,11 +128,10 @@
             S.saveSettings({ engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765' });
             IBP.engine.check().then(function (ok) { drawStatus(); IBP.ui.toast(ok ? 'موتور پایتون متصل است' : 'موتور پایتون پاسخ نمی‌دهد', ok ? 'success' : 'warning'); });
           } })),
-        window.ibpDesktop ? h('div.hint', { style: { marginTop: '12px' } }, 'در نسخه رومیزی، موتور همراه برنامه نصب شده و خودکار اجرا می‌شود؛ مدیریت آن در بخش «نسخه رومیزی ویندوز» است.') : h('div.engine-panel', { style: { marginTop: '14px' } },
+        window.ibpDesktop || IBP.server.active() ? null : h('div.engine-panel', { style: { marginTop: '14px' } },
           h('div.ep-icon', { html: icon('python', 22) }),
           h('div', { style: { flex: 1, minWidth: '240px' } },
-            h('div.ep-t', 'راه‌اندازی موتور روی ویندوز'),
-            h('div.ep-d', { html: '۱. پایتون ۳٫۱۰ یا جدیدتر را نصب کنید. ۲. در پوشه <code>engine</code> فایل <code>start_engine.bat</code> را اجرا کنید (بار اول کتابخانه‌ها نصب می‌شوند). ۳. پنجره را باز بگذارید؛ برنامه به‌طور خودکار متصل می‌شود. در نسخه نصبی ویندوز (فاز ۸) این مرحله خودکار است.' })))), 'python'));
+            h('div.ep-d', { html: 'اجرا: <code>engine/start_engine.bat</code>' })))), 'python'));
 
     /* ---------------- نسخه رومیزی ویندوز (فقط داخل برنامه نصبی) ---------------- */
     if (window.ibpDesktop) root.appendChild(desktopSection());
@@ -171,10 +170,7 @@
 
     /* ---------------- درباره ---------------- */
     root.appendChild(section('درباره نرم‌افزار', 'Integrated Business Planning · نسخه ' + IBP.APP.version,
-      h('div', { style: { lineHeight: '2', fontSize: '13px', color: 'var(--text-2)' } },
-        h('div', 'محل ذخیره داده: ' + (S.adapterKind() === 'memory' ? 'حافظه موقت مرورگر (با بستن برنامه پاک می‌شود)' : 'پایگاه داده محلی (IndexedDB) روی همین رایانه')),
-        h('div', 'معماری: رابط کاربری HTML/JavaScript بدون وابستگی اینترنتی · لایه داده قابل تعویض با سرور · موتور تحلیل پایتون و دستیار هوشمند در فازهای بعد')), 'info'));
-    root.appendChild(IBP.roadmap.phaseTable());
+      h('div', { style: { fontSize: '13px', color: 'var(--text-2)' } }, 'محل ذخیره داده: ' + (IBP.server.active() ? 'سرور مرکزی ' + IBP.server.base() : S.adapterKind() === 'memory' ? 'حافظه موقت' : 'همین رایانه')), 'info'));
   }
 
   /** بخش نسخه رومیزی: موتور همراه، کلید Claude (ذخیره رمزنگاری‌شده در پوسته)، به‌روزرسانی و پوشه داده‌ها */
@@ -198,13 +194,12 @@
         h('button.btn', { type: 'button', html: icon('report', 16) + '<span>گزارش موتور</span>', onclick: function () { D.openEngineLog(); } }),
         h('button.btn', { type: 'button', html: icon('database', 16) + '<span>باز کردن پوشه داده‌ها</span>', onclick: function () { D.openDataFolder(); } })));
       body.appendChild(h('h4', { style: { margin: '18px 0 6px' } }, 'کلید Claude برای دستیار هوشمند'));
-      body.appendChild(h('div.hint', 'کلید با رمزنگاری ویندوز در پوشه داده‌ها ذخیره و فقط به موتور تحلیل داده می‌شود؛ این صفحه هرگز آن را نمی‌خواند. وضعیت: ' + (info.claudeConfigured ? 'تنظیم شده' : 'تنظیم نشده')));
+      body.appendChild(h('div.hint', info.claudeConfigured ? 'تنظیم شده' : 'تنظیم نشده'));
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' } },
         h('div', { style: { flex: '1', minWidth: '260px' } }, keyIn),
         h('button.btn.btn-primary', { type: 'button', html: icon('check', 16) + '<span>ذخیره کلید</span>', onclick: act(function () { if (!keyIn.value.trim()) throw new Error('کلید را وارد کنید'); var k = keyIn.value; keyIn.value = ''; return D.setClaudeKey(k).then(function () { return IBP.engine.check(); }); }, 'کلید ذخیره شد و موتور دوباره اجرا شد') }),
         info.claudeConfigured ? h('button.btn.btn-danger-ghost', { type: 'button', html: icon('trash', 16) + '<span>حذف کلید</span>', onclick: act(function () { return D.setClaudeKey('').then(function () { return IBP.engine.check(); }); }, 'کلید حذف شد') }) : null));
       body.appendChild(h('h4', { style: { margin: '18px 0 6px' } }, 'به‌روزرسانی'));
-      body.appendChild(h('div.hint', 'فایل‌های خروجی ساخت نسخه جدید (Setup.exe، latest.yml و blockmap) را در یک پوشه وب داخلی قرار دهید و نشانی آن را اینجا وارد کنید؛ برنامه نسخه جدید را دریافت و پس از تأیید نصب می‌کند. داده‌ها حفظ می‌شوند.'));
       body.appendChild(h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' } },
         h('div', { style: { flex: '1', minWidth: '260px' } }, urlIn),
         h('label', { style: { display: 'inline-flex', gap: '6px', alignItems: 'center', fontSize: '13px' } }, auto, 'بررسی خودکار هنگام اجرا'),

@@ -11,6 +11,8 @@
   var timer = null;
 
   function url() {
+    // حالت سرور: تحلیل‌ها روی همان سرور مرکزی و با نشست کاربر اجرا می‌شوند
+    if (IBP.server && IBP.server.active()) return IBP.server.base();
     var s = IBP.store ? IBP.store.settings() : {};
     return String(s.engineUrl || 'http://127.0.0.1:8765').replace(/\/+$/, '');
   }
@@ -19,13 +21,18 @@
     state.status = st; state.info = info || null; state.error = err || null; state.checkedAt = Date.now();
     if (changed) listeners.forEach(function (cb) { try { cb(state); } catch (e) { console.error(e); } });
   }
+  function authHeaders(h) {
+    var st = IBP.server && IBP.server.active() ? IBP.server.state() : null;
+    if (st && st.token) h.Authorization = 'Bearer ' + st.token;
+    return h;
+  }
   function request(path, opts) {
     opts = opts || {};
     var ctrl = window.AbortController ? new AbortController() : null;
     var to = setTimeout(function () { if (ctrl) ctrl.abort(); }, opts.timeout || 30000);
     return fetch(url() + path, {
       method: opts.body ? 'POST' : 'GET',
-      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      headers: authHeaders(opts.body ? { 'Content-Type': 'application/json' } : {}),
       body: opts.body ? JSON.stringify(opts.body) : undefined,
       signal: ctrl ? ctrl.signal : undefined
     }).then(function (r) {
@@ -65,7 +72,7 @@
       opts = opts || {};
       var ctrl = window.AbortController ? new AbortController() : null;
       var to = setTimeout(function () { if (ctrl) ctrl.abort(); }, opts.timeout || 60000);
-      return fetch(url() + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}), signal: ctrl ? ctrl.signal : undefined })
+      return fetch(url() + path, { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }), body: JSON.stringify(body || {}), signal: ctrl ? ctrl.signal : undefined })
         .then(function (r) { clearTimeout(to); if (!r.ok) throw new Error('خطای موتور (' + r.status + ')'); return r.blob(); },
           function (e) { clearTimeout(to); setStatus('offline', null, e.message); throw new Error('اتصال به موتور برقرار نشد'); });
     },

@@ -55,7 +55,7 @@
     stage.className = 'focus-stage';
     var bar = document.createElement('div');
     bar.className = 'focus-bar';
-    bar.innerHTML = '<span class="focus-hint">' + IBP.ui.icon('target', 15) + '<span>حالت تمرکز · با کشیدن روی نمودار بزرگ‌نمایی کنید · Esc برای بازگشت</span></span>';
+    bar.innerHTML = '<span class="focus-hint">' + IBP.ui.icon('target', 15) + '<span>حالت تمرکز · Esc</span></span>';
     var close = document.createElement('button');
     close.type = 'button'; close.className = 'btn btn-sm'; close.innerHTML = IBP.ui.icon('x', 15) + '<span>بستن</span>';
     close.addEventListener('click', unfocus);

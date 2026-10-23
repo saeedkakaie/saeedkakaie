@@ -33,12 +33,22 @@
     tx.objectStore('kv').put({ key: key, value: value });
     return new Promise(function (res, rej) { tx.oncomplete = res; tx.onerror = function () { rej(tx.error); }; });
   }
+  function srv() { return !!(IBP.server && IBP.server.active()); }
+  function coPath(code, p) { return '/api/companies/' + encodeURIComponent(String(code).toUpperCase()) + (p || ''); }
   function persist() {
+    if (srv()) {
+      // در حالت سرور فقط خلاصه‌های تازه شرکت‌ها فرستاده می‌شود (فهرست شرکت‌ها در خود سرور است)
+      return Promise.all(state.companies.filter(function (c) { return c.summary && c._sent !== c.summary; }).map(function (c) {
+        var sm = c.summary;
+        return IBP.server.api('PUT', coPath(c.code, '/summary'), sm).then(function () { c._sent = sm; }, function () { /* بدون دسترسی */ });
+      }));
+    }
     return Promise.all([writeKV('holding', state.holding), writeKV('companies', state.companies)]);
   }
   function dbNameFor(code) { return 'ibp-co-' + String(code).toLowerCase().replace(/[^a-z0-9_-]/g, '_'); }
 
   function adapterFor(c) {
+    if (srv()) return new IBP.store.adapters.ApiAdapter(c.code);
     return memoryOnly ? new IBP.store.adapters.MemoryAdapter() : new IBP.store.adapters.IndexedDBAdapter(c.dbName);
   }
 
@@ -115,6 +125,15 @@
     current: function () { return state.current; },
 
     init: function (progress) {
+      if (srv()) {
+        return IBP.server.api('GET', '/api/holding').then(function (h) {
+          state.holding = { name: h.name || IBP.templates.HOLDING.name, version: h.version || IBP.templates.VERSION };
+          if (!h.name && IBP.server.isAdmin()) IBP.server.api('PUT', '/api/holding', { name: state.holding.name, version: state.holding.version }).catch(function () {});
+          state.companies = (h.companies || []).map(function (c) {
+            return { id: 'srv-' + c.code.toLowerCase(), code: c.code, name: c.name || c.code, templateId: c.templateId || '', activity: c.activity || '', model: c.model || '', createdAt: c.createdAt, dbName: 'server:' + c.code, summary: c.summary, _sent: c.summary };
+          });
+        });
+      }
       return openReg().then(function () { return Promise.all([readKV('holding'), readKV('companies')]); }).then(function (r) {
         state.holding = r[0] || { name: IBP.templates.HOLDING.name, version: IBP.templates.VERSION };
         state.companies = r[1] || [];
@@ -170,10 +189,10 @@
       if (!code) return Promise.reject(new Error('کد شرکت الزامی است'));
       if (H.byCode(code)) return Promise.reject(new Error('کد «' + code + '» تکراری است'));
       var tplInfo = info.templateId ? IBP.templates.find(info.templateId) : null;
-      var c = { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, name: info.name || code, templateId: info.templateId || '', activity: info.activity || '', model: info.businessModel || (tplInfo ? tplInfo.model : '') || 'B2C', dbName: dbNameFor(code), createdAt: new Date().toISOString() };
-      state.companies.push(c);
+      var c = { id: (srv() ? 'srv-' : 'co-') + code.toLowerCase() + (srv() ? '' : '-' + Date.now().toString(36)), code: code, name: info.name || code, templateId: info.templateId || '', activity: info.activity || '', model: info.businessModel || (tplInfo ? tplInfo.model : '') || 'B2C', dbName: srv() ? 'server:' + code : dbNameFor(code), createdAt: new Date().toISOString() };
       var S = IBP.store;
-      return S.init(adapterFor(c)).then(function () {
+      var reg = srv() ? IBP.server.api('POST', '/api/companies', { code: code, name: c.name, templateId: c.templateId, activity: c.activity, model: c.model, createdAt: c.createdAt }) : Promise.resolve();
+      return reg.then(function () { state.companies.push(c); return S.init(adapterFor(c)); }).then(function () {
         var tpl = info.templateId ? IBP.templates.get(info.templateId) : null;
         S.saveSettings({ companyName: c.name, companyCode: c.code, industry: tpl ? tpl.name : (info.activity || ''), templateId: info.templateId || '', businessModel: info.businessModel || (tpl ? tpl.model : '') || 'B2C' });
         if (opts.seed && tpl) return IBP.seed.load({ templateId: tpl.id, companyName: c.name, companyCode: c.code, cyclePeriod: IBP.jalali.currentPeriod() });
@@ -184,6 +203,7 @@
         c.industry = S.settings().industry;
         return persist();
       }).then(function () { return c; }, function (err) {
+        if (srv() && H.get(c.id)) return c; // شرکت روی سرور ساخته شده؛ خطا در داده نمونه
         state.companies = state.companies.filter(function (x) { return x.id !== c.id; });
         return persist().then(function () { throw err; });
       });
@@ -193,6 +213,14 @@
       var c = H.get(id);
       if (!c) return Promise.reject(new Error('شرکت یافت نشد'));
       if (patch.code && patch.code.toUpperCase() !== c.code && H.byCode(patch.code)) return Promise.reject(new Error('کد تکراری است'));
+      if (srv()) {
+        if (patch.code && patch.code.toUpperCase() !== c.code) return Promise.reject(new Error('کد شرکت روی سرور قابل تغییر نیست'));
+        return IBP.server.api('PUT', coPath(c.code), { name: patch.name || c.name, model: patch.model || c.model, activity: patch.activity !== undefined ? patch.activity : c.activity }).then(function () {
+          Object.assign(c, patch, { code: c.code });
+          if (state.current && state.current.id === id) IBP.store.saveSettings({ companyName: c.name, businessModel: c.model || 'B2C' });
+          return c;
+        });
+      }
       Object.assign(c, patch, patch.code ? { code: patch.code.toUpperCase() } : {});
       if (state.current && state.current.id === id) IBP.store.saveSettings({ companyName: c.name, companyCode: c.code, businessModel: c.model || 'B2C' });
       return persist().then(function () { return c; });
@@ -200,12 +228,16 @@
     remove: function (id) {
       var c = H.get(id);
       if (!c) return Promise.resolve();
+      if (srv()) return IBP.server.api('DELETE', coPath(c.code)).then(function () { state.companies = state.companies.filter(function (x) { return x.id !== id; }); });
       state.companies = state.companies.filter(function (x) { return x.id !== id; });
       return persist().then(function () {
         if (window.indexedDB) return new Promise(function (res) { var r = window.indexedDB.deleteDatabase(c.dbName); r.onsuccess = r.onerror = r.onblocked = function () { res(); }; });
       });
     },
-    setHoldingName: function (name) { state.holding.name = name; return persist(); },
+    setHoldingName: function (name) {
+      state.holding.name = name;
+      return srv() ? IBP.server.api('PUT', '/api/holding', { name: name }) : persist();
+    },
 
     /** ورود به فضای کاری یک شرکت */
     enter: function (id) {
@@ -246,6 +278,11 @@
         IBP.schema.keys().forEach(function (k) { data[k] = IBP.store.all(k); });
         return Promise.resolve({ company: c, records: data, settings: IBP.store.settings(), meta: { icRequests: IBP.store.meta('icRequests') } });
       }
+      if (srv()) {
+        return IBP.server.api('GET', coPath(c.code, '/data')).then(function (d) {
+          return { company: c, records: d.records, settings: Object.assign(IBP.store.defaultSettings(), (d.meta || {}).settings || {}), meta: d.meta || {} };
+        }, function () { return null; });
+      }
       if (memoryOnly) return Promise.resolve(null);
       var a = new IBP.store.adapters.IndexedDBAdapter(c.dbName);
       return a.open().then(function () { return a.loadAll(); }).then(function (d) {
@@ -263,6 +300,7 @@
         chain = chain.then(function () {
           if (progress) progress(c, i, n);
           if (state.current && state.current.id === c.id) { var e = IBP.store.exportAll(); return { meta: e.meta, data: e.data }; }
+          if (srv()) return IBP.server.api('GET', coPath(c.code, '/data')).then(function (d) { return { meta: d.meta, data: d.records }; });
           if (memoryOnly) return null;
           var a = new IBP.store.adapters.IndexedDBAdapter(c.dbName);
           return a.open().then(function () { return a.loadAll(); }).then(function (d) { a.close(); return { meta: d.meta, data: d.records }; });
@@ -281,19 +319,22 @@
           var info = x.info || {}, code = String(info.code || '').trim().toUpperCase();
           if (!code || !x.data) return null;
           if (progress) progress(info, i, obj.companies.length);
-          var c = H.byCode(code);
+          var c = H.byCode(code), reg = Promise.resolve();
+          var fields = { name: info.name || (c && c.name) || code, templateId: info.templateId || '', activity: info.activity || '', model: info.model || (c && c.model) || 'B2C' };
           if (!c) {
-            c = { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, dbName: dbNameFor(code), createdAt: info.createdAt || new Date().toISOString() };
+            c = srv() ? { id: 'srv-' + code.toLowerCase(), code: code, dbName: 'server:' + code, createdAt: info.createdAt || new Date().toISOString() }
+              : { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, dbName: dbNameFor(code), createdAt: info.createdAt || new Date().toISOString() };
+            if (srv()) reg = IBP.server.api('POST', '/api/companies', Object.assign({ code: code, createdAt: c.createdAt }, fields));
             state.companies.push(c);
-          }
-          Object.assign(c, { name: info.name || c.name || code, templateId: info.templateId || '', activity: info.activity || '', model: info.model || c.model || 'B2C' });
-          return S.init(adapterFor(c)).then(function () { return S.importAll({ data: x.data, meta: x.meta }); }).then(function () {
+          } else if (srv()) reg = IBP.server.api('PUT', coPath(code), fields);
+          Object.assign(c, fields);
+          return reg.then(function () { return S.init(adapterFor(c)); }).then(function () { return S.importAll({ data: x.data, meta: x.meta }); }).then(function () {
             c.summary = summarize(); c.industry = S.settings().industry;
           });
         });
       });
       return chain.then(function () {
-        if (obj.holding && obj.holding.name) state.holding.name = obj.holding.name;
+        if (obj.holding && obj.holding.name) { state.holding.name = obj.holding.name; if (srv()) return IBP.server.api('PUT', '/api/holding', { name: obj.holding.name }).then(persist); }
         return persist();
       }).then(function () {
         if (cur && H.get(cur.id)) return H.enter(cur.id);

@@ -6,7 +6,7 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.8.0', phase: 8 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.9.0', phase: 9 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
@@ -35,15 +35,16 @@
     },
     {
       group: 'تصمیم‌گیری', items: [
-        { route: 'review', label: 'بازنگری مدیریت', icon: 'review', badge: 'جدید' },
-        { route: 'reports', label: 'گزارش‌ها', icon: 'report', badge: 'جدید' },
+        { route: 'review', label: 'بازنگری مدیریت', icon: 'review' },
+        { route: 'reports', label: 'گزارش‌ها', icon: 'report' },
         { route: 'agent', label: 'دستیار هوشمند', icon: 'bot', badge: 'AI' }
       ]
     },
     {
       group: 'سیستم', items: [
         { route: 'settings', label: 'تنظیمات', icon: 'settings' },
-        { route: 'users', label: 'کاربران و دسترسی', icon: 'users', phase: 9 }
+        { route: 'users', label: 'کاربران و دسترسی', icon: 'users' },
+        { route: 'audit', label: 'سوابق تغییرات', icon: 'clock' }
       ]
     }
   ];
@@ -94,13 +95,14 @@
     els.cycleChip = h('a.cycle-chip', { href: '#/cycle', title: 'چرخه برنامه‌ریزی' });
     els.companyChip = h('button.company-chip', { type: 'button', title: 'تغییر شرکت', onclick: switchCompany });
     els.theme = h('button.tb-btn', { type: 'button', 'aria-label': 'تغییر پوسته روشن و تیره', onclick: toggleTheme });
+    els.userChip = h('button.user-chip', { type: 'button', hidden: true, onclick: function () { userMenu(); } });
     els.bell = h('button.tb-btn', { type: 'button', 'aria-label': 'اعلان‌ها', onclick: function () { showNotifications(); } });
     var search = h('button.search-trigger', { type: 'button', 'aria-label': 'جستجو و فرمان', onclick: function () { IBP.palette.open(); },
-      html: icon('search', 16) + '<span class="st-label">جستجو در صفحه‌ها، محصولات و فرمان‌ها…</span><span class="kbd">Ctrl K</span>' });
+      html: icon('search', 16) + '<span class="st-label">جستجو…</span><span class="kbd">Ctrl K</span>' });
     var top = h('header.topbar',
       h('button.tb-btn.menu-btn', { type: 'button', 'aria-label': 'منو', html: icon('menu'), onclick: function () { app.classList.toggle('nav-open'); } }),
       h('div', els.crumb, els.title),
-      h('div.topbar-actions', els.companyChip, search, els.cycleChip, h('span.today-chip', J.longDate()), els.bell, els.theme)
+      h('div.topbar-actions', els.companyChip, search, els.cycleChip, h('span.today-chip', J.longDate()), els.bell, els.userChip, els.theme)
     );
     els.content = h('main.content', { id: 'content', tabindex: '-1' });
     main.appendChild(top); main.appendChild(els.content);
@@ -109,6 +111,20 @@
     app.appendChild(main);
     els.app = app;
     document.getElementById('root').appendChild(app);
+  }
+
+  /** منوی کاربر (حالت سرور) */
+  function userMenu() {
+    var u = IBP.server.user();
+    if (!u) return;
+    var areas = IBP.server.areas();
+    var body = h('div.user-menu',
+      h('div.um-head', h('b', u.name || u.username), h('span', u.username + ' · ' + IBP.server.roleLabel(u.role))),
+      h('div.um-row', h('span', 'شرکت‌ها'), h('span', u.companies.indexOf('*') >= 0 ? 'همه' : u.companies.join('، ') || '—')),
+      u.role === 'editor' ? h('div.um-row', h('span', 'ویرایش'), h('span', u.areas.map(function (a) { return areas[a] || a; }).join('، ') || '—')) : null,
+      h('a.um-item', { href: '#/users', html: icon('lock', 15) + '<span>تغییر رمز عبور</span>', onclick: function () { IBP.ui.closePopover(); } }),
+      h('button.um-item', { type: 'button', html: icon('x', 15) + '<span>خروج از حساب</span>', onclick: function () { IBP.holding.saveSummary().then(function () { IBP.server.logout(); }); } }));
+    IBP.ui.popover(els.userChip, body);
   }
 
   function toggleCollapse() {
@@ -128,7 +144,10 @@
     els.brandSub.textContent = IBP.holding.holdingName();
     els.cycleChip.innerHTML = icon('calendar', 16) + '<span class="cc-label">چرخه</span><strong>' + J.label(st.cyclePeriod) + '</strong>';
     var kind = S.adapterKind();
-    els.storeLine.innerHTML = '<span class="dot ' + (kind === 'memory' ? 'warn' : 'on') + '"></span><span class="status-text">' + (kind === 'memory' ? 'ذخیره موقت' : 'پایگاه داده محلی') + '</span>';
+    els.storeLine.innerHTML = '<span class="dot ' + (kind === 'memory' ? 'warn' : 'on') + '"></span><span class="status-text">' + (kind === 'memory' ? 'ذخیره موقت' : kind === 'server' ? 'سرور مرکزی' : 'پایگاه داده محلی') + '</span>';
+    var u = IBP.server.user();
+    els.userChip.hidden = !u;
+    if (u) els.userChip.innerHTML = icon('users', 16) + '<span class="uc-name">' + F.escape(u.name || u.username) + '</span>' + (IBP.server.readOnly() ? '<span class="uc-ro">فقط مشاهده</span>' : '');
     updateEngine();
     updateBell();
     applyThemeIcon();
@@ -137,7 +156,7 @@
     var es = IBP.engine.state();
     var on = es.status === 'online';
     els.engineLine.innerHTML = '<span class="dot ' + (on ? 'on' : 'off') + '"></span><span class="status-text">موتور پایتون: ' + (on ? 'متصل' : es.status === 'unknown' ? 'در حال بررسی' : 'غیرفعال') + '</span>';
-    els.engineLine.title = on ? 'نسخه ' + (es.info && es.info.version) : 'برای تحلیل پیشرفته، موتور پایتون را اجرا کنید (تنظیمات)';
+    els.engineLine.title = on ? 'نسخه ' + (es.info && es.info.version) : 'موتور پایتون اجرا نشده است';
   }
   function updateBell() {
     var n = 0;
@@ -264,8 +283,25 @@
     buildShell();
     var bootEl = document.getElementById('boot');
     var bootText = bootEl ? bootEl.querySelector('.boot-text') : null;
-    IBP.engine.startWatch();
-    IBP.holding.init(function (msg) { if (bootText) bootText.textContent = msg; }).then(function () {
+    var hideBoot = function () { if (bootEl) bootEl.style.display = 'none'; };
+    // حالت سرور: پیش از هر چیز ورود کاربر
+    IBP.server.detect().then(function (active) {
+      if (!active) {
+        if (IBP.server.error()) { hideBoot(); return IBP.login.unreachable(IBP.server.error()); }
+        return null;
+      }
+      return IBP.server.restore().then(function (u) {
+        if (u) return u;
+        hideBoot();
+        return IBP.login.show();
+      }).then(function () {
+        if (bootEl) bootEl.style.display = '';
+        IBP.server.startSync();
+      });
+    }).then(function () {
+      IBP.engine.startWatch();
+      return IBP.holding.init(function (msg) { if (bootText) bootText.textContent = msg; });
+    }).then(function () {
       var sid = IBP.holding.sessionCompany();
       if (sid && IBP.holding.get(sid)) return IBP.holding.enter(sid).then(function () { enterCompany(); });
       IBP.gate.show();
