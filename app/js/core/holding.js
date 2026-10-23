@@ -255,6 +255,53 @@
     },
     summarize: summarize,
 
+    /** پشتیبان کامل هلدینگ: همه شرکت‌ها با داده، تنظیمات و سوابق (برای انتقال به نسخه رومیزی یا رایانه دیگر) */
+    exportHolding: function (progress) {
+      var out = { app: 'Integrated Business Planning', format: 2, kind: 'holding', version: IBP.APP && IBP.APP.version, exportedAt: new Date().toISOString(), holding: { name: H.holdingName() }, companies: [] };
+      var chain = Promise.resolve(), n = state.companies.length;
+      state.companies.forEach(function (c, i) {
+        chain = chain.then(function () {
+          if (progress) progress(c, i, n);
+          if (state.current && state.current.id === c.id) { var e = IBP.store.exportAll(); return { meta: e.meta, data: e.data }; }
+          if (memoryOnly) return null;
+          var a = new IBP.store.adapters.IndexedDBAdapter(c.dbName);
+          return a.open().then(function () { return a.loadAll(); }).then(function (d) { a.close(); return { meta: d.meta, data: d.records }; });
+        }).then(function (x) {
+          if (x) out.companies.push({ info: { code: c.code, name: c.name, templateId: c.templateId || '', activity: c.activity || '', model: c.model || '', createdAt: c.createdAt }, meta: x.meta, data: x.data });
+        });
+      });
+      return chain.then(function () { return out; });
+    },
+    /** بازیابی پشتیبان کامل هلدینگ؛ شرکت‌های هم‌کد جایگزین و بقیه دست‌نخورده می‌مانند */
+    importHolding: function (obj, progress) {
+      if (!obj || obj.kind !== 'holding' || !Array.isArray(obj.companies)) return Promise.reject(new Error('این فایل پشتیبان کامل هلدینگ نیست'));
+      var cur = state.current, chain = Promise.resolve(), S = IBP.store;
+      obj.companies.forEach(function (x, i) {
+        chain = chain.then(function () {
+          var info = x.info || {}, code = String(info.code || '').trim().toUpperCase();
+          if (!code || !x.data) return null;
+          if (progress) progress(info, i, obj.companies.length);
+          var c = H.byCode(code);
+          if (!c) {
+            c = { id: 'co-' + code.toLowerCase() + '-' + Date.now().toString(36), code: code, dbName: dbNameFor(code), createdAt: info.createdAt || new Date().toISOString() };
+            state.companies.push(c);
+          }
+          Object.assign(c, { name: info.name || c.name || code, templateId: info.templateId || '', activity: info.activity || '', model: info.model || c.model || 'B2C' });
+          return S.init(adapterFor(c)).then(function () { return S.importAll({ data: x.data, meta: x.meta }); }).then(function () {
+            c.summary = summarize(); c.industry = S.settings().industry;
+          });
+        });
+      });
+      return chain.then(function () {
+        if (obj.holding && obj.holding.name) state.holding.name = obj.holding.name;
+        return persist();
+      }).then(function () {
+        if (cur && H.get(cur.id)) return H.enter(cur.id);
+        state.current = null;
+        return null;
+      }).then(function () { return obj.companies.length; });
+    },
+
     /** به‌روزرسانی خلاصه همه شرکت‌ها (هر شرکت در فضای کاری خودش محاسبه می‌شود) و بازگشت به شرکت جاری */
     refreshAll: function (progress) {
       var cur = state.current, chain = Promise.resolve();

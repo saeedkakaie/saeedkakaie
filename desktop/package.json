@@ -1,0 +1,111 @@
+{
+  "name": "zar-ibp-desktop",
+  "productName": "Zar IBP",
+  "version": "0.8.0",
+  "description": "برنامه‌ریزی یکپارچه کسب‌وکار (IBP) هلدینگ گروه زر — نسخه رومیزی ویندوز",
+  "author": "Zar Group",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "prepare:python": "python scripts/prepare_python.py",
+    "dist": "python scripts/prepare_python.py && node scripts/build.js",
+    "dist:only": "node scripts/build.js"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
+  },
+  "devDependencies": {
+    "electron": "43.7.9",
+    "electron-builder": "26.17.0"
+  },
+  "build": {
+    "appId": "ir.zargroup.ibp",
+    "productName": "Zar IBP",
+    "copyright": "Zar Group",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "package.json",
+      "build/icon.png"
+    ],
+    "extraResources": [
+      {
+        "from": "../app",
+        "to": "app",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../engine",
+        "to": "engine",
+        "filter": [
+          "**/*",
+          "!**/__pycache__/**",
+          "!**/*.pyc",
+          "!.venv/**",
+          "!tests/**",
+          "!conftest.py",
+          "!start_engine.*",
+          "!.pytest_cache/**"
+        ]
+      },
+      {
+        "from": "build/python",
+        "to": "python",
+        "filter": [
+          "**/*",
+          "!.ibp-stamp"
+        ]
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Zar-IBP-Setup-${version}.${ext}",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "IBP گروه زر",
+      "uninstallDisplayName": "IBP گروه زر ${version}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerLanguages": [
+        "fa_IR"
+      ],
+      "language": "1065",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true,
+      "warningsAsErrors": false
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://localhost/ibp-updates"
+      }
+    ],
+    "toolsets": {
+      "nsis": "1.2.1"
+    }
+  }
+}

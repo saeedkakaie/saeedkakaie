@@ -61,6 +61,7 @@
           var inp = h('input', { type: 'text', value: H.holdingName() });
           UI.modal({ title: 'نام هلدینگ', body: h('div.field', h('label', 'نام'), inp), actions: [{ label: 'انصراف' }, { label: 'ذخیره', primary: true, onClick: function () { H.setHoldingName(inp.value.trim() || H.holdingName()).then(render); } }] });
         } }),
+        h('button.btn', { type: 'button', title: 'بازیابی همه شرکت‌ها از فایل پشتیبان کامل هلدینگ (مثلاً از نسخه مرورگری)', html: icon('upload', 16) + '<span>بازیابی پشتیبان</span>', onclick: function () { restoreHolding().then(function (n) { if (n) render(); }); } }),
         h('button.btn.btn-primary', { type: 'button', html: icon('plus', 16) + '<span>افزودن شرکت</span>', onclick: function () { companyForm(null, render); } }))));
 
     wrap.appendChild(h('section.hero', { style: { marginBottom: '22px' } },
@@ -129,6 +130,31 @@
     el.classList.add('hidden');
     document.body.classList.remove('gate-open');
   }
+
+  /* ---------------- پشتیبان کامل هلدینگ (همه شرکت‌ها) ---------------- */
+  function backupHolding() {
+    UI.toast('در حال تهیه پشتیبان همه شرکت‌ها…', 'info');
+    return IBP.holding.exportHolding().then(function (obj) {
+      var t = J.today();
+      UI.download('IBP-holding-backup-' + t.jy + '-' + String(t.jm).padStart(2, '0') + '-' + String(t.jd).padStart(2, '0') + '.json', JSON.stringify(obj), 'application/json');
+      UI.toast('پشتیبان ' + F.num(obj.companies.length) + ' شرکت آماده شد', 'success');
+    }, function (e) { UI.toast(e.message, 'error'); });
+  }
+  function restoreHolding() {
+    return UI.pickFile('.json').then(function (f) {
+      if (!f) return 0;
+      var obj;
+      try { obj = JSON.parse(f.text); } catch (e) { UI.toast('فایل پشتیبان قابل خواندن نیست', 'error'); return 0; }
+      if (!obj || obj.kind !== 'holding') { UI.toast('این فایل پشتیبان کامل هلدینگ نیست؛ پشتیبان یک شرکت را از «تنظیمات» همان شرکت بازیابی کنید.', 'warning'); return 0; }
+      var names = obj.companies.map(function (c) { return (c.info && c.info.name) || '?'; }).join('، ');
+      return UI.confirm('داده‌های ' + F.num(obj.companies.length) + ' شرکت (' + names + ') از فایل «' + f.name + '» بازیابی می‌شود؛ شرکت‌های هم‌کد جایگزین می‌شوند و بقیه شرکت‌ها دست نمی‌خورند.', { danger: true, ok: 'بازیابی', title: 'بازیابی پشتیبان هلدینگ' }).then(function (ok) {
+        if (!ok) return 0;
+        UI.toast('در حال بازیابی…', 'info');
+        return IBP.holding.importHolding(obj).then(function (n) { UI.toast('داده‌های ' + F.num(n) + ' شرکت بازیابی شد', 'success'); return n; }, function (e) { UI.toast(e.message, 'error'); return 0; });
+      });
+    });
+  }
+  IBP.holdingBackup = { backup: backupHolding, restore: restoreHolding };
 
   IBP.gate = { show: show, hide: hide, render: function () { if (el && !el.classList.contains('hidden')) render(); } };
 })(window.IBP = window.IBP || {});

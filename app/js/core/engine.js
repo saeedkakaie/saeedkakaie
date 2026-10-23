@@ -76,5 +76,8 @@
     }
   };
 
+  // نسخه رومیزی: پوسته پس از آماده شدن موتور همراه خبر می‌دهد تا بی‌درنگ متصل شویم
+  if (window.ibpDesktop && window.ibpDesktop.onEngine) window.ibpDesktop.onEngine(function (st) { if (st && st.status === 'online') E.check(); });
+
   IBP.engine = E;
 })(window.IBP = window.IBP || {});

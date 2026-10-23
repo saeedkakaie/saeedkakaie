@@ -1,0 +1,10 @@
+# نسخه‌های آزموده‌شده بسته‌های موتور برای نسخه نصبی ویندوز (همان engine/requirements.txt با نسخه ثابت)
+anthropic==2.1.0
+fastapi==0.161.0
+numpy==2.5.4
+openpyxl==3.1.5
+pandas==3.1.0
+scikit-learn==1.9.1
+scipy==1.18.1
+statsmodels==0.15.0
+uvicorn==0.54.0

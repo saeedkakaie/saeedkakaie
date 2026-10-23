@@ -128,11 +128,14 @@
             S.saveSettings({ engineUrl: engineUrl.value.trim() || 'http://127.0.0.1:8765' });
             IBP.engine.check().then(function (ok) { drawStatus(); IBP.ui.toast(ok ? 'موتور پایتون متصل است' : 'موتور پایتون پاسخ نمی‌دهد', ok ? 'success' : 'warning'); });
           } })),
-        h('div.engine-panel', { style: { marginTop: '14px' } },
+        window.ibpDesktop ? h('div.hint', { style: { marginTop: '12px' } }, 'در نسخه رومیزی، موتور همراه برنامه نصب شده و خودکار اجرا می‌شود؛ مدیریت آن در بخش «نسخه رومیزی ویندوز» است.') : h('div.engine-panel', { style: { marginTop: '14px' } },
           h('div.ep-icon', { html: icon('python', 22) }),
           h('div', { style: { flex: 1, minWidth: '240px' } },
             h('div.ep-t', 'راه‌اندازی موتور روی ویندوز'),
             h('div.ep-d', { html: '۱. پایتون ۳٫۱۰ یا جدیدتر را نصب کنید. ۲. در پوشه <code>engine</code> فایل <code>start_engine.bat</code> را اجرا کنید (بار اول کتابخانه‌ها نصب می‌شوند). ۳. پنجره را باز بگذارید؛ برنامه به‌طور خودکار متصل می‌شود. در نسخه نصبی ویندوز (فاز ۸) این مرحله خودکار است.' })))), 'python'));
+
+    /* ---------------- نسخه رومیزی ویندوز (فقط داخل برنامه نصبی) ---------------- */
+    if (window.ibpDesktop) root.appendChild(desktopSection());
 
     /* ---------------- پشتیبان‌گیری ---------------- */
     var counts = IBP.schema.keys().map(function (k) { return S.count(k); }).reduce(function (a, b) { return a + b; }, 0);
@@ -147,6 +150,7 @@
             if (!f) return;
             var obj;
             try { obj = JSON.parse(f.text); } catch (e) { IBP.ui.toast('فایل پشتیبان قابل خواندن نیست', 'error'); return; }
+            if (obj && obj.kind === 'holding') { IBP.ui.toast('این فایل پشتیبان کامل هلدینگ است؛ از دکمه «بازیابی پشتیبان هلدینگ» استفاده کنید.', 'warning'); return; }
             IBP.ui.confirm('همه داده‌های فعلی با محتوای فایل «' + f.name + '» جایگزین می‌شود. ادامه می‌دهید؟', { danger: true, ok: 'بازیابی' }).then(function (ok) {
               if (!ok) return;
               try { S.importAll(obj).then(function () { IBP.ui.toast('بازیابی انجام شد', 'success'); IBP.app.refresh(); }); }
@@ -154,6 +158,8 @@
             });
           });
         } }),
+        h('button.btn', { type: 'button', title: 'همه شرکت‌های هلدینگ در یک فایل؛ برای انتقال به نسخه رومیزی یا رایانه دیگر', html: icon('layers', 16) + '<span>پشتیبان کامل هلدینگ</span>', onclick: function () { IBP.holdingBackup.backup(); } }),
+        h('button.btn', { type: 'button', html: icon('upload', 16) + '<span>بازیابی پشتیبان هلدینگ</span>', onclick: function () { IBP.holdingBackup.restore().then(function (n) { if (n) IBP.app.refresh(); }); } }),
         h('button.btn.btn-danger-ghost', { type: 'button', html: icon('trash', 16) + '<span>حذف همه داده‌ها</span>', onclick: function () {
           IBP.ui.confirm('همه داده‌ها برای همیشه حذف می‌شوند. پیش از این کار از داده‌ها پشتیبان بگیرید.', { danger: true, ok: 'حذف همه', title: 'حذف همه داده‌ها' }).then(function (ok) {
             if (!ok) return;
@@ -169,6 +175,44 @@
         h('div', 'محل ذخیره داده: ' + (S.adapterKind() === 'memory' ? 'حافظه موقت مرورگر (با بستن برنامه پاک می‌شود)' : 'پایگاه داده محلی (IndexedDB) روی همین رایانه')),
         h('div', 'معماری: رابط کاربری HTML/JavaScript بدون وابستگی اینترنتی · لایه داده قابل تعویض با سرور · موتور تحلیل پایتون و دستیار هوشمند در فازهای بعد')), 'info'));
     root.appendChild(IBP.roadmap.phaseTable());
+  }
+
+  /** بخش نسخه رومیزی: موتور همراه، کلید Claude (ذخیره رمزنگاری‌شده در پوسته)، به‌روزرسانی و پوشه داده‌ها */
+  function desktopSection() {
+    var D = window.ibpDesktop, body = h('div', h('div.muted', 'در حال خواندن وضعیت…'));
+    var sec = section('نسخه رومیزی ویندوز', 'موتور تحلیل همراه، کلید Claude، به‌روزرسانی و پوشه داده‌ها', body, 'cpu');
+    var ENG = { online: ['good', 'فعال'], starting: ['warning', 'در حال اجرا'], stopping: ['neutral', 'در حال توقف'], stopped: ['neutral', 'متوقف'], error: ['critical', 'خطا'] };
+    function draw(info) {
+      body.textContent = '';
+      var e = info.engine || {}, eb = ENG[e.status] || ['neutral', e.status || '—'];
+      var keyIn = h('input', { type: 'password', dir: 'ltr', autocomplete: 'off', placeholder: info.claudeConfigured ? '•••••••• (تنظیم شده؛ برای تغییر کلید جدید وارد کنید)' : 'sk-ant-…' });
+      var urlIn = h('input', { type: 'url', dir: 'ltr', value: info.updateUrl || '', placeholder: 'http://server/ibp-updates' });
+      var auto = h('input', { type: 'checkbox' }); auto.checked = info.autoCheckUpdates !== false;
+      var act = function (fn, ok) { return function () { var b = this; b.disabled = true; Promise.resolve().then(fn).then(function (r) { if (ok) IBP.ui.toast(ok, 'success'); return D.info().then(draw); }, function (err) { IBP.ui.toast(String(err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'error'); }).then(function () { b.disabled = false; }); }; };
+      body.appendChild(h('div.settings-grid',
+        field('نسخه برنامه', h('div', { html: '<b>' + F.escape(info.version) + '</b> <span class="cell-sub">Electron ' + F.escape(info.electron) + '</span>' })),
+        field('موتور تحلیل همراه', h('div', { html: IBP.ui.statusBadge(eb[0], eb[1]) + (e.external ? ' <span class="cell-sub">موتور جداگانه روی همین رایانه</span>' : '') + (e.error ? '<div class="hint">' + F.escape(e.error) + '</div>' : '') })),
+        field('پوشه داده‌ها', h('div', { dir: 'ltr', style: { fontSize: '12px', wordBreak: 'break-all' } }, info.dataDir))));
+      body.appendChild(h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '12px' } },
+        h('button.btn', { type: 'button', html: icon('refresh', 16) + '<span>اجرای دوباره موتور</span>', onclick: act(function () { return D.restartEngine().then(function () { return IBP.engine.check(); }); }, 'موتور دوباره اجرا شد') }),
+        h('button.btn', { type: 'button', html: icon('report', 16) + '<span>گزارش موتور</span>', onclick: function () { D.openEngineLog(); } }),
+        h('button.btn', { type: 'button', html: icon('database', 16) + '<span>باز کردن پوشه داده‌ها</span>', onclick: function () { D.openDataFolder(); } })));
+      body.appendChild(h('h4', { style: { margin: '18px 0 6px' } }, 'کلید Claude برای دستیار هوشمند'));
+      body.appendChild(h('div.hint', 'کلید با رمزنگاری ویندوز در پوشه داده‌ها ذخیره و فقط به موتور تحلیل داده می‌شود؛ این صفحه هرگز آن را نمی‌خواند. وضعیت: ' + (info.claudeConfigured ? 'تنظیم شده' : 'تنظیم نشده')));
+      body.appendChild(h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' } },
+        h('div', { style: { flex: '1', minWidth: '260px' } }, keyIn),
+        h('button.btn.btn-primary', { type: 'button', html: icon('check', 16) + '<span>ذخیره کلید</span>', onclick: act(function () { if (!keyIn.value.trim()) throw new Error('کلید را وارد کنید'); var k = keyIn.value; keyIn.value = ''; return D.setClaudeKey(k).then(function () { return IBP.engine.check(); }); }, 'کلید ذخیره شد و موتور دوباره اجرا شد') }),
+        info.claudeConfigured ? h('button.btn.btn-danger-ghost', { type: 'button', html: icon('trash', 16) + '<span>حذف کلید</span>', onclick: act(function () { return D.setClaudeKey('').then(function () { return IBP.engine.check(); }); }, 'کلید حذف شد') }) : null));
+      body.appendChild(h('h4', { style: { margin: '18px 0 6px' } }, 'به‌روزرسانی'));
+      body.appendChild(h('div.hint', 'فایل‌های خروجی ساخت نسخه جدید (Setup.exe، latest.yml و blockmap) را در یک پوشه وب داخلی قرار دهید و نشانی آن را اینجا وارد کنید؛ برنامه نسخه جدید را دریافت و پس از تأیید نصب می‌کند. داده‌ها حفظ می‌شوند.'));
+      body.appendChild(h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center', marginTop: '8px' } },
+        h('div', { style: { flex: '1', minWidth: '260px' } }, urlIn),
+        h('label', { style: { display: 'inline-flex', gap: '6px', alignItems: 'center', fontSize: '13px' } }, auto, 'بررسی خودکار هنگام اجرا'),
+        h('button.btn', { type: 'button', html: icon('check', 16) + '<span>ذخیره</span>', onclick: act(function () { return D.setUpdateConfig({ updateUrl: urlIn.value, autoCheckUpdates: auto.checked }); }, 'تنظیمات به‌روزرسانی ذخیره شد') }),
+        h('button.btn', { type: 'button', html: icon('refresh', 16) + '<span>بررسی اکنون</span>', onclick: act(function () { return D.setUpdateConfig({ updateUrl: urlIn.value, autoCheckUpdates: auto.checked }).then(function () { return D.checkUpdates(); }); }) })));
+    }
+    D.info().then(draw, function (e) { body.textContent = 'خطا: ' + e.message; });
+    return sec;
   }
 
   IBP.register('settings', { title: 'تنظیمات', render: render });

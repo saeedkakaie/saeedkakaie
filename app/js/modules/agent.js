@@ -334,6 +334,13 @@
   }
 
   function claudeHelp(cs) {
+    if (window.ibpDesktop) {
+      UI.modal({ title: 'راه‌اندازی Claude', body: h('div', h('p', 'وضعیت فعلی: ' + cs.text), h('ol.agent-help',
+        h('li', 'در «تنظیمات ← نسخه رومیزی ویندوز» کلید API را وارد و ذخیره کنید؛ موتور همراه خودکار دوباره اجرا می‌شود.'),
+        h('li', 'کلید با رمزنگاری ویندوز ذخیره می‌شود و فقط موتور تحلیل از آن استفاده می‌کند؛ برنامه فقط نتایج تجمیعی ابزارها را به Claude می‌فرستد.'))),
+        actions: [{ label: 'بستن' }, { label: 'رفتن به تنظیمات', primary: true, onClick: function () { location.hash = '#/settings'; } }] });
+      return;
+    }
     var steps = cs.reason === 'engine' ? ['موتور تحلیل پایتون را اجرا کنید (پوشه engine، فایل run.py) و در «تنظیمات» آدرس آن را بررسی کنید.'] : [];
     steps.push('بسته anthropic را روی موتور نصب کنید: pip install -r engine/requirements.txt');
     steps.push('کلید API را فقط روی رایانه موتور به‌صورت متغیر محیطی تعریف کنید؛ در ویندوز: setx ANTHROPIC_API_KEY "کلید شما" و سپس موتور را دوباره اجرا کنید.');

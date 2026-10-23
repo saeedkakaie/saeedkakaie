@@ -1,0 +1,102 @@
+# ساخت و آزمون نسخه نصبی ویندوز (فاز ۸) روی رایانه ویندوز واقعی GitHub
+#   ۱) پایتون مستقل و بسته‌های موتور آماده می‌شوند
+#   ۲) همه آزمون‌های موتور با همان پایتونی اجرا می‌شوند که در نصب قرار می‌گیرد
+#   ۳) فایل نصب ساخته، بی‌صدا نصب و اجرا می‌شود و بالا آمدن موتور همراه بررسی می‌شود
+#   ۴) فایل نصب (و فایل‌های به‌روزرسانی) به‌عنوان خروجی کار ذخیره می‌شوند؛ با برچسب v* انتشار (Release) هم ساخته می‌شود
+name: Windows installer
+
+on:
+  push:
+    paths:
+      - "desktop/**"
+      - "app/**"
+      - "engine/**"
+      - ".github/workflows/windows-installer.yml"
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tools
+        run: npm ci --no-audit --no-fund
+
+      - name: Prepare bundled Python
+        run: python scripts/prepare_python.py
+
+      - name: Engine tests with bundled Python
+        run: |
+          $py = Resolve-Path "build\python\python.exe"
+          & $py -E -s -c "import sys, numpy, pandas, scipy, sklearn, statsmodels, fastapi, uvicorn, openpyxl, anthropic; print(sys.version)"
+          if ($LASTEXITCODE) { exit 1 }
+          $tools = Join-Path $env:RUNNER_TEMP "pytest-tools"
+          & $py -m pip install --disable-pip-version-check -q --target $tools pytest httpx
+          $env:PYTHONPATH = $tools
+          Push-Location ..\engine
+          & $py -m pytest -q -p no:cacheprovider tests
+          $rc = $LASTEXITCODE
+          Pop-Location
+          exit $rc
+
+      - name: Build installer
+        run: node scripts/build.js
+
+      - name: Silent install and launch
+        run: |
+          $setup = Get-ChildItem dist -Filter "Zar-IBP-Setup-*.exe" | Select-Object -First 1
+          Write-Host "Installer: $($setup.Name) ($([math]::Round($setup.Length / 1MB)) MB)"
+          Start-Process $setup.FullName -ArgumentList "/S" -Wait
+          $exe = Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Filter "Zar IBP.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $exe) { Write-Error "installed app not found"; exit 1 }
+          Write-Host "Installed: $($exe.FullName)"
+          if (-not (Test-Path (Join-Path $exe.DirectoryName "resources\python\python.exe"))) { Write-Error "bundled python missing"; exit 1 }
+          $app = Start-Process $exe.FullName -PassThru
+          $ok = $false
+          for ($i = 0; $i -lt 90; $i++) {
+            Start-Sleep -Seconds 2
+            try { $h = Invoke-RestMethod "http://127.0.0.1:8765/health" -TimeoutSec 2; $ok = $true; break } catch { }
+          }
+          if ($ok) { Write-Host "Engine started by installed app: version $($h.version), python $($h.python), agent $($h.agent | ConvertTo-Json -Compress)" }
+          $log = Join-Path $env:APPDATA "Zar IBP\logs\engine.log"
+          if (Test-Path $log) { Get-Content $log -Tail 20 }
+          Stop-Process -Id $app.Id -Force -ErrorAction SilentlyContinue
+          Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          if (-not $ok) { Write-Error "engine did not start from the installed app"; exit 1 }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Zar-IBP-Windows
+          path: |
+            desktop/dist/*.exe
+            desktop/dist/*.blockmap
+            desktop/dist/latest.yml
+          retention-days: 30
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem dist -File | Where-Object { $_.Name -match '\.(exe|blockmap)$' -or $_.Name -eq 'latest.yml' } | ForEach-Object { $_.FullName }
+          gh release create $env:GITHUB_REF_NAME @files --title "Zar IBP $env:GITHUB_REF_NAME" --notes "نسخه نصبی ویندوز"

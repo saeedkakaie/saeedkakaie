@@ -6,7 +6,7 @@
 
   var h = IBP.ui.h, icon = IBP.ui.icon, J = IBP.jalali, S = IBP.store, F = IBP.fmt;
 
-  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.7.0', phase: 7 };
+  IBP.APP = { name: 'Integrated Business Planning', short: 'IBP', version: '0.8.0', phase: 8 };
 
   /* ---------------- منوی اصلی ---------------- */
   var NAV = [
