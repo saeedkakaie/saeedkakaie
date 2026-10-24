@@ -75,7 +75,9 @@ def slim() -> None:
                 continue
             shutil.rmtree(d, ignore_errors=True)
             removed += 1
-    for sub in ("Lib/idlelib", "Lib/tkinter", "Lib/turtledemo", "Lib/ensurepip", "tcl"):
+    # ابزارهای توسعه و نصب بسته (pip، فایل‌های سرآیند) برای اجرا لازم نیستند
+    for sub in ("Lib/idlelib", "Lib/tkinter", "Lib/turtledemo", "Lib/ensurepip", "tcl", "include", "libs", "Scripts",
+                "Lib/site-packages/pip", "Lib/lib2to3", "Lib/pydoc_data"):
         p = OUT / sub
         if p.exists():
             shutil.rmtree(p, ignore_errors=True)
@@ -85,6 +87,7 @@ def slim() -> None:
 
 def main() -> None:
     if STAMP.exists() and STAMP.read_text() == stamp_value() and (OUT / "python.exe").exists():
+        slim()
         print("پایتون آماده است (بدون تغییر)")
         return
     download_runtime()

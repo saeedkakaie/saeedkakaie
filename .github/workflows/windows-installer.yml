@@ -89,7 +89,6 @@ jobs:
           name: Zar-IBP-Windows
           path: |
             desktop/dist/*.exe
-            desktop/dist/*.blockmap
             desktop/dist/latest.yml
           retention-days: 30
 
@@ -98,5 +97,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $files = Get-ChildItem dist -File | Where-Object { $_.Name -match '\.(exe|blockmap)$' -or $_.Name -eq 'latest.yml' } | ForEach-Object { $_.FullName }
+          $files = Get-ChildItem dist -File | Where-Object { $_.Name -match '\.exe$' -or $_.Name -eq 'latest.yml' } | ForEach-Object { $_.FullName }
           gh release create $env:GITHUB_REF_NAME @files --title "Zar IBP $env:GITHUB_REF_NAME" --notes "نسخه نصبی ویندوز"

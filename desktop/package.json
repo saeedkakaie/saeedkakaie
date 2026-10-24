@@ -1,7 +1,7 @@
 {
   "name": "zar-ibp-desktop",
   "productName": "Zar IBP",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "برنامه‌ریزی یکپارچه کسب‌وکار (IBP) هلدینگ گروه زر — نسخه رومیزی ویندوز",
   "author": "Zar Group",
   "license": "UNLICENSED",
@@ -69,34 +69,14 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "dir",
           "arch": [
             "x64"
           ]
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Zar-IBP-Setup-${version}.${ext}",
       "requestedExecutionLevel": "asInvoker"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowElevation": true,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "IBP گروه زر",
-      "uninstallDisplayName": "IBP گروه زر ${version}",
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerLanguages": [
-        "fa_IR"
-      ],
-      "language": "1065",
-      "deleteAppDataOnUninstall": false,
-      "runAfterFinish": true,
-      "warningsAsErrors": false
     },
     "publish": [
       {
@@ -106,6 +86,10 @@
     ],
     "toolsets": {
       "nsis": "1.2.1"
-    }
+    },
+    "electronLanguages": [
+      "fa",
+      "en-US"
+    ]
   }
 }
