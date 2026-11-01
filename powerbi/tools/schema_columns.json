@@ -1,0 +1,210 @@
+{
+ "plants": [
+  "id",
+  "code",
+  "name",
+  "city",
+  "workingDays",
+  "active"
+ ],
+ "warehouses": [
+  "id",
+  "code",
+  "name",
+  "plantId",
+  "type",
+  "capacity"
+ ],
+ "resources": [
+  "id",
+  "code",
+  "name",
+  "plantId",
+  "type",
+  "shifts",
+  "hoursPerShift",
+  "efficiency",
+  "costPerHour"
+ ],
+ "families": [
+  "id",
+  "code",
+  "name",
+  "color",
+  "description"
+ ],
+ "products": [
+  "id",
+  "code",
+  "name",
+  "familyId",
+  "plantId",
+  "uom",
+  "unitWeightKg",
+  "unitPrice",
+  "unitCost",
+  "lifecycle",
+  "abc",
+  "xyz",
+  "safetyStockDays",
+  "batchSize",
+  "shelfLifeDays",
+  "launchDate",
+  "phaseOutDate",
+  "successorId",
+  "intercompany",
+  "active"
+ ],
+ "routings": [
+  "id",
+  "productId",
+  "resourceId",
+  "unitsPerHour",
+  "setupHours",
+  "priority"
+ ],
+ "suppliers": [
+  "id",
+  "code",
+  "name",
+  "city",
+  "leadTimeDays",
+  "reliability",
+  "isImport"
+ ],
+ "materials": [
+  "id",
+  "code",
+  "name",
+  "type",
+  "uom",
+  "unitCost",
+  "supplierId",
+  "internalCompany",
+  "internalProductCode",
+  "leadTimeDays",
+  "moq",
+  "safetyStockDays"
+ ],
+ "bom": [
+  "id",
+  "productId",
+  "materialId",
+  "qtyPer",
+  "scrap"
+ ],
+ "channels": [
+  "id",
+  "code",
+  "name",
+  "discount",
+  "internal"
+ ],
+ "regions": [
+  "id",
+  "code",
+  "name",
+  "manager"
+ ],
+ "customers": [
+  "id",
+  "code",
+  "name",
+  "channelId",
+  "regionId",
+  "tier",
+  "creditLimit",
+  "paymentDays"
+ ],
+ "salesActuals": [
+  "id",
+  "period",
+  "productId",
+  "customerId",
+  "qty",
+  "revenue"
+ ],
+ "forecasts": [
+  "id",
+  "version",
+  "cycle",
+  "period",
+  "productId",
+  "qty",
+  "lo",
+  "hi",
+  "method"
+ ],
+ "budgets": [
+  "id",
+  "period",
+  "productId",
+  "qty",
+  "revenue"
+ ],
+ "inventory": [
+  "id",
+  "productId",
+  "warehouseId",
+  "qty",
+  "asOf"
+ ],
+ "materialInventory": [
+  "id",
+  "materialId",
+  "warehouseId",
+  "qty",
+  "onOrder",
+  "asOf"
+ ],
+ "cycleSteps": [
+  "id",
+  "cycle",
+  "order",
+  "name",
+  "owner",
+  "dueDate",
+  "status",
+  "notes"
+ ],
+ "events": [
+  "id",
+  "code",
+  "name",
+  "kind",
+  "startPeriod",
+  "endPeriod",
+  "notes"
+ ],
+ "eventImpacts": [
+  "id",
+  "eventId",
+  "familyId",
+  "uplift",
+  "source"
+ ],
+ "demandAdjustments": [
+  "id",
+  "cycle",
+  "period",
+  "level",
+  "target",
+  "oldQty",
+  "newQty",
+  "reason",
+  "note",
+  "at"
+ ],
+ "actions": [
+  "id",
+  "cycle",
+  "kind",
+  "title",
+  "area",
+  "owner",
+  "dueDate",
+  "priority",
+  "status",
+  "note"
+ ]
+}

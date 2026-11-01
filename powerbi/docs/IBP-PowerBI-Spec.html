@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مشخصات پیاده‌سازی IBP در Power BI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--ink:#1d2433;--muted:#5b6475;--line:#e3e6ec;--accent:#b8860b;--accent-2:#2f5d8a;--code:#f2f4f7;--good:#0b8a0b;--warn:#b57900;--bad:#c23030}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151b;--card:#1a1f27;--ink:#e6e9ef;--muted:#a3abba;--line:#2c3340;--accent:#e0b44a;--accent-2:#7fb0e0;--code:#222833;--good:#5cc85c;--warn:#e6b450;--bad:#ef6b6b}}
+:root[data-theme="dark"]{--bg:#12151b;--card:#1a1f27;--ink:#e6e9ef;--muted:#a3abba;--line:#2c3340;--accent:#e0b44a;--accent-2:#7fb0e0;--code:#222833;--good:#5cc85c;--warn:#e6b450;--bad:#ef6b6b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Vazirmatn,Tahoma,sans-serif;font-size:15px;line-height:1.85}
+.wrap{max-width:1060px;margin:0 auto;padding:24px 16px 80px}
+header.top{border-bottom:3px solid var(--accent);padding-bottom:14px;margin-bottom:22px}
+h1{font-size:26px;margin:0 0 4px;font-weight:800}
+h2{font-size:21px;margin:40px 0 10px;padding-top:8px;border-top:1px solid var(--line);color:var(--accent-2)}
+h3{font-size:17px;margin:26px 0 6px}
+h4{font-size:15px;margin:18px 0 4px;color:var(--muted)}
+p{margin:6px 0 10px}
+.sub{color:var(--muted)}
+nav.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 18px;columns:2;column-gap:28px}
+nav.toc a{color:var(--ink);text-decoration:none;display:block;padding:1px 0}
+nav.toc a:hover{color:var(--accent-2)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:12px 0}
+.note{border-inline-start:4px solid var(--accent);background:var(--card);padding:10px 14px;border-radius:6px;margin:12px 0}
+.warn{border-inline-start-color:var(--bad)}
+table{border-collapse:collapse;width:100%;margin:10px 0 16px;background:var(--card);font-size:13.5px}
+th,td{border:1px solid var(--line);padding:5px 8px;vertical-align:top;text-align:start}
+th{background:var(--code);font-weight:600}
+code{font-family:Consolas,"Cascadia Mono",monospace;background:var(--code);padding:1px 5px;border-radius:4px;font-size:12.5px;direction:ltr;unicode-bidi:embed}
+pre{background:var(--code);border:1px solid var(--line);border-radius:8px;padding:10px 14px;overflow-x:auto;direction:ltr;text-align:left;font-size:12.5px;line-height:1.6;white-space:pre}
+.f{direction:ltr;unicode-bidi:plaintext;font-family:Consolas,monospace;font-size:13px;background:var(--code);display:block;padding:6px 12px;border-radius:6px;margin:6px 0;text-align:left;white-space:pre-wrap}
+.tag{display:inline-block;font-size:12px;padding:0 8px;border-radius:10px;border:1px solid var(--line);margin-inline-end:4px}
+.t-py{background:#e7f0ff;color:#234}.t-dax{background:#fff4d6;color:#553}.t-pq{background:#e8f7ea;color:#253}.t-app{background:#f3e8ff;color:#425}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .tag{filter:brightness(.8)}}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:760px){nav.toc{columns:1}.grid2{grid-template-columns:1fr}table{font-size:12.5px;display:block;overflow-x:auto}td code{white-space:nowrap}}
+.scroll{overflow-x:auto}
+footer{margin-top:40px;color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:10px}
+@media print{body{background:#fff;font-size:12px}.wrap{max-width:none;padding:0}h2{page-break-before:always}nav.toc{page-break-after:always}pre,.f,table{page-break-inside:avoid}a{color:inherit}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top">
+<h1>مشخصات پیاده‌سازی IBP در Power BI</h1>
+<div class="sub">راهنمای فنی برای برنامه‌نویس Power BI: همه مراحل، فرمول‌ها و منطق محاسبات برنامه IBP، مدل داده، اندازه‌ها، صفحات گزارش و روش آزمون</div>
+<div class="sub">نسخه برنامه مبنا: 0.9.0 · فرمول‌ها از کد برنامه استخراج و با خروجی آن آزموده شده‌اند</div>
+</header>
+
+<nav class="toc">
+<a href="#s0">۰. این بسته چیست و از کجا شروع کنیم</a>
+<a href="#s1">۱. معماری و تقسیم کار (پایتون / Power Query / DAX)</a>
+<a href="#s2">۲. داده‌های ورودی</a>
+<a href="#s3">۳. مدل داده و روابط</a>
+<a href="#s4">۴. قراردادهای عمومی (چرخه، دوره، واحد، نسخه)</a>
+<a href="#s5">۵. مرحله ۱ IBP — پورتفوی محصول</a>
+<a href="#s6">۶. مرحله ۲ — پیش‌بینی آماری</a>
+<a href="#s7">۷. مرحله ۳ — برنامه تقاضا و اجماع</a>
+<a href="#s8">۸. دقت پیش‌بینی، FVA و سیگنال ردیابی</a>
+<a href="#s9">۹. مرحله ۴ — برنامه تولید (MPS) و ظرفیت</a>
+<a href="#s10">۱۰. موجودی، پوشش و MRP</a>
+<a href="#s11">۱۱. مرحله ۵ — مالی: بهای تمام‌شده، سود و زیان، بودجه، سرمایه در گردش</a>
+<a href="#s12">۱۲. سناریوها و شبیه‌سازی مونت‌کارلو</a>
+<a href="#s13">۱۳. نمای هلدینگ و جریان‌های درون‌گروهی</a>
+<a href="#s14">۱۴. مرحله ۶ — هشدارها و کارنامه جلسه مدیریت (MBR)</a>
+<a href="#s15">۱۵. صفحات گزارش Power BI</a>
+<a href="#s16">۱۶. ثبت داده از داخل گزارش (Write-back)</a>
+<a href="#s17">۱۷. امنیت (RLS) و بروزرسانی خودکار</a>
+<a href="#s18">۱۸. آزمون و پذیرش: اعداد مرجع</a>
+<a href="#s19">۱۹. برنامه کار پیشنهادی برای برنامه‌نویس</a>
+<a href="#s20">۲۰. نکات، تفاوت‌ها و محدودیت‌ها</a>
+<a href="#a1">پیوست: فهرست همه اندازه‌های DAX</a>
+</nav>
+
+<!-- ===================================================================== -->
+<h2 id="s0">۰. این بسته چیست و از کجا شروع کنیم</h2>
+<p>برنامه IBP شش شرکت هلدینگ را در یک چرخه ماهانه برنامه‌ریزی می‌کند: پورتفوی ← پیش‌بینی آماری ← برنامه تقاضا و اجماع ← برنامه تولید و ظرفیت ← موجودی و مواد ← مالی و سناریو ← جلسه مدیریت. این سند همان منطق را برای Power BI بازنویسی می‌کند. هر فرمول این‌جا عیناً همان کد برنامه است و برای هر عدد مهم، مقدار مرجع برنامه آمده تا خروجی Power BI با آن مقایسه شود.</p>
+<table>
+<tr><th style="width:32%">پوشه / فایل</th><th>کاربرد</th></tr>
+<tr><td><code>docs/IBP-PowerBI-Spec.html</code></td><td>همین سند</td></tr>
+<tr><td><code>powerquery/queries.pq</code></td><td>متن همه کوئری‌های Power Query (M)؛ هر بخش یک Blank Query با همان نام</td></tr>
+<tr><td><code>dax/measures.dax</code></td><td>همه اندازه‌ها (Measures) و ستون‌های محاسباتی DAX، دسته‌بندی‌شده به ترتیب مراحل</td></tr>
+<tr><td><code>python/ibp_pbi.py</code></td><td>محاسبات ترتیبی که در DAX ممکن نیست: پیش‌بینی آماری، برنامه تولید، MRP، بهای تمام‌شده، سود و زیان، سناریو، مونت‌کارلو</td></tr>
+<tr><td><code>python/ibp_engine/</code></td><td>موتور تحلیل برنامه (روش‌های پیش‌بینی و مونت‌کارلو)؛ <code>ibp_pbi.py</code> از آن استفاده می‌کند</td></tr>
+<tr><td><code>tools/export_data.py</code></td><td>خروجی CSV ورودی‌ها از پایگاه داده سرور مرکزی (<code>ibp.db</code>) یا فایل «پشتیبان کامل هلدینگ»</td></tr>
+<tr><td><code>tools/validate.py</code></td><td>مقایسه خودکار خروجی پایتون با نتایج مرجع برنامه</td></tr>
+<tr><td><code>tools/export_sample.js</code></td><td>(برای نگه‌دارنده بسته) ساخت داده نمونه و نتایج مرجع از خود برنامه</td></tr>
+<tr><td><code>sample/data/</code></td><td>داده نمونه ۶ شرکت (ورودی)</td></tr>
+<tr><td><code>sample/reference/</code></td><td>نتایج محاسبه خود برنامه روی همان داده؛ «پاسخ درست» برای آزمون</td></tr>
+<tr><td><code>sample/out/</code></td><td>خروجی نمونه <code>ibp_pbi.py</code> (جدول‌های Fact) برای شروع کار بدون اجرای پایتون</td></tr>
+</table>
+<div class="note"><b>شروع سریع:</b> ۱) پارامتر <code>DataFolder</code> را روی <code>sample/data</code> و <code>OutputFolder</code> را روی <code>sample/out</code> بگذارید. ۲) کوئری‌های <code>queries.pq</code> را بسازید. ۳) روابط بخش ۳ را تعریف کنید. ۴) اندازه‌های <code>measures.dax</code> را اضافه کنید. ۵) اعداد کارت‌ها را با جدول بخش ۱۸ مقایسه کنید. بعد از آن صفحات بخش ۱۵ را بسازید.</div>
+<p>برچسب‌ها در این سند: <span class="tag t-py">پایتون</span> محاسبه در <code>ibp_pbi.py</code>، <span class="tag t-pq">Power Query</span> ستون یا جدول در M، <span class="tag t-dax">DAX</span> اندازه یا ستون محاسباتی، <span class="tag t-app">برنامه</span> ثبت در برنامه IBP یا Write-back.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s1">۱. معماری و تقسیم کار</h2>
+<pre>
+ برنامه IBP / سرور مرکزی (ibp.db)  یا  ERP
+          │  tools/export_data.py   (CSV با همان ستون‌ها، همه شرکت‌ها با ستون CompanyCode)
+          ▼
+   DataFolder\*.csv ───────────────┐
+          │                        │
+          │ python/ibp_pbi.py      │ (زمان‌بندی‌شده، مثلاً هر شب یا بعد از ثبت اجماع)
+          ▼                        │
+   OutputFolder\Fact*.csv          │
+          │                        │
+          ▼                        ▼
+            Power Query (M)  ──►  مدل ستاره‌ای  ──►  DAX (اندازه‌ها، What-if)  ──►  صفحات گزارش
+</pre>
+<h3>چرا بخشی از محاسبات در پایتون است؟</h3>
+<p>DAX برای تجمیع و نسبت عالی است، اما محاسباتی که هر ماه به نتیجه ماه قبل وابسته است (موجودی پایان ماه، تخصیص ظرفیت محدود، صدور سفارش با زمان تأمین) یا انتخاب بهترین مدل با بک‌تست را نمی‌توان در DAX درست و سریع نوشت. این بخش‌ها در پایتون اجرا و به‌صورت جدول Fact به مدل داده می‌شوند. خروجی پایتون با خروجی برنامه تا دقت <code>1e-14</code> برابر است (بخش ۱۸).</p>
+<table>
+<tr><th>محاسبه</th><th>محل</th><th>دلیل</th></tr>
+<tr><td>تقویم شمسی، شدت رمضان/محرم، شماره پیوسته ماه</td><td><span class="tag t-pq">PQ</span></td><td>ثابت؛ یک بار</td></tr>
+<tr><td>کلید چندشرکتی، تن، مبلغ برآوردی، Lag پیش‌بینی، جدول دقت</td><td><span class="tag t-pq">PQ</span></td><td>ستون ردیفی</td></tr>
+<tr><td>پورتفوی: ABC، XYZ، الگوی تقاضا، توصیه</td><td><span class="tag t-dax">DAX ستون</span></td><td>وابسته به فروش ۱۲ ماه</td></tr>
+<tr><td>پیش‌بینی آماری با بک‌تست و انتخاب روش</td><td><span class="tag t-py">پایتون</span></td><td>۱۹ روش، بک‌تست چرخشی، یادگیری ماشین</td></tr>
+<tr><td>تجمیع تقاضا، مقایسه با سال قبل و بودجه، دقت، FVA</td><td><span class="tag t-dax">DAX</span></td><td>تجمیع</td></tr>
+<tr><td>ذخیره اطمینان، برنامه تولید (MPS)، بار خطوط، کمبود</td><td><span class="tag t-py">پایتون</span></td><td>ترتیبی و محدودیت ظرفیت</td></tr>
+<tr><td>RCCP سرانگشتی (بدون محدودیت)</td><td><span class="tag t-dax">DAX</span></td><td>تجمیع ساده</td></tr>
+<tr><td>MRP (نیاز مواد، سفارش، زمان صدور)</td><td><span class="tag t-py">پایتون</span></td><td>ترتیبی</td></tr>
+<tr><td>بهای تمام‌شده استاندارد (مواد/تبدیل/سربار)</td><td><span class="tag t-py">پایتون</span></td><td>BOM و مسیر</td></tr>
+<tr><td>سود و زیان برنامه، پل بودجه، سرمایه در گردش، What-if قیمت/مواد/ارز/تبدیل</td><td><span class="tag t-dax">DAX</span> (کنترل با <span class="tag t-py">پایتون</span>)</td><td>پارامتر تعاملی</td></tr>
+<tr><td>سناریوهای تقاضا/ظرفیت و مونت‌کارلو</td><td><span class="tag t-py">پایتون</span></td><td>برنامه تولید باید دوباره ساخته شود</td></tr>
+<tr><td>تعدیل اجماع، اقدام‌ها، وضعیت گام‌های چرخه</td><td><span class="tag t-app">برنامه/Write-back</span></td><td>Power BI فقط‌خواندنی است</td></tr>
+</table>
+<h3>اجرای پایتون</h3>
+<pre>
+pip install pandas numpy scipy statsmodels scikit-learn      (پایتون 3.10 به بالا)
+
+# ۱) خروجی داده از سرور مرکزی (یا --backup فایل_پشتیبان.json)
+python tools/export_data.py --db  "D:\IBP-Server\data"  "C:\IBP\data"
+
+# ۲) محاسبات: پیش‌بینی آماری + برنامه + MRP + مالی + سناریو با ۵۰۰۰ اجرای مونت‌کارلو
+python python/ibp_pbi.py "C:\IBP\data" "C:\IBP\out" --forecast --scenarios --mc 5000
+</pre>
+<p>اگر پیش‌بینی آماری را خود برنامه IBP اجرا کرده و در جدول <code>forecasts</code> ذخیره شده است، <code>--forecast</code> لازم نیست. در آن حالت ذخیره اطمینان از ضریب تغییرات فروش برآورد می‌شود، مگر این‌که با <code>--metrics</code> فایل شاخص‌های خطا داده شود (بخش ۹). بدون <code>--forecast</code> اجرای کامل ۶ شرکت چند ثانیه و با آن حدود یک دقیقه طول می‌کشد.</p>
+<table>
+<tr><th>فایل خروجی</th><th>دانه</th><th>ستون‌ها</th></tr>
+<tr><td><code>FactStatForecast</code></td><td>شرکت × محصول × ماه آینده</td><td>version=آماری، cycle، period، productId، qty، lo، hi، method</td></tr>
+<tr><td><code>FactForecastMetrics</code></td><td>شرکت × محصول</td><td>method، methodLabel، wmape، bias، rmse، zeroShare</td></tr>
+<tr><td><code>FactPlan</code></td><td>شرکت × محصول × ماه برنامه</td><td>demand، safetyStock، production، prebuild، overtime، alt، inventoryEnd، shortage، relError، openingInventory</td></tr>
+<tr><td><code>FactResourceLoad</code></td><td>شرکت × خط × ماه</td><td>capacityHours، hours، overtimeHours، utilization</td></tr>
+<tr><td><code>FactMRP</code></td><td>شرکت × ماده × ماه</td><td>gross، net، plannedReceipt، plannedRelease، projected، safetyStock، leadMonths، onHand، onOrder، internalCompany</td></tr>
+<tr><td><code>FactUnitCost</code></td><td>شرکت × محصول</td><td>matDom، matImp، matIc، conv، overhead، std</td></tr>
+<tr><td><code>FactPnL</code></td><td>شرکت × ماه</td><td>revenue … operating، nwc، receivables، payables، invFinished، invMaterials، budgetRevenue، hasBudget (برای کنترل DAX)</td></tr>
+<tr><td><code>FactPlanKPI</code></td><td>شرکت</td><td>شاخص‌های خلاصه برنامه، پل بودجه، DSO (برای کنترل)</td></tr>
+<tr><td><code>FactScenario</code></td><td>شرکت × سناریو</td><td>محرک‌ها، درآمد/سود ۱۲ ماه، نرخ پاسخ‌گویی، شکاف بودجه، P10/P50/P90 مونت‌کارلو، احتمال رسیدن به بودجه</td></tr>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s2">۲. داده‌های ورودی</h2>
+<p>هر جدول یک CSV با کدگذاری UTF-8 است و ستون اول آن <code>CompanyCode</code> است. شناسه‌ها (<code>id</code>) فقط داخل یک شرکت یکتا هستند؛ برای همین در Power Query کلید <code>CompanyCode|id</code> ساخته می‌شود (تابع <code>fnKey</code>). دوره‌ها به‌صورت عدد شمسی <code>yyyymm</code> (مثلاً <code>140508</code> = آبان ۱۴۰۵) هستند. در محیط واقعی می‌توان به‌جای CSV همین ستون‌ها را از SQL Server یا ERP خواند؛ فقط گام Source کوئری‌ها تغییر می‌کند.</p>
+<div class="scroll"><table><tr><th style='width:16%'>فایل</th><th style='width:26%'>محتوا</th><th>ستون‌ها</th></tr>
+<tr><td><code>companies.csv</code></td><td>فهرست شرکت‌ها</td><td><code>CompanyCode</code>، <code>CompanyName</code>، <code>BusinessModel</code>، <code>TemplateId</code></td></tr>
+<tr><td><code>settings.csv</code></td><td>تنظیمات هر شرکت (کلید-مقدار)</td><td><code>CompanyCode</code>، <code>key</code>، <code>value</code></td></tr>
+<tr><td><code>calendar_lunar.csv</code></td><td>تقویم ماهانه شمسی با روزهای رمضان و دهه محرم (مشترک)</td><td><code>PeriodKey</code>، <code>JYear</code>، <code>JMonth</code>، <code>MonthName</code>، <code>Days</code>، <code>RamadanDays</code>، <code>MuharramDays</code>، <code>RamadanIntensity</code>، <code>MuharramIntensity</code>، <code>GregorianStart</code></td></tr>
+<tr><td><code>plants.csv</code></td><td>کارخانه‌ها (روز کاری ماه)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>city</code>، <code>workingDays</code>، <code>active</code></td></tr>
+<tr><td><code>warehouses.csv</code></td><td>انبارها</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>plantId</code>، <code>type</code>، <code>capacity</code></td></tr>
+<tr><td><code>resources.csv</code></td><td>خطوط تولید (شیفت، ساعت، راندمان، هزینه ساعت)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>plantId</code>، <code>type</code>، <code>shifts</code>، <code>hoursPerShift</code>، <code>efficiency</code>، <code>costPerHour</code></td></tr>
+<tr><td><code>families.csv</code></td><td>خانواده محصول</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>color</code>، <code>description</code></td></tr>
+<tr><td><code>products.csv</code></td><td>محصولات (وزن، قیمت، بهای واحد، چرخه عمر، ذخیره اطمینان، بچ، ماندگاری، کلاس)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>familyId</code>، <code>plantId</code>، <code>uom</code>، <code>unitWeightKg</code>، <code>unitPrice</code>، <code>unitCost</code>، <code>lifecycle</code>، <code>safetyStockDays</code>، <code>intercompany</code>، <code>batchSize</code>، <code>shelfLifeDays</code>، <code>active</code>، <code>launchDate</code>، <code>abc</code>، <code>xyz</code></td></tr>
+<tr><td><code>routings.csv</code></td><td>مسیر تولید: محصول × خط با نرخ تولید و اولویت</td><td><code>CompanyCode</code>، <code>id</code>، <code>productId</code>، <code>resourceId</code>، <code>unitsPerHour</code>، <code>setupHours</code>، <code>priority</code></td></tr>
+<tr><td><code>suppliers.csv</code></td><td>تأمین‌کنندگان (وارداتی یا داخلی)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>city</code>، <code>leadTimeDays</code>، <code>reliability</code>، <code>isImport</code></td></tr>
+<tr><td><code>materials.csv</code></td><td>مواد اولیه و بسته‌بندی (بها، زمان تأمین، MOQ، شرکت تأمین‌کننده درون‌گروهی)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>type</code>، <code>uom</code>، <code>unitCost</code>، <code>supplierId</code>، <code>internalCompany</code>، <code>internalProductCode</code>، <code>leadTimeDays</code>، <code>moq</code>، <code>safetyStockDays</code></td></tr>
+<tr><td><code>bom.csv</code></td><td>فهرست مواد: مقدار در هر واحد و ضایعات</td><td><code>CompanyCode</code>، <code>id</code>، <code>productId</code>، <code>materialId</code>، <code>qtyPer</code>، <code>scrap</code></td></tr>
+<tr><td><code>channels.csv</code></td><td>کانال فروش و تخفیف</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>discount</code>، <code>internal</code></td></tr>
+<tr><td><code>regions.csv</code></td><td>مناطق فروش</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>manager</code></td></tr>
+<tr><td><code>customers.csv</code></td><td>مشتریان (کانال، منطقه، مهلت پرداخت)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>channelId</code>، <code>regionId</code>، <code>tier</code>، <code>creditLimit</code>، <code>paymentDays</code></td></tr>
+<tr><td><code>salesActuals.csv</code></td><td>فروش واقعی ماهانه: محصول × مشتری</td><td><code>CompanyCode</code>، <code>id</code>، <code>period</code>، <code>productId</code>، <code>customerId</code>، <code>qty</code>، <code>revenue</code></td></tr>
+<tr><td><code>forecasts.csv</code></td><td>پیش‌بینی‌ها: نسخه × چرخه × ماه × محصول (با بازه آماری)</td><td><code>CompanyCode</code>، <code>id</code>، <code>version</code>، <code>cycle</code>، <code>period</code>، <code>productId</code>، <code>qty</code>، <code>method</code>، <code>lo</code>، <code>hi</code></td></tr>
+<tr><td><code>budgets.csv</code></td><td>بودجه ماهانه محصول (مقدار و مبلغ)</td><td><code>CompanyCode</code>، <code>id</code>، <code>period</code>، <code>productId</code>، <code>qty</code>، <code>revenue</code></td></tr>
+<tr><td><code>inventory.csv</code></td><td>موجودی فعلی کالا در انبارها</td><td><code>CompanyCode</code>، <code>id</code>، <code>productId</code>، <code>warehouseId</code>، <code>qty</code>، <code>asOf</code></td></tr>
+<tr><td><code>materialInventory.csv</code></td><td>موجودی و سفارش در راه مواد</td><td><code>CompanyCode</code>، <code>id</code>، <code>materialId</code>، <code>warehouseId</code>، <code>qty</code>، <code>onOrder</code>، <code>asOf</code></td></tr>
+<tr><td><code>events.csv</code></td><td>مناسبت‌ها (رمضان، محرم، کمپین و …)</td><td><code>CompanyCode</code>، <code>id</code>، <code>code</code>، <code>name</code>، <code>kind</code>، <code>notes</code>، <code>startPeriod</code>، <code>endPeriod</code></td></tr>
+<tr><td><code>eventImpacts.csv</code></td><td>اثر هر مناسبت بر هر خانواده (درصد)</td><td><code>CompanyCode</code>، <code>id</code>، <code>eventId</code>، <code>familyId</code>، <code>uplift</code>، <code>source</code></td></tr>
+<tr><td><code>demandAdjustments.csv</code></td><td>سابقه تعدیل‌های اجماع</td><td><code>CompanyCode</code>، <code>id</code>، <code>cycle</code>، <code>period</code>، <code>level</code>، <code>target</code>، <code>oldQty</code>، <code>newQty</code>، <code>reason</code>، <code>note</code>، <code>at</code></td></tr>
+<tr><td><code>cycleSteps.csv</code></td><td>گام‌های چرخه IBP و وضعیت</td><td><code>CompanyCode</code>، <code>cycle</code>، <code>order</code>، <code>name</code>، <code>owner</code>، <code>dueDate</code>، <code>status</code>، <code>notes</code>، <code>id</code></td></tr>
+<tr><td><code>actions.csv</code></td><td>اقدام‌های جلسات</td><td><code>CompanyCode</code>، <code>id</code>، <code>cycle</code>، <code>kind</code>، <code>title</code>، <code>area</code>، <code>owner</code>، <code>dueDate</code>، <code>priority</code>، <code>status</code>، <code>note</code></td></tr>
+</table></div>
+<h3>تنظیمات هر شرکت (settings)</h3>
+<p>کلید-مقدار؛ در کوئری <code>Company</code> به ستون تبدیل و مقادیر خالی با پیش‌فرض برنامه پر می‌شوند.</p>
+<table>
+<tr><th>کلید</th><th>پیش‌فرض</th><th>معنا و محل استفاده</th></tr>
+<tr><td><code>cyclePeriod</code></td><td>—</td><td>ماه چرخه جاری (yyyymm). همه پنجره‌های زمانی نسبت به آن است</td></tr>
+<tr><td><code>historyMonths</code> / <code>horizonMonths</code></td><td>36 / 18</td><td>طول سابقه برای پیش‌بینی / افق پیش‌بینی و برنامه (برنامه حداکثر ۱۸ ماه)</td></tr>
+<tr><td><code>frozenMonths</code></td><td>1</td><td>افق منجمد؛ پیش‌ساخت در ماه‌های منجمد مجاز نیست</td></tr>
+<tr><td><code>serviceLevelTarget</code></td><td>0.95</td><td>سطح خدمت هدف؛ z ذخیره اطمینان و هدف نرخ پاسخ‌گویی</td></tr>
+<tr><td><code>forecastAccuracyTarget</code></td><td>0.8</td><td>هدف دقت پیش‌بینی (کارنامه)</td></tr>
+<tr><td><code>utilizationWarn</code> / <code>utilizationMax</code></td><td>0.85 / 1</td><td>آستانه هشدار و اضافه‌بار ظرفیت</td></tr>
+<tr><td><code>excessMonths</code></td><td>3</td><td>پوشش بیش از این = موجودی مازاد</td></tr>
+<tr><td><code>abcA</code> / <code>abcB</code></td><td>0.8 / 0.95</td><td>مرز سهم تجمعی فروش برای کلاس A و B</td></tr>
+<tr><td><code>xyzX</code> / <code>xyzY</code></td><td>0.2 / 0.5</td><td>مرز ضریب تغییرات برای X و Y</td></tr>
+<tr><td><code>ssMethod</code></td><td>statistical</td><td>روش ذخیره اطمینان: <code>statistical</code> یا <code>days</code></td></tr>
+<tr><td><code>overtimePct</code></td><td>0.1</td><td>سقف اضافه‌کاری به‌صورت درصدی از ظرفیت عادی هر خط</td></tr>
+<tr><td><code>prebuildMonths</code></td><td>3</td><td>حداکثر ماه پیش‌ساخت (تولید زودتر)</td></tr>
+<tr><td><code>productionLeadDays</code></td><td>7</td><td>زمان تولید؛ در ذخیره اطمینان آماری</td></tr>
+<tr><td><code>priceInflation</code> / <code>costInflation</code></td><td>0.025 / 0.02</td><td>تورم ماهانه قیمت فروش / هزینه</td></tr>
+<tr><td><code>holdingRate</code></td><td>0.015</td><td>هزینه نگهداری ماهانه به‌صورت درصدی از ارزش موجودی</td></tr>
+<tr><td><code>overtimePremium</code></td><td>0.5</td><td>صرف اضافه‌کاری (۵۰٪ بیش از نرخ عادی)</td></tr>
+<tr><td><code>dpoDays</code></td><td>45</td><td>دوره پرداخت به تأمین‌کنندگان</td></tr>
+<tr><td><code>fcOrigins</code> / <code>fcLead</code> / <code>fcMetric</code> / <code>fcEnsemble</code></td><td>12 / 3 / wmape / 1</td><td>تنظیمات بک‌تست پیش‌بینی (بخش ۶)</td></tr>
+<tr><td><code>supplyVersion</code></td><td>اجماعی</td><td>نسخه پیش‌بینی مبنای برنامه تولید</td></tr>
+<tr><td><code>displayScale</code></td><td>1e9</td><td>مقیاس نمایش مبالغ (میلیارد ریال)</td></tr>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s3">۳. مدل داده و روابط</h2>
+<p>مدل ستاره‌ای چندشرکتی است. جدول <code>Company</code> فقط از طریق ابعاد اصلی (محصول، خط، ماده) فیلتر می‌کند تا مسیر دوگانه و ابهام پیش نیاید. جدول <code>Period</code> بین همه شرکت‌ها مشترک است. همه روابط یک به چند و تک‌جهته هستند مگر این‌که خلافش گفته شود.</p>
+<table>
+<tr><th>از (یک)</th><th>به (چند)</th><th>وضعیت</th><th>توضیح</th></tr>
+<tr><td>Company[CompanyCode]</td><td>Product[CompanyCode]</td><td>فعال</td><td>مسیر اصلی فیلتر شرکت به همه Factهای محصولی</td></tr>
+<tr><td>Company[CompanyCode]</td><td>Resource[CompanyCode]</td><td>فعال</td><td>به ResourceLoad و Routing</td></tr>
+<tr><td>Company[CompanyCode]</td><td>Material[CompanyCode]</td><td>فعال</td><td>به MRP و BOM</td></tr>
+<tr><td>Company[CompanyCode]</td><td>Scenario، Actions، CycleSteps، PnLCheck [CompanyCode]</td><td>فعال</td><td>جدول‌های بدون محصول</td></tr>
+<tr><td>Family[FamilyKey]</td><td>Product[FamilyKey]</td><td>فعال</td><td></td></tr>
+<tr><td>Product[ProductKey]</td><td>Sales، Forecast، Accuracy، Budget، Inventory، Plan، UnitCost، ForecastMetrics، Adjustments</td><td>فعال</td><td></td></tr>
+<tr><td>Customer[CustomerKey]</td><td>Sales[CustomerKey]</td><td>فعال</td><td>Customer به Company وصل نمی‌شود (ابهام مسیر)</td></tr>
+<tr><td>Channel[ChannelKey] / Region[RegionKey]</td><td>Customer</td><td>فعال</td><td>برف‌دانه‌ای</td></tr>
+<tr><td>Resource[ResourceKey]</td><td>ResourceLoad، Routing</td><td>فعال</td><td></td></tr>
+<tr><td>Product[ProductKey]</td><td>Routing[ProductKey]</td><td><b>غیرفعال</b></td><td>در RCCP با <code>TREATAS</code> استفاده می‌شود</td></tr>
+<tr><td>Material[MaterialKey]</td><td>BOM، MRP</td><td>فعال</td><td></td></tr>
+<tr><td>Product[ProductKey]</td><td>BOM[ProductKey]</td><td><b>غیرفعال</b></td><td>در صورت نیاز با <code>USERELATIONSHIP</code></td></tr>
+<tr><td>Supplier[SupplierKey]</td><td>Material[SupplierKey]</td><td>فعال</td><td></td></tr>
+<tr><td>Period[PeriodKey]</td><td>Sales، Forecast، Accuracy، Budget، Plan، ResourceLoad، MRP، PnLCheck [period]</td><td>فعال</td><td>کلید ماه شمسی yyyymm</td></tr>
+<tr><td colspan="4">جدول‌های بی‌ارتباط: <code>UnitSelector</code> (مقدار/تن/مبلغ)، پارامترهای What-if (<code>Price Change %</code> و …)، <code>UserAccess</code> (برای RLS)</td></tr>
+</table>
+<div class="note">ستون <code>Period[MonthIndex] = JYear×12 + JMonth</code> را در همه پنجره‌های زمانی استفاده کنید. توابع هوش زمانی DAX (مثل <code>SAMEPERIODLASTYEAR</code>) با تقویم شمسی و ماه‌های ۳۰/۳۱ روزه درست کار نمی‌کنند. Period را با «Sort by column» بر اساس <code>PeriodKey</code> مرتب کنید.</div>
+
+<!-- ===================================================================== -->
+<h2 id="s4">۴. قراردادهای عمومی</h2>
+<h3>چرخه و پنجره‌های زمانی</h3>
+<p>هر شرکت ماه چرخه خودش را دارد: <code>c = Company[CycleIndex]</code>. ماه c اولین ماه برنامه است و آخرین ماه دارای فروش واقعی <code>c−1</code> است.</p>
+<table>
+<tr><th>پنجره</th><th>MonthIndex</th></tr>
+<tr><td>۱۲ ماه اخیر (LTM)</td><td><code>c−12 … c−1</code></td></tr>
+<tr><td>۱۲ ماه قبل از آن</td><td><code>c−24 … c−13</code></td></tr>
+<tr><td>۳ ماه اخیر</td><td><code>c−3 … c−1</code> (و همان ماه‌های سال قبل: <code>c−15 … c−13</code>)</td></tr>
+<tr><td>۱۲ ماه آینده</td><td><code>c … c+11</code></td></tr>
+<tr><td>۶ ماه آینده (هشدار ظرفیت، ریسک تقاضا)</td><td><code>c … c+5</code></td></tr>
+</table>
+<p>چون شرکت‌ها ممکن است چرخه متفاوت داشته باشند، اندازه‌های پنجره‌دار با الگوی زیر روی شرکت‌ها جمع زده می‌شوند (در نمای هلدینگ هم درست است):</p>
+<pre>SUMX ( VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Revenue], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] &gt;= c - 12, 'Period'[MonthIndex] &lt;= c - 1 ) )</pre>
+<h3>واحدها</h3>
+<span class="f">Tons      = qty × unitWeightKg / 1000
+PriceList(t) = unitPrice × (1 + priceInflation)^(MonthIndex(t) − c)
+AvgDiscount  = Σ_channel ( customers_in_channel × discount ) / Σ customers        (وزن = تعداد مشتری هر کانال)
+Value(t)     = qty × PriceList(t) × (1 − AvgDiscount)                          (مبلغ برآوردی پیش‌بینی، ستون Forecast[RevenueEst])</span>
+<p>بهای تمام‌شده فروش واقعی گذشته (ستون <code>Sales[CostDeflated]</code>) با همان تورم قیمت به گذشته برده می‌شود: <code>qty × unitCost × (1+priceInflation)^(MonthIndex − c)</code> و سود ناخالص واقعی = درآمد − آن.</p>
+<h3>نسخه‌های پیش‌بینی</h3>
+<table>
+<tr><th>نسخه</th><th>منبع</th><th>کاربرد</th></tr>
+<tr><td>آماری</td><td>خروجی مدل (بخش ۶)</td><td>مبنای بی‌طرف؛ بازه ۸۰٪</td></tr>
+<tr><td>اجماعی</td><td>آماری + تعدیل برنامه‌ریزان فروش و بازاریابی در جلسه تقاضا</td><td>مبنای برنامه تولید و مالی</td></tr>
+<tr><td>ساده (Naive)</td><td>فروش ماه قبل</td><td>فقط برای سنجش ارزش افزوده (FVA)</td></tr>
+</table>
+<p>ستون <code>Forecast[IsCurrentCycle]</code> نسخه‌های چرخه جاری را جدا می‌کند و <code>Forecast[Lag] = MonthIndex(period) − MonthIndex(cycle)</code> فاصله پیش‌بینی تا ماه هدف است.</p>
+<h3>تقویم قمری</h3>
+<span class="f">RamadanIntensity(month)  = روزهای رمضان در آن ماه شمسی / روزهای ماه
+MuharramIntensity(month) = روزهای دهه اول محرم در آن ماه / روزهای ماه</span>
+<p>جدول <code>calendar_lunar.csv</code> (۱۳۹۸ تا ۱۴۲۰) همراه بسته است و از خود برنامه ساخته شده؛ نیازی به محاسبه قمری در Power BI نیست.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s5">۵. مرحله ۱ — پورتفوی محصول <span class="tag t-dax">DAX ستون</span></h2>
+<p>ستون‌های محاسباتی روی جدول Product (بخش ۰۹ فایل DAX). همه روی ۱۲ ماه اخیر شرکت همان محصول.</p>
+<span class="f">Revenue12   = Σ revenue        (c−12 … c−1)
+Cost12      = Σ CostDeflated
+Qty12, QtyPrev12 = Σ qty در ۱۲ ماه اخیر و ۱۲ ماه قبل از آن
+Margin12    = 1 − Cost12 / Revenue12
+VolumeGrowth = Qty12 / QtyPrev12 − 1        (اگر QtyPrev12 &gt; 0)</span>
+<h4>ABC (پارتو درآمد)</h4>
+<span class="f">CumShareBefore = Σ Revenue12 محصولات پرفروش‌ترِ همان شرکت (بدون خود محصول) / Σ Revenue12 شرکت
+Class = C اگر Revenue12 ≤ 0 ؛ A اگر CumShareBefore &lt; abcA ؛ B اگر CumShareBefore &lt; abcB ؛ وگرنه C</span>
+<p>نکته: معیار «سهم تجمعی قبل از محصول» است (نه بعد از آن)؛ بنابراین محصولی که از مرز ۸۰٪ عبور می‌کند هنوز A است.</p>
+<h4>XYZ (نوسان)</h4>
+<span class="f">q_m = فروش هر ۱۲ ماه (ماه بدون فروش = 0)
+CV12 = σ_pop(q) / mean(q)          (انحراف معیار جامعه، تقسیم بر 12)
+X اگر CV12 ≤ xyzX ؛ Y اگر CV12 ≤ xyzY ؛ وگرنه Z (و Z اگر فروشی نبوده)</span>
+<h4>الگوی تقاضا (Syntetos–Boylan)</h4>
+<span class="f">n = تعداد ماه‌های دارای فروش از 12 ؛ ADI = 12 / n
+CV² = (σ_pop / mean)² فقط روی ماه‌های دارای فروش
+ADI &lt; 1.32 و CV² &lt; 0.49 → هموار ؛ ADI &lt; 1.32 و CV² ≥ 0.49 → نامنظم
+ADI ≥ 1.32 و CV² &lt; 0.49 → متناوب ؛ ADI ≥ 1.32 و CV² ≥ 0.49 → کلوخه‌ای</span>
+<h4>توصیه پورتفوی (اولین شرط برقرار، به همین ترتیب)</h4>
+<table>
+<tr><th>#</th><th>شرط</th><th>توصیه</th></tr>
+<tr><td>1</td><td>چرخه عمر «توقف» یا غیرفعال</td><td>خروج از سبد</td></tr>
+<tr><td>2</td><td>تاریخ حذف تدریجی ثبت شده</td><td>مدیریت حذف تدریجی</td></tr>
+<tr><td>3</td><td>چرخه عمر «معرفی»</td><td>پایش معرفی</td></tr>
+<tr><td>4</td><td>کلاس C و رشد حجم &lt; −۱۰٪ و (حاشیه نامعلوم یا &lt; میانگین شرکت)</td><td>کاندید حذف</td></tr>
+<tr><td>5</td><td>کلاس A/B و رشد &gt; ۱۰٪ و حاشیه ≥ ۰٫۹ × میانگین</td><td>سرمایه‌گذاری و رشد</td></tr>
+<tr><td>6</td><td>کلاس A/B و حاشیه &lt; ۰٫۷۵ × میانگین</td><td>بازبینی قیمت/هزینه</td></tr>
+<tr><td>7</td><td>الگو کلوخه‌ای یا نامنظم، یا XYZ = Z</td><td>افزایش ذخیره یا تولید سفارشی</td></tr>
+<tr><td>8</td><td>سایر</td><td>نگهداری</td></tr>
+</table>
+<p>میانگین حاشیه شرکت = <code>1 − ΣCost12 / ΣRevenue12</code> همه محصولات شرکت. شاخص «سهم ۲۰٪ برتر» = سهم درآمد <code>round(0.2 × تعداد)</code> محصول پرفروش (حداقل یکی). این قواعد روی همه ۸۳ محصول نمونه با برنامه یکسان آزموده شده است.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s6">۶. مرحله ۲ — پیش‌بینی آماری <span class="tag t-py">پایتون</span></h2>
+<p>کد: <code>ibp_pbi.forecast_payload</code> و <code>run_forecast</code> که موتور برنامه (<code>ibp_engine/demand.py</code>) را صدا می‌زند. این بخش را در DAX بازنویسی نکنید؛ فقط خروجی آن را بخوانید.</p>
+<h3>ورودی هر محصول</h3>
+<ul>
+<li>فقط محصولات فعال و غیر «توقف».</li>
+<li>سری ماهانه فروش از <code>max(اولین ماه دارای فروش شرکت، c − historyMonths)</code> تا <code>c−1</code>؛ ماه بدون فروش = 0. سری هر محصول از اولین ماه فروش خودش شروع می‌شود.</li>
+<li>ضریب مناسبت خانواده برای هر ماه گذشته و آینده:</li>
+</ul>
+<span class="f">EventFactor(month, family) = Π_events ( 1 + uplift(event, family) × intensity(event, month) )     (هر عامل حداقل 0)
+intensity = RamadanIntensity برای رمضان ؛ MuharramIntensity برای محرم ؛ 1 برای سایر مناسبت‌ها در بازه startPeriod…endPeriod</span>
+<ul><li>شدت ماهانه رمضان، محرم و کمپین (بیشینه شدت مناسبت‌های «کمپین/سایر») به‌عنوان متغیر توضیحی روش‌های رگرسیونی و یادگیری ماشین.</li></ul>
+<h3>روش‌ها</h3>
+<table>
+<tr><th>گروه</th><th>روش‌ها</th></tr>
+<tr><td>تقاضای منظم (سهم ماه‌های صفر ≤ ۳۰٪)</td><td>ساده، فصلی ساده، رانش، میانگین متحرک ۳، میانگین متحرک فصلی، هموارسازی نمایی + فصل، روند میرا + فصل، هولت خطی + فصل، هولت-وینترز جمعی و ضربی، تتا، روند خطی + فصل، رگرسیون فصل و مناسبت، ARIMA فصلی، و مدل سراسری گرادیان بوستینگ (روی همه محصولات با تأخیرهای ۱، ۲، ۳، ۱۲)</td></tr>
+<tr><td>تقاضای متناوب (صفر &gt; ۳۰٪)</td><td>کراستون (SBA)، TSB، تجمیع زمانی (ADIDA)، میانگین متحرک، میانگین متحرک فصلی، فصلی ساده، ساده</td></tr>
+<tr><td>سابقه کوتاه (کمتر از ۶ ماه)</td><td>میانگین ۳ ماه آخر × ضریب مناسبت</td></tr>
+</table>
+<p>هولت-وینترز و ARIMA دست‌کم ۲۴ ماه آموزش لازم دارند؛ هولت-وینترز ضربی فقط برای سری‌های بدون صفر.</p>
+<h3>بک‌تست چرخشی و انتخاب روش</h3>
+<span class="f">origins = آخرین fcOrigins (۱۲) نقطه شروع که دست‌کم ۱۳ ماه آموزش دارند
+در هر origin: آموزش با داده قبل از آن، پیش‌بینی fcLead (۳) ماه بعد
+f = همه پیش‌بینی‌های بک‌تست ، a = واقعی‌های متناظر
+WMAPE = Σ|f − a| / Σa        Bias = Σ(f − a) / Σa        RMSE_rel = √mean((f − a)²) / mean(a)
+روش منتخب = کمترین fcMetric (wmape | rmse | wmapeBias = WMAPE + |Bias|)
+ترکیب (Ensemble) = میانگین ۳ روش برتر؛ اگر معیارش بهتر باشد انتخاب می‌شود</span>
+<h3>بازه ۸۰٪</h3>
+<span class="f">e_k = √mean( min(2, (a − f)/a)² )   برای افق k = 1..lead از بک‌تست روش منتخب (فقط a &gt; 0)
+برای افق‌های دورتر: e_i = e_lead × √((i+1)/lead) ؛ بدون بک‌تست: e_i = 0.25 × √(1 + i/6)
+lo = max(0, f × (1 − 1.2816 × e)) ،  hi = f × (1 + 1.2816 × e)</span>
+<p>خروجی: <code>FactStatForecast</code> (مقادیر گردشده) و <code>FactForecastMetrics</code>. کوئری <code>Forecast</code> نسخه آماری همان چرخه را با خروجی پایتون جایگزین می‌کند.</p>
+<div class="note">نکته: برنامه یک پیاده‌سازی جاوااسکریپتی هم دارد (برای حالت بدون موتور) که روش‌هایش کمتر است؛ نتایج مرجع این بسته با همان ساخته شده‌اند. بنابراین پیش‌بینی آماری پایتون ممکن است با «forecasts» نمونه کمی فرق کند؛ این طبیعی است. برای آزمون برنامه تولید و مالی، از پیش‌بینی موجود در داده استفاده کنید (بدون <code>--forecast</code>).</div>
+
+<!-- ===================================================================== -->
+<h2 id="s7">۷. مرحله ۳ — برنامه تقاضا و اجماع <span class="tag t-dax">DAX</span> <span class="tag t-app">ثبت</span></h2>
+<p>صفحه اصلی جلسه تقاضا: ماتریس محصول (یا خانواده) × ماه‌های آینده، با انتخاب واحد (مقدار/تن/مبلغ) از جدول <code>UnitSelector</code>.</p>
+<span class="f">[Consensus Qty]  = Σ Forecast[qty] | version = اجماعی ، IsCurrentCycle
+[Consensus (Unit)] = SWITCH(UnitSelector, تن → Σ Tons ، مبلغ → Σ RevenueEst ، مقدار → Σ qty)
+[Consensus Tons 12M] = Σ تن اجماعی c … c+11
+[Consensus vs Last Year %] = Consensus Tons 12M / Σ Sales Tons (c−12 … c−1) − 1
+[Consensus vs Budget %]    = Σ تن اجماعی در ماه‌های دارای بودجه (c … c+11) / Σ تن بودجه همان بازه − 1
+[Sales Qty LY (shifted)]   = فروش همان ماه در سال قبل (MonthIndex − 12) برای نمایش کنار پیش‌بینی</span>
+<h4>ریسک‌های برنامه (بررسی تقاضا)</h4>
+<ul>
+<li><b>خارج از بازه آماری:</b> مجموع اجماعی ۶ ماه آینده بیرون از <code>[Σlo, Σhi]</code> آماری همان ۶ ماه (اندازه‌های <code>Consensus 6M</code>، <code>Stat Lo 6M</code>، <code>Stat Hi 6M</code>).</li>
+<li><b>رشد غیرعادی:</b> مقایسه با سال قبل و رشد ۳ ماه اخیر؛ اگر رشد ریالی بیش از ۵ واحد درصد از رشد وزنی بالاتر باشد، رشد «قیمتی» است.</li>
+<li><b>سوگیری مداوم:</b> محصولات با |سوگیری ۳ ماه| &gt; ۲۰٪ (بخش ۸).</li>
+</ul>
+<h4>تعدیل اجماع</h4>
+<p>در برنامه هر تغییر اجماع یک ردیف در <code>demandAdjustments</code> می‌سازد (cycle، period، سطح محصول/خانواده/شرکت، target، oldQty، newQty، دلیل، توضیح). در تعدیل سطح خانواده یا شرکت، عدد جدید به نسبت مقدار اجماعی فعلی محصولات (در همان واحد نمایش) پخش می‌شود؛ اگر جمع فعلی صفر باشد به نسبت آماری، و اگر آن هم صفر باشد مساوی. Power BI این جدول را برای ردگیری «چه کسی، چرا، چقدر» نشان می‌دهد؛ ثبت آن در بخش ۱۶ آمده است.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s8">۸. دقت پیش‌بینی، FVA و سیگنال ردیابی <span class="tag t-pq">PQ</span> <span class="tag t-dax">DAX</span></h2>
+<h3>ساخت جدول Accuracy (Power Query)</h3>
+<p>دانه: شرکت × محصول × ماه × نسخه. مقایسه همیشه با پیش‌بینی <b>lag-1</b> است: پیش‌بینی‌ای که در چرخه ماه قبل برای این ماه ثبت شده.</p>
+<ul>
+<li>برای اجماعی و آماری: فقط ماه‌هایی که آن نسخه پیش‌بینی lag-1 دارد. در آن ماه‌ها، اجتماع «محصولات دارای فروش» و «محصولات دارای پیش‌بینی» گرفته می‌شود؛ پیش‌بینی یا فروش نبوده = 0.</li>
+<li>ساده: پیش‌بینی = فروش ماه قبل همان محصول (اگر نبوده 0).</li>
+</ul>
+<h3>اندازه‌ها</h3>
+<span class="f">WMAPE    = Σ|F − A| / ΣA
+Accuracy = max(0, 1 − WMAPE)            (فقط اگر ΣA &gt; 0)
+Bias     = Σ(F − A) / ΣA               (+ بیش‌برآورد ، − کم‌برآورد)
+FVA آماری   = Accuracy(آماری) − Accuracy(ساده)
+FVA قضاوت   = Accuracy(اجماعی) − Accuracy(آماری)        (مثبت = جلسه اجماع ارزش افزوده)
+Accuracy 3M / Bias 3M = همان با نسخه اجماعی در c−3 … c−1     (مرجع داشبورد و کارنامه)
+Tracking Signal (هر محصول) = Σ(F − A) / mean|F − A|  ؛  |TS| &gt; 4 = سوگیری مداوم</span>
+<div class="note">دقت در سطح هر تجمیع با WMAPE همان تجمیع محاسبه می‌شود (نه میانگین دقت محصولات). مقدار مرجع: ZMC دقت ۳ ماه ۷۶٫۷٪ و سوگیری ۶٫۰٪+.</div>
+
+<!-- ===================================================================== -->
+<h2 id="s9">۹. مرحله ۴ — برنامه تولید (MPS) و ظرفیت <span class="tag t-py">پایتون</span></h2>
+<p>کد: <code>supply_inputs</code>، <code>plan_mps</code>، <code>project</code>. افق <code>T = min(horizonMonths, 18)</code> ماه از c.</p>
+<h3>۹-۱ ظرفیت خطوط</h3>
+<span class="f">CapacityHours (ماهانه) = shifts × hoursPerShift × workingDays(کارخانه) × efficiency
+پیش‌فرض‌ها: shifts=1 ، hoursPerShift=8 ، workingDays=25 ، efficiency=1
+OvertimeHours (سقف) = CapacityHours × overtimePct</span>
+<h3>۹-۲ تقاضا و ذخیره اطمینان</h3>
+<span class="f">demand[t] = پیش‌بینی نسخه supplyVersion (پیش‌فرض اجماعی) چرخه c ؛ اگر نبود، آماری
+z = NormInv(serviceLevelTarget)          (۰٫۹۵ → 1.6449)
+L = 1 + productionLeadDays / 30
+rel = RMSE نسبی بک‌تست روش منتخب (اگر نبود WMAPE)
+      در نبود شاخص بک‌تست: min(1, 0.6 × σ_pop/mean فروش ۱۲ ماه اخیر) ؛ اگر میانگین 0 → 0.3
+rel = clamp(rel, 0.03, 1.2)
+next[t] = (demand[t] + demand[t+1]) / 2      (ماه آخر: demand[t])
+SS[t] = statistical: z × rel × next[t] × √L
+        days:        safetyStockDays / 30 × next[t]
+shelfM = shelfLifeDays / 30 (اگر خالی 99)
+SS[t] = max(0, min(SS[t], next[t] × max(0.1, 0.4 × shelfM)))</span>
+<h3>۹-۳ الگوریتم تخصیص (دقیقاً به این ترتیب)</h3>
+<p>محصولات به ترتیب اولویت: کلاس ABC محصول (A، B، C؛ نامعلوم = C)، سپس قیمت بالاتر. مسیرهای هر محصول (routings با نرخ &gt; 0) به ترتیب priority؛ اولی «خط اصلی».</p>
+<pre>
+برای هر ماه t = 0..T-1:
+  برای هر محصول به ترتیب اولویت:
+    need = max(0, demand[t] + SS[t] − inv)
+    اگر batchSize &gt; 0:  need = ceil(need / batch) × batch
+    اگر محصول مسیر تولید ندارد (کالای بازرگانی): got = need
+    وگرنه:
+      got  = take(خط اصلی، ظرفیت عادی ماه t)
+      got += take(خطوط جایگزین، ظرفیت عادی ماه t)
+      k = 1
+      تا وقتی got &lt; need و k ≤ maxCarry و t−k ≥ min(frozenMonths, t):
+          got += take(همه خطوط، ظرفیت عادی ماه t−k)   ← «پیش‌ساخت» برای ماه t
+          k += 1
+      got += take(همه خطوط، ظرفیت اضافه‌کاری ماه t)
+    inv = max(0, inv + got − demand[t])
+
+take(خطوط، ظرفیت): برای هر مسیر به ترتیب: q = min(باقی‌مانده نیاز، ساعت آزاد × unitsPerHour) ؛ ساعت آزاد −= q / unitsPerHour
+maxCarry = max(0, min(prebuildMonths, floor(0.6 × shelfM)))
+</pre>
+<p>سپس برای هر محصول (کد <code>project</code>):</p>
+<span class="f">inventoryEnd[t] = max(0, inv[t−1] + production[t] − demand[t])        (inv[−1] = موجودی فعلی)
+shortage[t]     = max(0, −(inv[t−1] + production[t] − demand[t]))
+Fill rate       = 1 − Σshortage / Σdemand ؛  Fill rate (ارزشی) با وزن unitPrice
+Utilization[r,t] = ساعت بار / CapacityHours ؛ Bottleneck = utilization &gt; 1.0001
+Avg utilization (شاخص) = میانگین ساده همه خط×ماه‌ها
+Below SS = تعداد محصولاتی که دست‌کم یک ماه inventoryEnd &lt; 0.999 × SS − 0.5</span>
+<div class="note warn"><b>اصلاح انجام‌شده در برنامه:</b> در نسخه قبلی برنامه، کلاس A به‌اشتباه هم‌اولویت C مرتب می‌شد. این خطا در همین تحویل اصلاح شد (<code>app/js/core/supply.js</code>) و نتایج مرجع با نسخه اصلاح‌شده تولید شده‌اند.</div>
+<h3>۹-۴ RCCP سرانگشتی <span class="tag t-dax">DAX</span></h3>
+<p>بدون محدودیت ظرفیت و بدون پیش‌ساخت؛ برای هشدار ظرفیت و نمای سریع:</p>
+<span class="f">RequiredHours[r, t] = Σ_products ( Consensus Qty[p, t] / unitsPerHour(مسیر اصلی p) )
+مسیر اصلی RCCP = مسیر priority 1 با بیشترین unitsPerHour (ستون Routing[IsPrimaryRCCP])
+RCCP Utilization = RequiredHours / CapacityHours</span>
+
+<!-- ===================================================================== -->
+<h2 id="s10">۱۰. موجودی، پوشش و MRP</h2>
+<h3>۱۰-۱ پوشش موجودی کالا <span class="tag t-dax">DAX</span></h3>
+<span class="f">AvgDemandNext3 = Σ اجماعی (c … c+2) / 3
+MonthsOfCover  = OnHand / AvgDemandNext3   (اگر تقاضا 0: 999 اگر موجودی هست، وگرنه 0)
+SSMonths       = safetyStockDays / 30
+وضعیت: بحرانی اگر تقاضا &gt; 0 و پوشش &lt; SSMonths ؛ هشدار اگر پوشش &lt; SSMonths + 0.5 ؛ مازاد اگر پوشش &gt; excessMonths ؛ وگرنه مناسب
+ارزش موجودی = OnHand × unitCost</span>
+<h3>۱۰-۲ MRP <span class="tag t-py">پایتون</span></h3>
+<pre>
+gross[m, t] = Σ_products production[p, t] × qtyPer(p, m) × (1 + scrap)
+avg   = mean(gross[m, ·])
+lt    = max(0, ceil((leadTimeDays − 5) / 30))          زمان تأمین بر حسب ماه
+SS_m  = safetyStockDays / 30 × avg
+onOrder دریافت می‌شود در ماه  rec = min(T−1, max(0, lt−1))
+inv = onHand
+برای t = 0..T-1:
+    avail = inv + (onOrder اگر t = rec) − gross[t]
+    اگر avail &lt; SS_m:
+        net[t] = SS_m − avail
+        qty = net[t] ؛ اگر MOQ &gt; 0:  qty = ceil(max(net, MOQ) / MOQ) × MOQ
+        plannedReceipt[t] = qty
+        release = t − lt ؛ اگر &lt; 0 → 0 و «دیرکرد» ثبت می‌شود
+        plannedRelease[release] += qty
+        avail += qty
+    projected[t] = inv = avail
+</pre>
+<p><b>درخواست درون‌گروهی:</b> ماده‌ای که <code>internalCompany</code> دارد از شرکت دیگر هلدینگ تأمین می‌شود؛ <code>plannedReceipt</code> آن (تبدیل‌شده به تن: کیلوگرم ÷ ۱۰۰۰) تقاضای شرکت تأمین‌کننده است (اندازه <code>IC Request Tons</code>، بخش ۱۳).</p>
+
+<!-- ===================================================================== -->
+<h2 id="s11">۱۱. مرحله ۵ — مالی</h2>
+<h3>۱۱-۱ بهای تمام‌شده استاندارد <span class="tag t-py">پایتون</span></h3>
+<span class="f">Material(p) = Σ_BOM qtyPer × (1 + scrap) × material.unitCost
+   ← درون‌گروهی (matIc) اگر internalCompany دارد ؛ وارداتی (matImp) اگر تأمین‌کننده isImport ؛ وگرنه داخلی (matDom)
+Conversion(p) = costPerHour(خط مسیر priority 1) / unitsPerHour
+Overhead(p)   = max(0, unitCost − Material − Conversion)
+Std(p)        = Material + Conversion + Overhead</span>
+<h3>۱۱-۲ سود و زیان برنامه <span class="tag t-dax">DAX</span> (ستون‌های پایه در <span class="tag t-pq">PQ</span>)</h3>
+<p>برای هر محصول × ماه برنامه (t = MonthNo = 0..T−1):</p>
+<span class="f">Sold     = max(0, demand − shortage)
+PriceNet = unitPrice × (1+priceInflation)^t × (1 − AvgDiscount)              ستون Plan[PriceNet]
+CostInfl = (1+costInflation)^t                                             ستون Plan[CostInfl]
+Revenue  = Sold × PriceNet × kP
+Material = Sold × CostInfl × ((matDom + matIc) + matImp × kFx) × kM
+Conversion = Sold × conv × CostInfl × kC
+Overhead = Sold × overhead × CostInfl
+COGS = Material + Conversion + Overhead ؛ Gross = Revenue − COGS
+Overtime cost (هر خط × ماه) = overtimeHours × costPerHour × overtimePremium × CostInfl × kC
+Holding cost = inventoryEnd × unitCost × CostInfl × holdingRate
+Operating = Gross − Overtime cost − Holding cost
+Lost sales = shortage × PriceNet × kP
+kP, kM, kFx, kC = 1 + (پارامتر What-if)/100</span>
+<p>شاخص‌های ۱۲ ماه = همان با <code>MonthNo &lt; 12</code>. پارامترهای What-if (قیمت، مواد، ارز، تبدیل) دقیقاً همان سناریوی برنامه را در DAX تولید می‌کنند؛ تغییر <b>تقاضا و ظرفیت</b> برنامه تولید را عوض می‌کند و باید با پایتون (<code>--scenarios</code>) محاسبه شود.</p>
+<h3>۱۱-۳ مقایسه با بودجه و پل بودجه</h3>
+<span class="f">Budget Gap % = Σ Revenue ماه‌های دارای ردیف بودجه (MonthNo &lt; 12) / Σ بودجه درآمد همان ماه‌ها − 1
+
+پل (همه ماه‌های برنامه که بودجه دارند، در سطح محصول × ماه):
+  BudgetPrice  = budgetRevenue / budgetQty   (اگر budgetQty = 0 → PriceNet × kP)
+  Volume effect = Σ (Sold − budgetQty) × BudgetPrice
+  Price & mix   = PlanRevenue − Budget − Volume effect
+  Budget + Volume + Price&amp;mix = Plan revenue</span>
+<h3>۱۱-۴ سرمایه در گردش</h3>
+<span class="f">DSO = Σ(revenue × paymentDays مشتری) / Σ revenue   روی ۱۲ ماه اخیر ؛ پیش‌فرض 30
+Receivables[t] = Revenue[t] × DSO / 30
+Purchases[t]   = Σ_material plannedReceipt × unitCost × kM × (kFx اگر وارداتی)
+Payables[t]    = Purchases[t] × dpoDays / 30
+Finished inv[t] = Σ inventoryEnd × unitCost      (بدون تورم)
+Materials inv[t] = Σ max(0, projected) × material.unitCost
+NWC[t] = Finished + Materials + Receivables − Payables</span>
+<p>جدول <code>PnLCheck</code> (= <code>FactPnL</code> پایتون) برای کنترل همه این اعداد در حالت پارامترهای صفر است.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s12">۱۲. سناریوها و مونت‌کارلو <span class="tag t-py">پایتون</span></h2>
+<table>
+<tr><th>سناریو</th><th>تقاضا</th><th>قیمت</th><th>مواد</th><th>ارز</th><th>تبدیل</th><th>ظرفیت</th></tr>
+<tr><td>پایه</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>خوش‌بینانه</td><td>+10</td><td>+3</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+<tr><td>بدبینانه</td><td>−10</td><td>0</td><td>+15</td><td>+20</td><td>+10</td><td>0</td></tr>
+<tr><td>شوک ارزی</td><td>−3</td><td>+8</td><td>+5</td><td>+35</td><td>+5</td><td>0</td></tr>
+<tr><td>افزایش ظرفیت</td><td>+8</td><td>0</td><td>0</td><td>0</td><td>+6</td><td>+15</td></tr>
+</table>
+<p>برای هر سناریو: تقاضای همه محصولات × (۱ + تقاضا٪)، ظرفیت همه خطوط × (۱ + ظرفیت٪)، برنامه تولید و MRP دوباره، سپس مالی با kP/kM/kFx/kC. فهرست سناریوها در <code>PRESETS</code> قابل تغییر است.</p>
+<h3>مونت‌کارلو (۱۲ ماه)</h3>
+<span class="f">برای هر اجرا و هر محصول:  z_p ~ N(0,1) (اثر مشترک محصول) ، z_t ~ N(0,1) (هر ماه)
+D_sim[t] = max(0, demand[t] × (1 + rel × (0.6 z_p + 0.8 z_t)))
+فروش[t] = min(D_sim[t], موجودی + تولید برنامه[t]) ؛ موجودی بعدی = باقی‌مانده
+درآمد = Σ فروش × قیمت ، سود ناخالص = Σ فروش × (قیمت − بهای واحد)
+خروجی: P10/P50/P90 سود و نرخ پاسخ‌گویی ؛ احتمال رسیدن سود ناخالص ماه‌های بودجه‌دار به سود بودجه (بودجه درآمد − budgetQty × unitCost × CostInfl)</span>
+<p>بذر تصادفی ثابت (7) است تا اجراها تکرارپذیر باشند.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s13">۱۳. نمای هلدینگ و جریان‌های درون‌گروهی</h2>
+<ul>
+<li>همه اندازه‌ها بدون فیلتر شرکت، جمع هلدینگ هستند (پنجره‌ها برای هر شرکت جدا حساب و جمع می‌شوند).</li>
+<li><b>درآمد خارج از گروه</b> = درآمد محصولاتی که <code>Product[Intercompany] = FALSE</code> (فروش به شرکت‌های دیگر گروه حذف می‌شود). مرجع: ARZ درآمد ۱۲ ماه ۳۳٫۷ هزار میلیارد، خارج از گروه ۱۳٫۶.</li>
+<li>جریان درون‌گروهی: ماتریس «شرکت خریدار × شرکت فروشنده» با <code>MRP[IC Request Tons]</code> بر حسب <code>MRP[internalCompany]</code>؛ در جلسه هلدینگ با برنامه فروش شرکت فروشنده به گروه مقایسه شود.</li>
+<li>کارت هر شرکت: درآمد LTM و رشد، دقت ۳ ماه، حاشیه ناخالص برنامه، شکاف بودجه، هشدارهای بحرانی.</li>
+</ul>
+
+<!-- ===================================================================== -->
+<h2 id="s14">۱۴. مرحله ۶ — هشدارها و کارنامه جلسه مدیریت <span class="tag t-dax">DAX</span></h2>
+<h3>هشدارها</h3>
+<table>
+<tr><th>نوع</th><th>سطح</th><th>شرط</th></tr>
+<tr><td>موجودی</td><td>بحرانی</td><td>وضعیت پوشش «بحرانی» (بخش ۱۰-۱)</td></tr>
+<tr><td>موجودی</td><td>هشدار</td><td>وضعیت «مازاد»</td></tr>
+<tr><td>ظرفیت</td><td>بحرانی</td><td>RCCP Utilization &gt; utilizationMax در دست‌کم یک ماه از ۶ ماه آینده</td></tr>
+<tr><td>ظرفیت</td><td>هشدار</td><td>اوج RCCP ۶ ماه &gt; utilizationWarn</td></tr>
+<tr><td>پیش‌بینی</td><td>هشدار</td><td>|سوگیری ۳ ماه محصول| &gt; ۲۰٪ و فروش &gt; 0</td></tr>
+</table>
+<h3>کارنامه MBR (good / warning / critical)</h3>
+<table>
+<tr><th>شاخص</th><th>خوب</th><th>هشدار</th><th>بحرانی</th></tr>
+<tr><td>دقت ۳ ماه</td><td>≥ هدف</td><td>≥ هدف − ۱۰٪</td><td>کمتر</td></tr>
+<tr><td>|سوگیری ۳ ماه|</td><td>≤ ۵٪</td><td>≤ ۱۰٪</td><td>بیشتر</td></tr>
+<tr><td>نرخ پاسخ‌گویی برنامه</td><td>≥ سطح خدمت هدف</td><td>≥ هدف − ۳٪</td><td>کمتر</td></tr>
+<tr><td>خط×ماه گلوگاه</td><td>0</td><td>≤ 6</td><td>بیشتر</td></tr>
+<tr><td>حاشیه ناخالص ۱۲ ماه</td><td>≥ ۲۰٪</td><td>≥ ۱۲٪</td><td>کمتر</td></tr>
+<tr><td>شکاف بودجه</td><td>≥ −۲٪</td><td>≥ −۸٪</td><td>کمتر (بدون بودجه: خنثی)</td></tr>
+<tr><td>میانه ماه پوشش (محصولات فعال، پوشش &lt; 999)</td><td>بین 0.5 و excessMonths</td><td>≤ excessMonths + 1</td><td>سایر</td></tr>
+<tr><td>هشدارهای بحرانی</td><td>0</td><td>≤ 3</td><td>بیشتر</td></tr>
+</table>
+<p>برای رنگ از اندازه‌ای مثل <code>Score Color Accuracy</code> در Conditional formatting ← Field value استفاده کنید (سبز <code>#0ca30c</code>، کهربایی <code>#fab219</code>، قرمز <code>#d03b3b</code>).</p>
+<p><b>اقدام‌ها:</b> جدول <code>actions</code> (عنوان، حوزه، مسئول، سررسید، اولویت، وضعیت) و <code>cycleSteps</code> (گام‌های چرخه با وضعیت) در صفحه MBR نمایش داده می‌شوند؛ اقدام سررسیدگذشته و باز را با رنگ قرمز مشخص کنید.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s15">۱۵. صفحات گزارش Power BI</h2>
+<p>هر صفحه معادل یک صفحه برنامه است. برش‌دهنده (Slicer) شرکت در همه صفحات همگام (Sync slicers) باشد؛ در صفحه هلدینگ بدون فیلتر.</p>
+<table>
+<tr><th style="width:17%">صفحه</th><th style="width:43%">نمودارها و جدول‌ها</th><th>اندازه‌های اصلی</th></tr>
+<tr><td>هلدینگ</td><td>کارت شرکت‌ها (Small multiples یا جدول با رنگ وضعیت)، ستون درآمد LTM به تفکیک شرکت، ماتریس جریان درون‌گروهی</td><td>Revenue LTM، Revenue External LTM، Revenue Growth LTM، Accuracy 3M، Plan GM % 12M، Budget Gap %، Critical Alerts</td></tr>
+<tr><td>داشبورد شرکت</td><td>کارت‌های KPI، روند ۲۴ ماه فروش (ریال و تن)، ستون اجماعی ۱۲ ماه آینده کنار سال قبل، جدول هشدارها</td><td>Revenue LTM، Tons Growth LTM، GM % LTM، Consensus vs Last Year %، Consensus vs Budget %، In Last 24M (فیلتر)</td></tr>
+<tr><td>چرخه IBP</td><td>جدول گام‌ها با وضعیت و سررسید، اقدام‌های باز</td><td>CycleSteps، Actions</td></tr>
+<tr><td>پورتفوی</td><td>ماتریس ABC × XYZ (تعداد و درآمد)، نمودار پراکندگی حاشیه × رشد (اندازه حباب = درآمد)، جدول توصیه</td><td>ستون‌های Product، Top 20% Share</td></tr>
+<tr><td>پیش‌بینی آماری</td><td>خط فروش واقعی + آماری با نوار lo/hi (Error bars)، جدول روش و WMAPE/سوگیری هر محصول</td><td>Sales Qty، Statistical Qty، Statistical Lo/Hi 80، ForecastMetrics</td></tr>
+<tr><td>برنامه تقاضا</td><td>ماتریس محصول/خانواده × ماه با انتخاب واحد؛ ردیف‌های آماری، اجماعی، بودجه، سال قبل؛ جدول تعدیل‌ها</td><td>Consensus (Unit)، Statistical (Unit)، Budget (Unit)، Sales Qty LY (shifted)، Adjustments</td></tr>
+<tr><td>دقت پیش‌بینی</td><td>روند ماهانه دقت سه نسخه، ستون FVA، جدول سیگنال ردیابی و محصولات سوگیر</td><td>Accuracy Consensus/Statistical/Naive، FVA Statistical، FVA Judgment، Tracking Signal، Biased Products (3M)</td></tr>
+<tr><td>بررسی تقاضا</td><td>جدول ریسک: اجماعی ۶ ماه در برابر بازه آماری، رشد در برابر سال قبل</td><td>Consensus 6M، Stat Lo 6M، Stat Hi 6M</td></tr>
+<tr><td>برنامه تولید</td><td>ماتریس محصول × ماه: تقاضا، ذخیره اطمینان، تولید، پیش‌ساخت، اضافه‌کاری، موجودی پایان، کمبود؛ کارت نرخ پاسخ‌گویی</td><td>Plan Demand، Production، Safety Stock، Prebuild، Overtime Units، Inventory End، Shortage، Fill Rate</td></tr>
+<tr><td>ظرفیت</td><td>نقشه حرارتی خط × ماه (رنگ: زیر هشدار سبز، تا سقف کهربایی، بالای سقف قرمز)، مقایسه RCCP و برنامه محدود</td><td>Utilization، RCCP Utilization، Overtime Hours، Bottleneck Resource-Months</td></tr>
+<tr><td>موجودی و مواد</td><td>جدول پوشش با وضعیت، ماتریس MRP ماده × ماه، سفارش‌های دیرکرد، درخواست‌های درون‌گروهی</td><td>Months of Cover، Coverage Status، Planned Receipts/Releases، Projected Stock، IC Request Tons</td></tr>
+<tr><td>مالی</td><td>صورت سود و زیان ماهانه (ماتریس)، چهار برش‌دهنده What-if، آبشار پل بودجه، روند سرمایه در گردش</td><td>Plan Revenue … Plan Operating Profit، Bridge *، Net Working Capital، Budget Gap %</td></tr>
+<tr><td>سناریوها</td><td>جدول مقایسه سناریوها، نوار P10–P90 سود ناخالص، احتمال رسیدن به بودجه</td><td>جدول Scenario</td></tr>
+<tr><td>جلسه مدیریت</td><td>کارنامه با رنگ وضعیت، اقدام‌ها، خلاصه تصمیم‌ها</td><td>Score *، Actions</td></tr>
+</table>
+<p>قالب اعداد: مبالغ با <code>displayScale</code> (میلیارد ریال) نمایش داده شوند؛ درصدها یک رقم اعشار. ترتیب ماه‌ها با <code>PeriodKey</code>؛ برچسب ماه <code>Period[Label]</code> (مثلاً «آبان ۱۴۰۵»). جهت گزارش راست‌به‌چپ و فونت فارسی (Vazirmatn یا B Nazanin نصب‌شده روی سرور گزارش).</p>
+
+<!-- ===================================================================== -->
+<h2 id="s16">۱۶. ثبت داده از داخل گزارش (Write-back)</h2>
+<p>Power BI ذاتاً فقط‌خواندنی است. سه گزینه برای ثبت تعدیل اجماع، اقدام‌ها و وضعیت گام‌ها:</p>
+<table>
+<tr><th>گزینه</th><th>شرح</th><th>مناسب برای</th></tr>
+<tr><td><b>الف) ثبت در برنامه IBP (پیشنهادی)</b></td><td>برنامه‌ریزان در برنامه (حالت سرور مرکزی، با کاربر و سطح دسترسی و ردگیری تغییرات) ثبت می‌کنند؛ <code>export_data.py --db</code> و بروزرسانی Power BI داده را می‌آورد</td><td>کمترین هزینه؛ ردگیری کامل؛ همان منطق تعدیل خانواده/شرکت</td></tr>
+<tr><td>ب) Power Apps داخل گزارش</td><td>ویژوال Power Apps با جدول SQL/SharePoint/Dataverse هم‌ساختار <code>demandAdjustments</code> و <code>actions</code>؛ بعد از ثبت، اسکریپت پایتون و بروزرسانی</td><td>اگر همه کار باید در Power BI باشد</td></tr>
+<tr><td>ج) Translytical task flows (Fabric)</td><td>دکمه داخل گزارش که User data function را صدا می‌زند و در پایگاه داده می‌نویسد</td><td>محیط Fabric</td></tr>
+</table>
+<p>در گزینه ب و ج، منطق پخش تعدیل سطح خانواده/شرکت باید پیاده شود: <code>new_p = newTotal × w_p / Σw</code> با <code>w_p</code> = اجماعی فعلی محصول در واحد نمایش؛ اگر Σw = 0 وزن = آماری، و اگر آن هم صفر وزن مساوی. مقدار به واحد «مقدار» برگردانده و ذخیره می‌شود.</p>
+
+<!-- ===================================================================== -->
+<h2 id="s17">۱۷. امنیت (RLS) و بروزرسانی خودکار</h2>
+<h3>RLS</h3>
+<p>جدول <code>UserAccess(UserEmail, CompanyCode)</code>؛ <code>*</code> یعنی همه شرکت‌ها. نقش «Company Access» با این فیلتر روی <code>Company</code> و همان الگو (با ستون CompanyCode خودشان) روی <code>Customer</code>، <code>Channel</code>، <code>Region</code>، <code>Family</code> و <code>Supplier</code> که به Company رابطه ندارند:</p>
+<pre>VAR u = USERPRINCIPALNAME ()
+RETURN
+    CONTAINS ( FILTER ( UserAccess, UserAccess[UserEmail] = u ), UserAccess[CompanyCode], Company[CompanyCode] )
+ || CONTAINS ( FILTER ( UserAccess, UserAccess[UserEmail] = u ), UserAccess[CompanyCode], "*" )</pre>
+<p>دسترسی‌ها می‌توانند از کاربران سرور مرکزی برنامه (نقش و شرکت‌های مجاز) استخراج شوند تا یک منبع حقیقت باشد.</p>
+<h3>بروزرسانی</h3>
+<ol>
+<li>Task Scheduler ویندوز (یا cron) روی سرور: <code>export_data.py</code> سپس <code>ibp_pbi.py</code> (مثلاً هر شب ۲:۰۰ و دستی بعد از جلسه اجماع).</li>
+<li>Power BI Service: On-premises data gateway روی همان سرور با دسترسی به پوشه‌ها؛ Scheduled refresh بعد از پایان اسکریپت (مثلاً ۳:۰۰).</li>
+<li>اسکریپت پایتون را داخل Power Query اجرا نکنید (در Service فقط با Personal gateway کار می‌کند و کند است)؛ اجرای جداگانه پایدارتر است.</li>
+<li>برای داده زیاد: به‌جای CSV در SQL Server بنویسید (<code>DataFrame.to_sql</code>) و Power Query را به SQL وصل کنید.</li>
+</ol>
+
+<!-- ===================================================================== -->
+<h2 id="s18">۱۸. آزمون و پذیرش: اعداد مرجع</h2>
+<p>این اعداد از خود برنامه روی داده نمونه (<code>sample/data</code>) گرفته شده‌اند. با پارامترهای What-if صفر، اعداد Power BI باید تا گرد کردن با این‌ها برابر باشند. فهرست کامل و جزئیات سطح محصول/ماه در <code>sample/reference</code> است (برنامه تولید، بار خطوط، MRP، بهای واحد، سود و زیان ماهانه، پورتفوی، دقت، پوشش، RCCP، هشدارها).</p>
+<div class="scroll"><p>ماه چرخه همه شرکت‌ها در نمونه: <b>۱۴۰۵۰۸</b>. مبالغ به میلیارد ریال.</p>
+<table><tr><th>شاخص</th><th>اندازه DAX</th><th>ZMC</th><th>ZKM</th><th>ARZ</th><th>ZNM</th><th>ROG</th><th>MHS</th></tr>
+<tr><td>درآمد ۱۲ ماه اخیر</td><td><code>Revenue LTM</code></td><td>۲۴٬۷۶۲٫۱</td><td>۱۰٬۸۱۲٫۵</td><td>۳۳٬۶۶۴٫۶</td><td>۲۷٬۵۶۱٫۷</td><td>۲۶٬۱۱۹٫۴</td><td>۱۹٬۸۶۸٫۷</td></tr>
+<tr><td>درآمد خارج از گروه ۱۲ ماه</td><td><code>Revenue External LTM</code></td><td>۲۴٬۷۶۲٫۱</td><td>۱۰٬۸۱۲٫۵</td><td>۱۳٬۵۸۰٫۱</td><td>۱۹٬۶۷۶٫۰</td><td>۱۸٬۳۱۷٫۹</td><td>۱۹٬۸۶۸٫۷</td></tr>
+<tr><td>درآمد ۱۲ ماه قبل از آن</td><td><code>Revenue Prev LTM</code></td><td>۱۷٬۴۷۳٫۹</td><td>۷٬۳۵۵٫۲</td><td>۲۵٬۷۴۳٫۴</td><td>۱۹٬۳۹۱٫۰</td><td>۱۶٬۰۸۲٫۲</td><td>۱۴٬۷۸۸٫۱</td></tr>
+<tr><td>تناژ ۱۲ ماه اخیر</td><td><code>Tons LTM</code></td><td>۴۰٬۸۴۲٫۶</td><td>۸٬۷۳۸٫۵</td><td>۱۱۵٬۵۴۷٫۴</td><td>۷۳٬۶۸۰٫۶</td><td>۲۶٬۹۱۹٫۰</td><td>۸۳٬۲۷۸٫۳</td></tr>
+<tr><td>دقت ۳ ماه (اجماعی)</td><td><code>Accuracy 3M</code></td><td>۷۶٫۷٪</td><td>۸۳٫۱٪</td><td>۳۳٫۰٪</td><td>۴۶٫۰٪</td><td>۳۰٫۴٪</td><td>۸۴٫۹٪</td></tr>
+<tr><td>سوگیری ۳ ماه</td><td><code>Bias 3M</code></td><td>۶٫۰٪</td><td>۵٫۱٪</td><td>۴۶٫۵٪</td><td>-۱۱٫۶٪</td><td>-۸٫۳٪</td><td>۸٫۲٪</td></tr>
+<tr><td>درآمد برنامه ۱۲ ماه</td><td><code>Plan Revenue 12M</code></td><td>۳۷٬۱۵۹٫۸</td><td>۱۶٬۰۶۰٫۷</td><td>۵۲٬۸۵۱٫۱</td><td>۳۸٬۱۵۳٫۳</td><td>۳۴٬۰۴۷٫۰</td><td>۲۸٬۴۴۹٫۵</td></tr>
+<tr><td>سود ناخالص برنامه ۱۲ ماه</td><td><code>Plan Gross 12M</code></td><td>۸٬۵۸۲٫۵</td><td>۳٬۷۴۷٫۸</td><td>۶٬۵۹۸٫۳</td><td>۴٬۹۸۳٫۱</td><td>۴٬۴۰۴٫۹</td><td>۴٬۰۵۶٫۰</td></tr>
+<tr><td>حاشیه ناخالص برنامه</td><td><code>Plan GM % 12M</code></td><td>۲۳٫۱٪</td><td>۲۳٫۳٪</td><td>۱۲٫۵٪</td><td>۱۳٫۱٪</td><td>۱۲٫۹٪</td><td>۱۴٫۳٪</td></tr>
+<tr><td>سود عملیاتی برنامه ۱۲ ماه</td><td><code>Plan Operating 12M</code></td><td>۸٬۳۴۲٫۳</td><td>۳٬۶۶۰٫۳</td><td>۶٬۱۱۸٫۲</td><td>۴٬۵۸۶٫۹</td><td>۴٬۰۸۸٫۵</td><td>۳٬۹۱۵٫۵</td></tr>
+<tr><td>تناژ فروش برنامه ۱۲ ماه</td><td><code>—</code></td><td>۴۵٬۶۳۷٫۵</td><td>۹٬۶۶۲٫۲</td><td>۱۳۱٬۴۳۰٫۳</td><td>۷۴٬۸۶۳٫۸</td><td>۲۹٬۲۱۷٫۰</td><td>۸۹٬۳۰۲٫۲</td></tr>
+<tr><td>فروش ازدست‌رفته ۱۲ ماه</td><td><code>Lost Sales 12M</code></td><td>۰٫۰</td><td>۰٫۰</td><td>۰٫۰</td><td>۰٫۰</td><td>۰٫۰</td><td>۰٫۰</td></tr>
+<tr><td>نرخ پاسخ‌گویی (مقداری، کل افق)</td><td><code>Fill Rate</code></td><td>۱۰۰٫۰۰٪</td><td>۹۹٫۹۹٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td></tr>
+<tr><td>نرخ پاسخ‌گویی (ارزشی)</td><td><code>Fill Rate (Value)</code></td><td>۱۰۰٫۰۰٪</td><td>۹۹٫۹۹٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td><td>۱۰۰٫۰۰٪</td></tr>
+<tr><td>میانگین بهره‌برداری خطوط</td><td><code>Avg Utilization (KPI)</code></td><td>۷۴٫۱٪</td><td>۸۳٫۶٪</td><td>۶۷٫۲٪</td><td>۸۱٫۳٪</td><td>۷۶٫۱٪</td><td>۷۷٫۷٪</td></tr>
+<tr><td>خط×ماه گلوگاه</td><td><code>Bottleneck Resource-Months</code></td><td>۰</td><td>۸</td><td>۰</td><td>۳</td><td>۰</td><td>۰</td></tr>
+<tr><td>ساعت اضافه‌کاری</td><td><code>Overtime Hours</code></td><td>۰٫۰</td><td>۳۲۰٫۷</td><td>۰٫۰</td><td>۸۴٫۴</td><td>۰٫۰</td><td>۰٫۰</td></tr>
+<tr><td>تن پیش‌ساخت</td><td><code>Prebuild Tons</code></td><td>۰٫۰</td><td>۲۹۱٫۰</td><td>۰٫۰</td><td>۱٬۴۹۸٫۸</td><td>۲۹۴٫۰</td><td>۵۹٫۷</td></tr>
+<tr><td>محصولات زیر ذخیره اطمینان</td><td><code>Products Below SS</code></td><td>۰</td><td>۲</td><td>۰</td><td>۰</td><td>۰</td><td>۰</td></tr>
+<tr><td>ارزش موجودی کالای فعلی</td><td><code>Inventory Value (Current)</code></td><td>۲٬۳۱۶٫۰</td><td>۱٬۱۷۲٫۴</td><td>۳٬۸۴۶٫۶</td><td>۳٬۸۴۳٫۳</td><td>۱٬۶۹۲٫۴</td><td>۲٬۲۵۹٫۲</td></tr>
+<tr><td>ارزش موجودی مواد فعلی</td><td><code>—</code></td><td>۱٬۴۰۱٫۶</td><td>۵۸۸٫۵</td><td>۳٬۷۶۶٫۳</td><td>۲٬۷۵۳٫۹</td><td>۲٬۰۵۴٫۴</td><td>۲٬۷۶۶٫۴</td></tr>
+<tr><td>بودجه درآمد ماه‌های قابل مقایسه</td><td><code>Budget Revenue (12M)</code></td><td>۱۵٬۸۳۰٫۳</td><td>۶٬۸۷۸٫۸</td><td>۲۰٬۹۵۷٫۷</td><td>۱۴٬۹۲۷٫۵</td><td>۱۳٬۶۴۲٫۱</td><td>۱۱٬۸۷۶٫۷</td></tr>
+<tr><td>شکاف با بودجه</td><td><code>Budget Gap %</code></td><td>-۶٫۳٪</td><td>-۶٫۸٪</td><td>۰٫۸٪</td><td>-۴٫۹٪</td><td>-۱٫۵٪</td><td>-۱٫۸٪</td></tr>
+<tr><td>ماه‌های دارای بودجه</td><td><code>—</code></td><td>۵</td><td>۵</td><td>۵</td><td>۵</td><td>۵</td><td>۵</td></tr>
+<tr><td>سرمایه در گردش پایان ماه ۱۲</td><td><code>Net Working Capital (ماه ۱۲)</code></td><td>۲٬۲۴۵٫۰</td><td>۶۸۴٫۳</td><td>۹٬۰۰۷٫۷</td><td>۸٬۰۰۶٫۹</td><td>۸٬۵۳۰٫۵</td><td>۵٬۵۰۲٫۴</td></tr>
+<tr><td>تعداد محصولات A</td><td><code>ABC Class</code></td><td>۸</td><td>۱۱</td><td>۶</td><td>۷</td><td>۴</td><td>۴</td></tr>
+<tr><td>تعداد محصولات B</td><td><code>ABC Class</code></td><td>۵</td><td>۵</td><td>۵</td><td>۴</td><td>۲</td><td>۲</td></tr>
+<tr><td>تعداد محصولات C</td><td><code>ABC Class</code></td><td>۸</td><td>۳</td><td>۲</td><td>۳</td><td>۲</td><td>۲</td></tr>
+<tr><td>سهم ۲۰٪ محصولات برتر</td><td><code>Top 20% Share</code></td><td>۵۴٫۱٪</td><td>۵۰٫۱٪</td><td>۶۲٫۵٪</td><td>۴۷٫۳٪</td><td>۴۸٫۳٪</td><td>۵۴٫۳٪</td></tr>
+<tr><td>هشدارهای بحرانی</td><td><code>Critical Alerts</code></td><td>۵</td><td>۸</td><td>۲</td><td>۲</td><td>۴</td><td>۳</td></tr>
+<tr><td>کل هشدارها</td><td><code>—</code></td><td>۱۲</td><td>۱۳</td><td>۹</td><td>۹</td><td>۶</td><td>۵</td></tr>
+</table>
+<details><summary>مقادیر کامل (بدون گرد کردن)</summary><table><tr><th>kpi</th><th>ZMC</th><th>ZKM</th><th>ARZ</th><th>ZNM</th><th>ROG</th><th>MHS</th></tr>
+<tr><td><code>cycle</code></td><td dir='ltr'>140508</td><td dir='ltr'>140508</td><td dir='ltr'>140508</td><td dir='ltr'>140508</td><td dir='ltr'>140508</td><td dir='ltr'>140508</td></tr>
+<tr><td><code>lastActual</code></td><td dir='ltr'>140507</td><td dir='ltr'>140507</td><td dir='ltr'>140507</td><td dir='ltr'>140507</td><td dir='ltr'>140507</td><td dir='ltr'>140507</td></tr>
+<tr><td><code>revenueLTM</code></td><td dir='ltr'>24762112893000</td><td dir='ltr'>10812528990000</td><td dir='ltr'>33664573308000</td><td dir='ltr'>27561725520000</td><td dir='ltr'>26119389796000</td><td dir='ltr'>19868699884000</td></tr>
+<tr><td><code>revenueExternalLTM</code></td><td dir='ltr'>24762112893000</td><td dir='ltr'>10812528990000</td><td dir='ltr'>13580086595000</td><td dir='ltr'>19676008384000</td><td dir='ltr'>18317857004000</td><td dir='ltr'>19868699884000</td></tr>
+<tr><td><code>revenuePrevLTM</code></td><td dir='ltr'>17473888603000</td><td dir='ltr'>7355247422000</td><td dir='ltr'>25743356893000</td><td dir='ltr'>19391015964000</td><td dir='ltr'>16082150759000</td><td dir='ltr'>14788129053000</td></tr>
+<tr><td><code>tonsLTM</code></td><td dir='ltr'>40842.63910000001</td><td dir='ltr'>8738.4945</td><td dir='ltr'>115547.44</td><td dir='ltr'>73680.6</td><td dir='ltr'>26919</td><td dir='ltr'>83278.3</td></tr>
+<tr><td><code>accuracy3m</code></td><td dir='ltr'>0.7669215088770963</td><td dir='ltr'>0.8309694068048945</td><td dir='ltr'>0.3304561627173326</td><td dir='ltr'>0.4599165332168681</td><td dir='ltr'>0.30385029617662895</td><td dir='ltr'>0.8489595206304752</td></tr>
+<tr><td><code>bias3m</code></td><td dir='ltr'>0.05996573386636208</td><td dir='ltr'>0.05080118282974845</td><td dir='ltr'>0.4652625553698151</td><td dir='ltr'>-0.116068973326216</td><td dir='ltr'>-0.0825255788906839</td><td dir='ltr'>0.08206597844139772</td></tr>
+<tr><td><code>wmape3m</code></td><td dir='ltr'>0.2330784911229037</td><td dir='ltr'>0.16903059319510547</td><td dir='ltr'>0.6695438372826674</td><td dir='ltr'>0.5400834667831319</td><td dir='ltr'>0.696149703823371</td><td dir='ltr'>0.15104047936952486</td></tr>
+<tr><td><code>planRevenue12</code></td><td dir='ltr'>37159757478317.016</td><td dir='ltr'>16060690639462.36</td><td dir='ltr'>52851144297867.09</td><td dir='ltr'>38153325612857.82</td><td dir='ltr'>34047035240284.02</td><td dir='ltr'>28449477312612.72</td></tr>
+<tr><td><code>planGross12</code></td><td dir='ltr'>8582541918103.123</td><td dir='ltr'>3747762386903.171</td><td dir='ltr'>6598289509905.927</td><td dir='ltr'>4983073509277.883</td><td dir='ltr'>4404884838797.29</td><td dir='ltr'>4056034690201.784</td></tr>
+<tr><td><code>planGM</code></td><td dir='ltr'>0.23096334584829026</td><td dir='ltr'>0.23335001408311973</td><td dir='ltr'>0.12484667262298449</td><td dir='ltr'>0.1306065311276186</td><td dir='ltr'>0.12937645841143566</td><td dir='ltr'>0.14256974374722842</td></tr>
+<tr><td><code>planOperating12</code></td><td dir='ltr'>8342261588614.631</td><td dir='ltr'>3660252702180.994</td><td dir='ltr'>6118199857558.799</td><td dir='ltr'>4586895515786.016</td><td dir='ltr'>4088517863017.822</td><td dir='ltr'>3915457234201.8086</td></tr>
+<tr><td><code>lostSales12</code></td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td></tr>
+<tr><td><code>planTons12</code></td><td dir='ltr'>45637.4744</td><td dir='ltr'>9662.227600000002</td><td dir='ltr'>131430.32</td><td dir='ltr'>74863.84999999999</td><td dir='ltr'>29217</td><td dir='ltr'>89302.25</td></tr>
+<tr><td><code>fillRate</code></td><td dir='ltr'>1</td><td dir='ltr'>0.9999326990379654</td><td dir='ltr'>1</td><td dir='ltr'>1</td><td dir='ltr'>1</td><td dir='ltr'>1</td></tr>
+<tr><td><code>fillRateValue</code></td><td dir='ltr'>1</td><td dir='ltr'>0.9999296944104046</td><td dir='ltr'>1</td><td dir='ltr'>1</td><td dir='ltr'>1</td><td dir='ltr'>1</td></tr>
+<tr><td><code>avgUtil</code></td><td dir='ltr'>0.7406483183389779</td><td dir='ltr'>0.836238763749337</td><td dir='ltr'>0.6719376855001217</td><td dir='ltr'>0.8130955424274883</td><td dir='ltr'>0.7609426189674453</td><td dir='ltr'>0.7768605084449282</td></tr>
+<tr><td><code>bottleneckResourceMonths</code></td><td dir='ltr'>0</td><td dir='ltr'>8</td><td dir='ltr'>0</td><td dir='ltr'>3</td><td dir='ltr'>0</td><td dir='ltr'>0</td></tr>
+<tr><td><code>overtimeHours</code></td><td dir='ltr'>0</td><td dir='ltr'>320.74784956457944</td><td dir='ltr'>0</td><td dir='ltr'>84.40921672154364</td><td dir='ltr'>0</td><td dir='ltr'>0</td></tr>
+<tr><td><code>prebuildTons</code></td><td dir='ltr'>0</td><td dir='ltr'>290.9899942560327</td><td dir='ltr'>0</td><td dir='ltr'>1498.789086814288</td><td dir='ltr'>293.9962282655744</td><td dir='ltr'>59.70950738718212</td></tr>
+<tr><td><code>productsBelowSS</code></td><td dir='ltr'>0</td><td dir='ltr'>2</td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td><td dir='ltr'>0</td></tr>
+<tr><td><code>inventoryValueFinished</code></td><td dir='ltr'>2316015412000</td><td dir='ltr'>1172435706000</td><td dir='ltr'>3846569702000</td><td dir='ltr'>3843310410000</td><td dir='ltr'>1692432302000</td><td dir='ltr'>2259182703000</td></tr>
+<tr><td><code>inventoryValueMaterials</code></td><td dir='ltr'>1401618645000</td><td dir='ltr'>588533655000</td><td dir='ltr'>3766274610000</td><td dir='ltr'>2753930120000</td><td dir='ltr'>2054396070000</td><td dir='ltr'>2766384660000</td></tr>
+<tr><td><code>budgetRevenueComparable</code></td><td dir='ltr'>15830264406000</td><td dir='ltr'>6878757785000</td><td dir='ltr'>20957726839000</td><td dir='ltr'>14927483788000</td><td dir='ltr'>13642094690000</td><td dir='ltr'>11876697779000</td></tr>
+<tr><td><code>budgetGap</code></td><td dir='ltr'>-0.06323814797646554</td><td dir='ltr'>-0.06778223177556153</td><td dir='ltr'>0.007569380600036979</td><td dir='ltr'>-0.04896169539159578</td><td dir='ltr'>-0.014702611100607443</td><td dir='ltr'>-0.017882402638834893</td></tr>
+<tr><td><code>budgetMonths</code></td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>5</td></tr>
+<tr><td><code>nwcEnd</code></td><td dir='ltr'>2244964278087.1797</td><td dir='ltr'>684299959193.727</td><td dir='ltr'>9007689246793.78</td><td dir='ltr'>8006869917229.344</td><td dir='ltr'>8530457804945.316</td><td dir='ltr'>5502362022159.004</td></tr>
+<tr><td><code>abcA</code></td><td dir='ltr'>8</td><td dir='ltr'>11</td><td dir='ltr'>6</td><td dir='ltr'>7</td><td dir='ltr'>4</td><td dir='ltr'>4</td></tr>
+<tr><td><code>abcB</code></td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>5</td><td dir='ltr'>4</td><td dir='ltr'>2</td><td dir='ltr'>2</td></tr>
+<tr><td><code>abcC</code></td><td dir='ltr'>8</td><td dir='ltr'>3</td><td dir='ltr'>2</td><td dir='ltr'>3</td><td dir='ltr'>2</td><td dir='ltr'>2</td></tr>
+<tr><td><code>top20Share</code></td><td dir='ltr'>0.5410373586410415</td><td dir='ltr'>0.500745197724552</td><td dir='ltr'>0.6253381175634058</td><td dir='ltr'>0.47268530181632834</td><td dir='ltr'>0.4833614286017296</td><td dir='ltr'>0.5434953031172374</td></tr>
+<tr><td><code>alertsCritical</code></td><td dir='ltr'>5</td><td dir='ltr'>8</td><td dir='ltr'>2</td><td dir='ltr'>2</td><td dir='ltr'>4</td><td dir='ltr'>3</td></tr>
+<tr><td><code>alertsTotal</code></td><td dir='ltr'>12</td><td dir='ltr'>13</td><td dir='ltr'>9</td><td dir='ltr'>9</td><td dir='ltr'>6</td><td dir='ltr'>5</td></tr>
+</table></details></div>
+<h3>روش آزمون</h3>
+<ol>
+<li><code>python tools/validate.py sample</code> ← باید <code>WORST</code> کمتر از <code>1e-6</code> باشد (محاسبات پایتون = برنامه).</li>
+<li>در Power BI یک صفحه «کنترل» با جدول شرکت × اندازه‌های بالا بسازید و با این جدول مقایسه کنید.</li>
+<li>سود و زیان DAX را ماه‌به‌ماه با <code>PnLCheck</code> مقایسه کنید (اختلاف = 0).</li>
+<li>ستون‌های پورتفوی را با <code>reference/portfolio.csv</code> و دقت سطح محصول را با <code>reference/accuracy_3m.csv</code> مقایسه کنید.</li>
+<li>پارامتر قیمت را ۱۰٪ کنید: درآمد دقیقاً ۱٫۱ برابر و هزینه‌ها بدون تغییر شود.</li>
+</ol>
+
+<!-- ===================================================================== -->
+<h2 id="s19">۱۹. برنامه کار پیشنهادی برای برنامه‌نویس</h2>
+<table>
+<tr><th>گام</th><th>کار</th><th>معیار پایان</th></tr>
+<tr><td>1</td><td>نصب پایتون و اجرای <code>validate.py</code> روی نمونه</td><td>WORST &lt; 1e-6</td></tr>
+<tr><td>2</td><td>Power Query: پارامترها، توابع، ابعاد (Period، Company، Product …)</td><td>همه کوئری‌ها بدون خطا</td></tr>
+<tr><td>3</td><td>روابط بخش ۳؛ Sort by column برای ماه‌ها</td><td>بدون هشدار ابهام</td></tr>
+<tr><td>4</td><td>بخش‌های ۰۱ تا ۰۳ DAX (فروش، تقاضا، دقت)</td><td>Revenue LTM، Accuracy 3M برابر مرجع</td></tr>
+<tr><td>5</td><td>ستون‌های پورتفوی (۰۹)</td><td>ABC/XYZ/توصیه برابر reference/portfolio</td></tr>
+<tr><td>6</td><td>Factهای پایتون، بخش‌های ۰۴ تا ۰۸ DAX</td><td>Fill rate، Avg util، Plan Gross 12M، Budget Gap، NWC برابر مرجع</td></tr>
+<tr><td>7</td><td>هشدارها و کارنامه (۱۰)، سناریوها</td><td>Critical Alerts برابر مرجع</td></tr>
+<tr><td>8</td><td>صفحات گزارش بخش ۱۵ و قالب‌بندی</td><td>بازبینی کاربر برنامه‌ریزی</td></tr>
+<tr><td>9</td><td>RLS، gateway، زمان‌بندی، اتصال به داده واقعی با <code>export_data.py --db</code></td><td>بروزرسانی خودکار شبانه</td></tr>
+<tr><td>10</td><td>Write-back (بخش ۱۶) در صورت نیاز</td><td>ثبت تعدیل و دیدن آن پس از بروزرسانی</td></tr>
+</table>
+
+<!-- ===================================================================== -->
+<h2 id="s20">۲۰. نکات، تفاوت‌ها و محدودیت‌ها</h2>
+<ul>
+<li>فایل‌های DAX و M با منطق برنامه نوشته و منطق آن‌ها با معادل پایتون آزموده شده، اما در خود Power BI Desktop اجرا نشده‌اند؛ ممکن است نام ستون یا نوع داده نیاز به اصلاح جزئی داشته باشد. معیار درستی، اعداد بخش ۱۸ است.</li>
+<li>تعریف «دقت ۳ ماه» در داشبورد و کارنامه: نسخه اجماعی، lag-1، WMAPE تجمیعی سه ماه. صفحه تقاضای برنامه دقت را برای هر ماه جداگانه هم نشان می‌دهد؛ هر دو در DAX ممکن است (با فیلتر Period).</li>
+<li>RCCP (بخش ۹-۴) بدون محدودیت است و با بار برنامه محدود (ResourceLoad) فرق دارد؛ هشدار ظرفیت برنامه از RCCP استفاده می‌کند.</li>
+<li>اگر برای یک محصول دو مسیر priority 1 با نرخ برابر وجود داشته باشد، برنامه اولی را برمی‌دارد ولی ستون <code>IsPrimaryRCCP</code> هر دو را علامت می‌زند؛ چنین داده‌ای را اصلاح کنید.</li>
+<li>هزینه نگهداری و موجودی پایانی بر اساس بهای واحد ثبت‌شده محصول (unitCost) است، نه بهای استاندارد.</li>
+<li>پیش‌بینی آماری پایتون (موتور کامل) ممکن است با نسخه آماری ذخیره‌شده در برنامه (اگر بدون موتور اجرا شده باشد) فرق کند.</li>
+<li>برای هر شرکت جدید فقط داده و تنظیماتش لازم است؛ مدل و اندازه‌ها چندشرکتی هستند.</li>
+</ul>
+
+<h2 id="a1">پیوست: فهرست همه اندازه‌ها و ستون‌های DAX</h2>
+<div class="scroll"><p>۱۶۲ مورد؛ متن کامل در <code>dax/measures.dax</code>.</p><table><tr><th>نام</th><th>نوع</th><th>توضیح</th></tr><tr><th colspan='3'>01 فروش واقعی</th></tr>
+<tr><td><code>Sales[Revenue]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Sales Qty]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Sales Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Gross Profit (Actual)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[GM % (Actual)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue External]</code></td><td>اندازه</td><td>فروش بیرون از گروه (حذف فروش درون‌گروهی در نمای تلفیقی هلدینگ)</td></tr>
+<tr><td><code>Sales[Revenue LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue Prev LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue Growth LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue External LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Tons LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Tons Prev LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Tons Growth LTM]</code></td><td>اندازه</td><td>رشد وزنی؛ اگر رشد ریالی بیش از ۵ واحد درصد از آن بالاتر باشد، رشد «قیمتی» است</td></tr>
+<tr><td><code>Sales[Gross Profit LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[GM % LTM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue L3M]</code></td><td>اندازه</td><td>۳ ماه اخیر در برابر همان ۳ ماه سال قبل</td></tr>
+<tr><td><code>Sales[Revenue L3M LY]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Revenue Growth L3M vs LY]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[Sales Qty LY (shifted)]</code></td><td>اندازه</td><td>فروش همان ماه‌ها در سال قبل (برای مقایسه برنامه آینده با سال قبل)</td></tr>
+<tr><td><code>Sales[Sales Tons LY (shifted)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Sales[In Last 24M]</code></td><td>اندازه</td><td>فیلتر بصری: ۲۴ ماه اخیر هر شرکت (روی Visual filter: = 1)</td></tr>
+<tr><th colspan='3'>02 تقاضا و پیش‌بینی (چرخه جاری)</th></tr>
+<tr><td><code>Forecast[Consensus Qty]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus Revenue]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Statistical Qty]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Statistical Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Statistical Revenue]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Statistical Lo 80]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Statistical Hi 80]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Budget[Budget Qty]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Budget[Budget Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Budget[Budget Revenue]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus (Unit)]</code></td><td>اندازه</td><td>تغییر واحد نمایش با جدول UnitSelector (مقدار / تن / مبلغ)</td></tr>
+<tr><td><code>Forecast[Statistical (Unit)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Budget[Budget (Unit)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus Tons 12M]</code></td><td>اندازه</td><td>۱۲ ماه آینده از ماه چرخه</td></tr>
+<tr><td><code>Forecast[Statistical Tons 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus vs Last Year %]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus Tons in Budget Months]</code></td><td>اندازه</td><td>فقط ماه‌هایی که بودجه دارند مقایسه می‌شوند (فیلتر از Budget به Period نمی‌رود، پس کلید ماه از خود Budget گرفته می‌شود)</td></tr>
+<tr><td><code>Forecast[Budget Tons 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus vs Budget %]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Consensus 6M]</code></td><td>اندازه</td><td>ریسک برنامه: اجماعی ۶ ماه آینده خارج از بازه ۸۰٪ آماری (در سطح محصول)</td></tr>
+<tr><td><code>Forecast[Stat Lo 6M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Stat Hi 6M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Plan Risk]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Forecast[Plan Risk Gap %]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>03 دقت پیش‌بینی و FVA</th></tr>
+<tr><td><code>Accuracy[Acc Actual]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Acc Abs Error]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Acc Error]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[WMAPE]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Forecast Accuracy]</code></td><td>اندازه</td><td>دقت = ۱ − WMAPE (کف صفر)</td></tr>
+<tr><td><code>Accuracy[Forecast Bias]</code></td><td>اندازه</td><td>سوگیری مثبت = بیش‌برآورد، منفی = کم‌برآورد</td></tr>
+<tr><td><code>Accuracy[Accuracy Consensus]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Accuracy Statistical]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Accuracy Naive]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Bias Consensus]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[FVA Statistical]</code></td><td>اندازه</td><td>ارزش افزوده پیش‌بینی (FVA): آماری نسبت به ساده، و قضاوت (اجماعی) نسبت به آماری</td></tr>
+<tr><td><code>Accuracy[FVA Judgment]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Accuracy 3M]</code></td><td>اندازه</td><td>دقت و سوگیری ۳ ماه اخیر (کارنامه، داشبورد، هشدارها)</td></tr>
+<tr><td><code>Accuracy[Bias 3M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Accuracy[Tracking Signal]</code></td><td>اندازه</td><td>سیگنال ردیابی (در سطح محصول): جمع خطاها ÷ میانگین قدرمطلق خطا؛ |TS| &gt; ۴ = سوگیری مداوم</td></tr>
+<tr><td><code>Accuracy[TS Out of Control]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>04 برنامه تولید (MPS) و موجودی پیش‌بینی‌شده</th></tr>
+<tr><td><code>Plan[Plan Demand]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Production]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Production Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Inventory End]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Inventory Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Safety Stock]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Shortage]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Prebuild]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Prebuild Tons]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Overtime Units]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Alt Line Units]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Fill Rate]</code></td><td>اندازه</td><td>نرخ پاسخ‌گویی به تقاضا (Fill rate) = ۱ − کمبود ÷ تقاضا</td></tr>
+<tr><td><code>Plan[Fill Rate (Value)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Shortage Value (List Price)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Inventory Value (Plan)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Months of Cover (Plan)]</code></td><td>اندازه</td><td>ماه پوشش = موجودی پایان ماه ÷ تقاضای ماه بعد</td></tr>
+<tr><td><code>Plan[Products Below SS]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>05 ظرفیت (بار خطوط و RCCP)</th></tr>
+<tr><td><code>ResourceLoad[Load Hours]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Capacity Hours]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Utilization]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Avg Utilization (KPI)]</code></td><td>اندازه</td><td>شاخص برنامه: میانگین ساده بهره‌برداری همه خط × ماه‌ها</td></tr>
+<tr><td><code>ResourceLoad[Peak Utilization]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Overtime Hours]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Bottleneck Resource-Months]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Routing[RCCP Required Hours]</code></td><td>اندازه</td><td>رابطه Routing ← Product غیرفعال است؛ محصول با TREATAS منتقل می‌شود</td></tr>
+<tr><td><code>Routing[RCCP Capacity Hours]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Routing[RCCP Utilization]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>06 موجودی، پوشش و MRP</th></tr>
+<tr><td><code>Inventory[On Hand]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Inventory Value (Current)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Avg Demand Next 3M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Months of Cover]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Coverage Status]</code></td><td>اندازه</td><td>وضعیت: بحرانی (زیر ذخیره اطمینان)، هشدار (کمتر از نیم ماه بالای آن)، مازاد (بیش از سقف ماه‌های تنظیمات)</td></tr>
+<tr><td><code>Inventory[Stockout Risk Products]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Excess Products]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Inventory[Excess Value]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Gross Requirement]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Net Requirement]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Planned Receipts]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Planned Releases]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Projected Stock]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Materials Stock Value]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[IC Request Tons]</code></td><td>اندازه</td><td>درخواست درون‌گروهی (تن) که شرکت خریدار برای شرکت تأمین‌کننده منتشر می‌کند</td></tr>
+<tr><th colspan='3'>07 سود و زیان برنامه (با پارامترهای What-if)</th></tr>
+<tr><td><code>Plan[kP]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[kM]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[kFx]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[kC]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Revenue]</code></td><td>اندازه</td><td>درآمد = Σ فروش‌رفته × قیمت دوره × (۱ − تخفیف میانگین) ؛ فروش‌رفته = max(0، تقاضا − کمبود)</td></tr>
+<tr><td><code>Plan[Plan Material Cost]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Conversion Cost]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Overhead]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan COGS]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Gross Profit]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan GM %]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>ResourceLoad[Overtime Cost]</code></td><td>اندازه</td><td>صرف اضافه‌کاری = ساعت اضافه‌کاری × هزینه ساعت خط × ضریب صرف × تورم هزینه</td></tr>
+<tr><td><code>Plan[Holding Cost]</code></td><td>اندازه</td><td>هزینه نگهداری = موجودی پایان ماه × بهای واحد × تورم × نرخ نگهداری ماهانه</td></tr>
+<tr><td><code>Plan[Plan Operating Profit]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Lost Sales]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Revenue 12M]</code></td><td>اندازه</td><td>شاخص‌های ۱۲ ماه (ماه ۰ تا ۱۱ برنامه)</td></tr>
+<tr><td><code>Plan[Plan Gross 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan GM % 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Plan Operating 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Lost Sales 12M]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Budget Revenue (12M)]</code></td><td>اندازه</td><td>شکاف با بودجه: درآمد برنامه در ماه‌هایی که بودجه دارند ÷ بودجه همان ماه‌ها − ۱</td></tr>
+<tr><td><code>Plan[Plan Revenue in Budget Months]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Budget Gap %]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Bridge Budget]</code></td><td>اندازه</td><td>پل بودجه (همه ماه‌های برنامه که بودجه دارند): اثر حجم با قیمت بودجه، باقی‌مانده = اثر قیمت و ترکیب</td></tr>
+<tr><td><code>Plan[Bridge Volume Effect]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Bridge Plan Revenue]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Bridge Price-Mix Effect]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>08 سرمایه در گردش</th></tr>
+<tr><td><code>Sales[DSO Days]</code></td><td>اندازه</td><td>دوره وصول = میانگین وزنی مهلت پرداخت مشتریان با فروش ۱۲ ماه اخیر (پیش‌فرض ۳۰ روز)</td></tr>
+<tr><td><code>Plan[Receivables]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Purchases]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>MRP[Payables]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Plan[Net Working Capital]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>09 پورتفوی (ستون‌های محاسباتی روی Product)</th></tr>
+<tr><td><code>Product[Revenue12]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[Cost12]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[Qty12]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[QtyPrev12]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[Margin12]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[VolumeGrowth]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[CumShareBefore]</code></td><td>ستون</td><td>سهم تجمعی محصولات پرفروش‌تر (بدون خود محصول) برای ABC</td></tr>
+<tr><td><code>Product[ABC Class]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[CV12]</code></td><td>ستون</td><td>ضریب تغییرات فروش ماهانه ۱۲ ماه (ماه‌های بدون فروش = صفر؛ انحراف معیار جامعه)</td></tr>
+<tr><td><code>Product[XYZ Class]</code></td><td>ستون</td><td></td></tr>
+<tr><td><code>Product[Demand Pattern]</code></td><td>ستون</td><td>الگوی تقاضا (Syntetos-Boylan): ADI = ۱۲ ÷ ماه‌های دارای فروش، CV² روی ماه‌های دارای فروش</td></tr>
+<tr><td><code>Product[Portfolio Recommendation]</code></td><td>ستون</td><td>توصیه پورتفوی (به همین ترتیب اولویت)</td></tr>
+<tr><td><code>Product[Top 20% Share]</code></td><td>اندازه</td><td></td></tr>
+<tr><th colspan='3'>10 هشدارها و کارنامه جلسه مدیریت (MBR)</th></tr>
+<tr><td><code>Company[Capacity Overload Resources (6M)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Biased Products (3M)]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Critical Alerts]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Accuracy]</code></td><td>اندازه</td><td>وضعیت: good / warning / critical (برای قالب‌بندی شرطی رنگ)</td></tr>
+<tr><td><code>Company[Score Bias]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Fill Rate]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Capacity]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Gross Margin]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Budget Gap]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Median Months of Cover]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Coverage]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Critical Alerts]</code></td><td>اندازه</td><td></td></tr>
+<tr><td><code>Company[Score Color Accuracy]</code></td><td>اندازه</td><td>یک اندازه رنگ برای هر شاخص؛ نمونه برای دقت (برای بقیه فقط [Score Accuracy] را عوض کنید)</td></tr>
+<tr><th colspan='3'>11 امنیت سطح ردیف (RLS)</th></tr></table></div>
+
+<footer>این سند از کد برنامه IBP (نسخه 0.9.0) و بسته Power BI همراه آن تولید شده است.</footer>
+</div>
+</body>
+</html>

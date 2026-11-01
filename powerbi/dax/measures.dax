@@ -1,0 +1,499 @@
+// =====================================================================================
+//  IBP گروه زر — اندازه‌ها (Measures) و ستون‌های محاسباتی DAX
+//  نام جدول‌ها و ستون‌ها همان خروجی Power Query (powerquery/queries.pq) است.
+//  هر بلوک «MEASURE جدول[نام] =» را در Power BI با New measure روی همان جدول بسازید
+//  (یا کل فایل را در TMDL view / DAX query view با DEFINE اجرا کنید).
+//  پوشه نمایش (Display folder) هر گروه در عنوان آن آمده است.
+//
+//  قرارداد زمانی: هر شرکت «ماه چرخه» دارد (Company[cyclePeriod]). ماه‌های گذشته نسبت به آن سنجیده می‌شوند:
+//    ۱۲ ماه اخیر = MonthIndex از c−12 تا c−1 ؛ ۱۲ ماه آینده = از c تا c+11  (c = Company[CycleIndex])
+//  اندازه‌های پنجره‌دار روی شرکت‌ها جمع زده می‌شوند (SUMX روی Company) تا با چند شرکت هم درست باشند.
+// =====================================================================================
+
+
+// ======================== 01 فروش واقعی ========================
+
+MEASURE Sales[Revenue] = SUM ( Sales[revenue] )
+MEASURE Sales[Sales Qty] = SUM ( Sales[qty] )
+MEASURE Sales[Sales Tons] = SUM ( Sales[Tons] )
+MEASURE Sales[Gross Profit (Actual)] = SUM ( Sales[Gross] )
+MEASURE Sales[GM % (Actual)] = DIVIDE ( [Gross Profit (Actual)], [Revenue] )
+// فروش بیرون از گروه (حذف فروش درون‌گروهی در نمای تلفیقی هلدینگ)
+MEASURE Sales[Revenue External] = CALCULATE ( [Revenue], Product[Intercompany] = FALSE () )
+
+MEASURE Sales[Revenue LTM] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Revenue], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+)
+MEASURE Sales[Revenue Prev LTM] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Revenue], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 24, 'Period'[MonthIndex] <= c - 13 )
+)
+MEASURE Sales[Revenue Growth LTM] = DIVIDE ( [Revenue LTM], [Revenue Prev LTM] ) - 1
+MEASURE Sales[Revenue External LTM] = CALCULATE ( [Revenue LTM], Product[Intercompany] = FALSE () )
+
+MEASURE Sales[Tons LTM] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Sales Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+)
+MEASURE Sales[Tons Prev LTM] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Sales Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 24, 'Period'[MonthIndex] <= c - 13 )
+)
+// رشد وزنی؛ اگر رشد ریالی بیش از ۵ واحد درصد از آن بالاتر باشد، رشد «قیمتی» است
+MEASURE Sales[Tons Growth LTM] = DIVIDE ( [Tons LTM], [Tons Prev LTM] ) - 1
+MEASURE Sales[Gross Profit LTM] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Gross Profit (Actual)], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+)
+MEASURE Sales[GM % LTM] = DIVIDE ( [Gross Profit LTM], [Revenue LTM] )
+
+// ۳ ماه اخیر در برابر همان ۳ ماه سال قبل
+MEASURE Sales[Revenue L3M] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Revenue], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 )
+)
+MEASURE Sales[Revenue L3M LY] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Revenue], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 15, 'Period'[MonthIndex] <= c - 13 )
+)
+MEASURE Sales[Revenue Growth L3M vs LY] = DIVIDE ( [Revenue L3M], [Revenue L3M LY] ) - 1
+
+// فروش همان ماه‌ها در سال قبل (برای مقایسه برنامه آینده با سال قبل)
+MEASURE Sales[Sales Qty LY (shifted)] =
+CALCULATE ( [Sales Qty], REMOVEFILTERS ( 'Period' ),
+    TREATAS ( SELECTCOLUMNS ( VALUES ( 'Period'[MonthIndex] ), "mi", 'Period'[MonthIndex] - 12 ), 'Period'[MonthIndex] ) )
+MEASURE Sales[Sales Tons LY (shifted)] =
+CALCULATE ( [Sales Tons], REMOVEFILTERS ( 'Period' ),
+    TREATAS ( SELECTCOLUMNS ( VALUES ( 'Period'[MonthIndex] ), "mi", 'Period'[MonthIndex] - 12 ), 'Period'[MonthIndex] ) )
+
+// فیلتر بصری: ۲۴ ماه اخیر هر شرکت (روی Visual filter: = 1)
+MEASURE Sales[In Last 24M] =
+VAR c = MAX ( Company[CycleIndex] )
+VAR m = MAX ( 'Period'[MonthIndex] )
+RETURN IF ( m >= c - 24 && m <= c - 1, 1 )
+
+
+// ======================== 02 تقاضا و پیش‌بینی (چرخه جاری) ========================
+
+MEASURE Forecast[Consensus Qty] = CALCULATE ( SUM ( Forecast[qty] ), Forecast[version] = "اجماعی", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Consensus Tons] = CALCULATE ( SUM ( Forecast[Tons] ), Forecast[version] = "اجماعی", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Consensus Revenue] = CALCULATE ( SUM ( Forecast[RevenueEst] ), Forecast[version] = "اجماعی", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Statistical Qty] = CALCULATE ( SUM ( Forecast[qty] ), Forecast[version] = "آماری", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Statistical Tons] = CALCULATE ( SUM ( Forecast[Tons] ), Forecast[version] = "آماری", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Statistical Revenue] = CALCULATE ( SUM ( Forecast[RevenueEst] ), Forecast[version] = "آماری", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Statistical Lo 80] = CALCULATE ( SUM ( Forecast[lo] ), Forecast[version] = "آماری", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Forecast[Statistical Hi 80] = CALCULATE ( SUM ( Forecast[hi] ), Forecast[version] = "آماری", Forecast[IsCurrentCycle] = TRUE () )
+MEASURE Budget[Budget Qty] = SUM ( Budget[qty] )
+MEASURE Budget[Budget Tons] = SUM ( Budget[Tons] )
+MEASURE Budget[Budget Revenue] = SUM ( Budget[revenue] )
+
+// تغییر واحد نمایش با جدول UnitSelector (مقدار / تن / مبلغ)
+MEASURE Forecast[Consensus (Unit)] =
+SWITCH ( SELECTEDVALUE ( UnitSelector[Unit], "مقدار" ), "تن", [Consensus Tons], "مبلغ", [Consensus Revenue], [Consensus Qty] )
+MEASURE Forecast[Statistical (Unit)] =
+SWITCH ( SELECTEDVALUE ( UnitSelector[Unit], "مقدار" ), "تن", [Statistical Tons], "مبلغ", [Statistical Revenue], [Statistical Qty] )
+MEASURE Budget[Budget (Unit)] =
+SWITCH ( SELECTEDVALUE ( UnitSelector[Unit], "مقدار" ), "تن", [Budget Tons], "مبلغ", [Budget Revenue], [Budget Qty] )
+
+// ۱۲ ماه آینده از ماه چرخه
+MEASURE Forecast[Consensus Tons 12M] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Consensus Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 11 )
+)
+MEASURE Forecast[Statistical Tons 12M] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Statistical Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 11 )
+)
+MEASURE Forecast[Consensus vs Last Year %] =
+VAR cons = [Consensus Tons 12M]
+VAR ly =
+    SUMX (
+        VALUES ( Company[CompanyCode] ),
+        VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+        RETURN CALCULATE ( [Sales Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+    )
+RETURN DIVIDE ( cons, ly ) - 1
+// فقط ماه‌هایی که بودجه دارند مقایسه می‌شوند (فیلتر از Budget به Period نمی‌رود، پس کلید ماه از خود Budget گرفته می‌شود)
+MEASURE Forecast[Consensus Tons in Budget Months] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    VAR months = CALCULATETABLE ( VALUES ( Budget[period] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 11, Budget[qty] > 0 )
+    RETURN CALCULATE ( [Consensus Tons], REMOVEFILTERS ( 'Period' ), TREATAS ( months, 'Period'[PeriodKey] ) )
+)
+MEASURE Forecast[Budget Tons 12M] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Budget Tons], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 11 )
+)
+MEASURE Forecast[Consensus vs Budget %] = DIVIDE ( [Consensus Tons in Budget Months], [Budget Tons 12M] ) - 1
+
+// ریسک برنامه: اجماعی ۶ ماه آینده خارج از بازه ۸۰٪ آماری (در سطح محصول)
+MEASURE Forecast[Consensus 6M] =
+SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Consensus Qty], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 5 ) )
+MEASURE Forecast[Stat Lo 6M] =
+SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Statistical Lo 80], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 5 ) )
+MEASURE Forecast[Stat Hi 6M] =
+SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Statistical Hi 80], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 5 ) )
+MEASURE Forecast[Plan Risk] =
+VAR cons = [Consensus 6M]
+VAR lo = [Stat Lo 6M]
+VAR hi = [Stat Hi 6M]
+RETURN
+    IF ( HASONEVALUE ( Product[ProductKey] ) && NOT ISBLANK ( hi ),
+        IF ( cons > hi, "بالاتر از بازه آماری", IF ( cons < lo, "پایین‌تر از بازه آماری" ) ) )
+MEASURE Forecast[Plan Risk Gap %] =
+VAR cons = [Consensus 6M]
+RETURN IF ( cons > [Stat Hi 6M], DIVIDE ( cons, [Stat Hi 6M] ) - 1, IF ( cons < [Stat Lo 6M], DIVIDE ( cons, [Stat Lo 6M] ) - 1 ) )
+
+
+// ======================== 03 دقت پیش‌بینی و FVA ========================
+// جدول Accuracy: هر ردیف = محصول × ماه × نسخه (ساده/آماری/اجماعی) با Forecast (lag-1) و Actual
+
+MEASURE Accuracy[Acc Actual] = SUM ( Accuracy[Actual] )
+MEASURE Accuracy[Acc Abs Error] = SUMX ( Accuracy, ABS ( Accuracy[Forecast] - Accuracy[Actual] ) )
+MEASURE Accuracy[Acc Error] = SUMX ( Accuracy, Accuracy[Forecast] - Accuracy[Actual] )
+MEASURE Accuracy[WMAPE] = DIVIDE ( [Acc Abs Error], [Acc Actual] )
+// دقت = ۱ − WMAPE (کف صفر)
+MEASURE Accuracy[Forecast Accuracy] = IF ( [Acc Actual] > 0, MAX ( 0, 1 - [WMAPE] ) )
+// سوگیری مثبت = بیش‌برآورد، منفی = کم‌برآورد
+MEASURE Accuracy[Forecast Bias] = DIVIDE ( [Acc Error], [Acc Actual] )
+MEASURE Accuracy[Accuracy Consensus] = CALCULATE ( [Forecast Accuracy], Accuracy[version] = "اجماعی" )
+MEASURE Accuracy[Accuracy Statistical] = CALCULATE ( [Forecast Accuracy], Accuracy[version] = "آماری" )
+MEASURE Accuracy[Accuracy Naive] = CALCULATE ( [Forecast Accuracy], Accuracy[version] = "ساده" )
+MEASURE Accuracy[Bias Consensus] = CALCULATE ( [Forecast Bias], Accuracy[version] = "اجماعی" )
+// ارزش افزوده پیش‌بینی (FVA): آماری نسبت به ساده، و قضاوت (اجماعی) نسبت به آماری
+MEASURE Accuracy[FVA Statistical] = [Accuracy Statistical] - [Accuracy Naive]
+MEASURE Accuracy[FVA Judgment] = [Accuracy Consensus] - [Accuracy Statistical]
+
+// دقت و سوگیری ۳ ماه اخیر (کارنامه، داشبورد، هشدارها)
+MEASURE Accuracy[Accuracy 3M] =
+VAR ae = SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Acc Abs Error], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 ) )
+VAR a = SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Acc Actual], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 ) )
+RETURN IF ( a > 0, MAX ( 0, 1 - DIVIDE ( ae, a ) ) )
+MEASURE Accuracy[Bias 3M] =
+VAR e = SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Acc Error], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 ) )
+VAR a = SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Acc Actual], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 ) )
+RETURN DIVIDE ( e, a )
+
+// سیگنال ردیابی (در سطح محصول): جمع خطاها ÷ میانگین قدرمطلق خطا؛ |TS| > ۴ = سوگیری مداوم
+MEASURE Accuracy[Tracking Signal] =
+VAR t = FILTER ( Accuracy, Accuracy[version] = "اجماعی" )
+VAR mad = AVERAGEX ( t, ABS ( Accuracy[Forecast] - Accuracy[Actual] ) )
+RETURN IF ( HASONEVALUE ( Product[ProductKey] ), DIVIDE ( SUMX ( t, Accuracy[Forecast] - Accuracy[Actual] ), mad ) )
+MEASURE Accuracy[TS Out of Control] =
+COUNTROWS ( FILTER ( VALUES ( Product[ProductKey] ), ABS ( CALCULATE ( [Tracking Signal] ) ) > 4 ) )
+
+
+// ======================== 04 برنامه تولید (MPS) و موجودی پیش‌بینی‌شده ========================
+// جدول Plan خروجی پایتون است (ibp_pbi.py)؛ این‌جا فقط تجمیع و شاخص.
+
+MEASURE Plan[Plan Demand] = SUM ( Plan[demand] )
+MEASURE Plan[Production] = SUM ( Plan[production] )
+MEASURE Plan[Production Tons] = SUMX ( Plan, Plan[production] * Plan[unitWeightKg] / 1000 )
+MEASURE Plan[Inventory End] = SUM ( Plan[inventoryEnd] )
+MEASURE Plan[Inventory Tons] = SUMX ( Plan, Plan[inventoryEnd] * Plan[unitWeightKg] / 1000 )
+MEASURE Plan[Safety Stock] = SUM ( Plan[safetyStock] )
+MEASURE Plan[Shortage] = SUM ( Plan[shortage] )
+MEASURE Plan[Prebuild] = SUM ( Plan[prebuild] )
+MEASURE Plan[Prebuild Tons] = SUMX ( Plan, Plan[prebuild] * Plan[unitWeightKg] / 1000 )
+MEASURE Plan[Overtime Units] = SUM ( Plan[overtime] )
+MEASURE Plan[Alt Line Units] = SUM ( Plan[alt] )
+// نرخ پاسخ‌گویی به تقاضا (Fill rate) = ۱ − کمبود ÷ تقاضا
+MEASURE Plan[Fill Rate] = IF ( [Plan Demand] > 0, 1 - DIVIDE ( [Shortage], [Plan Demand] ), 1 )
+MEASURE Plan[Fill Rate (Value)] =
+VAR d = SUMX ( Plan, Plan[demand] * Plan[unitPrice] )
+RETURN IF ( d > 0, 1 - DIVIDE ( SUMX ( Plan, Plan[shortage] * Plan[unitPrice] ), d ), 1 )
+MEASURE Plan[Shortage Value (List Price)] = SUMX ( Plan, Plan[shortage] * Plan[unitPrice] )
+MEASURE Plan[Inventory Value (Plan)] = SUMX ( Plan, Plan[inventoryEnd] * Plan[unitCost] )
+// ماه پوشش = موجودی پایان ماه ÷ تقاضای ماه بعد
+MEASURE Plan[Months of Cover (Plan)] =
+VAR pi = MAX ( Plan[PeriodIndex] )
+VAR nextD = CALCULATE ( [Plan Demand], REMOVEFILTERS ( 'Period' ), Plan[PeriodIndex] = pi + 1 )
+RETURN DIVIDE ( [Inventory End], IF ( ISBLANK ( nextD ), [Plan Demand], nextD ) )
+MEASURE Plan[Products Below SS] =
+COUNTROWS ( FILTER ( VALUES ( Plan[ProductKey] ),
+    CALCULATE ( COUNTROWS ( FILTER ( Plan, Plan[inventoryEnd] < Plan[safetyStock] * 0.999 - 0.5 ) ) ) > 0 ) )
+
+
+// ======================== 05 ظرفیت (بار خطوط و RCCP) ========================
+
+MEASURE ResourceLoad[Load Hours] = SUM ( ResourceLoad[hours] )
+MEASURE ResourceLoad[Capacity Hours] = SUM ( ResourceLoad[capacityHours] )
+MEASURE ResourceLoad[Utilization] = DIVIDE ( [Load Hours], [Capacity Hours] )
+// شاخص برنامه: میانگین ساده بهره‌برداری همه خط × ماه‌ها
+MEASURE ResourceLoad[Avg Utilization (KPI)] = AVERAGE ( ResourceLoad[utilization] )
+MEASURE ResourceLoad[Peak Utilization] = MAX ( ResourceLoad[utilization] )
+MEASURE ResourceLoad[Overtime Hours] = SUM ( ResourceLoad[overtimeHours] )
+MEASURE ResourceLoad[Bottleneck Resource-Months] = COUNTROWS ( FILTER ( ResourceLoad, ResourceLoad[utilization] > 1.0001 ) )
+
+// RCCP سرانگشتی: ساعت لازم = Σ (پیش‌بینی اجماعی ÷ نرخ تولید مسیر اصلی) — بدون پیش‌ساخت و اضافه‌کاری
+//  رابطه Routing ← Product غیرفعال است؛ محصول با TREATAS منتقل می‌شود
+MEASURE Routing[RCCP Required Hours] =
+SUMX (
+    FILTER ( Routing, Routing[IsPrimaryRCCP] = TRUE () ),
+    DIVIDE ( CALCULATE ( [Consensus Qty], TREATAS ( { Routing[ProductKey] }, Product[ProductKey] ) ), Routing[unitsPerHour] )
+)
+MEASURE Routing[RCCP Capacity Hours] = SUMX ( Resource, Resource[CapacityHours] ) * MAX ( 1, DISTINCTCOUNT ( 'Period'[PeriodKey] ) )
+MEASURE Routing[RCCP Utilization] = DIVIDE ( [RCCP Required Hours], [RCCP Capacity Hours] )
+
+
+// ======================== 06 موجودی، پوشش و MRP ========================
+
+MEASURE Inventory[On Hand] = SUM ( Inventory[OnHand] )
+MEASURE Inventory[Inventory Value (Current)] = SUMX ( Inventory, Inventory[OnHand] * RELATED ( Product[unitCost] ) )
+MEASURE Inventory[Avg Demand Next 3M] =
+SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( [Consensus Qty], REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 2 ) ) / 3
+MEASURE Inventory[Months of Cover] =
+VAR d = [Avg Demand Next 3M]
+VAR q = [On Hand]
+RETURN IF ( d > 0, q / d, IF ( q > 0, 999, 0 ) )
+// وضعیت: بحرانی (زیر ذخیره اطمینان)، هشدار (کمتر از نیم ماه بالای آن)، مازاد (بیش از سقف ماه‌های تنظیمات)
+MEASURE Inventory[Coverage Status] =
+VAR d = [Avg Demand Next 3M]
+VAR m = [Months of Cover]
+VAR ss = MAX ( Product[safetyStockDays] ) / 30
+VAR ex = LOOKUPVALUE ( Company[excessMonths], Company[CompanyCode], SELECTEDVALUE ( Product[CompanyCode] ) )
+RETURN
+    IF ( HASONEVALUE ( Product[ProductKey] ),
+        IF ( d > 0 && m < ss, "بحرانی", IF ( d > 0 && m < ss + 0.5, "هشدار", IF ( m > ex, "مازاد", "مناسب" ) ) ) )
+MEASURE Inventory[Stockout Risk Products] =
+COUNTROWS ( FILTER ( CALCULATETABLE ( VALUES ( Product[ProductKey] ), Product[IsActive] = TRUE () ), CALCULATE ( [Coverage Status] ) = "بحرانی" ) )
+MEASURE Inventory[Excess Products] =
+COUNTROWS ( FILTER ( CALCULATETABLE ( VALUES ( Product[ProductKey] ), Product[IsActive] = TRUE () ), CALCULATE ( [Coverage Status] ) = "مازاد" ) )
+MEASURE Inventory[Excess Value] =
+SUMX ( FILTER ( CALCULATETABLE ( VALUES ( Product[ProductKey] ), Product[IsActive] = TRUE () ), CALCULATE ( [Coverage Status] ) = "مازاد" ),
+    CALCULATE ( [Inventory Value (Current)] ) )
+
+MEASURE MRP[Gross Requirement] = SUM ( MRP[gross] )
+MEASURE MRP[Net Requirement] = SUM ( MRP[net] )
+MEASURE MRP[Planned Receipts] = SUM ( MRP[plannedReceipt] )
+MEASURE MRP[Planned Releases] = SUM ( MRP[plannedRelease] )
+MEASURE MRP[Projected Stock] = SUM ( MRP[projected] )
+MEASURE MRP[Materials Stock Value] = SUMX ( MRP, MAX ( 0, MRP[projected] ) * MRP[unitCost] )
+// درخواست درون‌گروهی (تن) که شرکت خریدار برای شرکت تأمین‌کننده منتشر می‌کند
+MEASURE MRP[IC Request Tons] = CALCULATE ( SUM ( MRP[ReceiptTons] ), NOT ISBLANK ( MRP[internalCompany] ), MRP[internalCompany] <> "" )
+
+
+// ======================== 07 سود و زیان برنامه (با پارامترهای What-if) ========================
+// پارامترها (Modeling ← New parameter ← Numeric range):
+//   'Price Change %'      (−20 تا 40)    'Material Change %'  (−20 تا 60)
+//   'FX Change %'         (−20 تا 80)    'Conversion Change %' (−20 تا 60)
+// تغییر تقاضا و ظرفیت برنامه تولید را عوض می‌کند و باید با پایتون (سناریو) محاسبه شود؛ این چهار محرک دقیق در DAX کار می‌کنند.
+
+MEASURE Plan[kP] = 1 + SELECTEDVALUE ( 'Price Change %'[Price Change %], 0 ) / 100
+MEASURE Plan[kM] = 1 + SELECTEDVALUE ( 'Material Change %'[Material Change %], 0 ) / 100
+MEASURE Plan[kFx] = 1 + SELECTEDVALUE ( 'FX Change %'[FX Change %], 0 ) / 100
+MEASURE Plan[kC] = 1 + SELECTEDVALUE ( 'Conversion Change %'[Conversion Change %], 0 ) / 100
+
+// درآمد = Σ فروش‌رفته × قیمت دوره × (۱ − تخفیف میانگین) ؛ فروش‌رفته = max(0، تقاضا − کمبود)
+MEASURE Plan[Plan Revenue] = SUMX ( Plan, Plan[Sold] * Plan[PriceNet] ) * [kP]
+MEASURE Plan[Plan Material Cost] =
+VAR fx = [kFx]
+RETURN SUMX ( Plan, Plan[Sold] * Plan[CostInfl] * ( Plan[matDom] + Plan[matIc] + Plan[matImp] * fx ) ) * [kM]
+MEASURE Plan[Plan Conversion Cost] = SUMX ( Plan, Plan[Sold] * Plan[conv] * Plan[CostInfl] ) * [kC]
+MEASURE Plan[Plan Overhead] = SUMX ( Plan, Plan[Sold] * Plan[overhead] * Plan[CostInfl] )
+MEASURE Plan[Plan COGS] = [Plan Material Cost] + [Plan Conversion Cost] + [Plan Overhead]
+MEASURE Plan[Plan Gross Profit] = [Plan Revenue] - [Plan COGS]
+MEASURE Plan[Plan GM %] = DIVIDE ( [Plan Gross Profit], [Plan Revenue] )
+// صرف اضافه‌کاری = ساعت اضافه‌کاری × هزینه ساعت خط × ضریب صرف × تورم هزینه
+MEASURE ResourceLoad[Overtime Cost] =
+SUMX ( ResourceLoad, ResourceLoad[overtimeHours] * RELATED ( Resource[costPerHour] ) * ResourceLoad[overtimePremium] * ResourceLoad[CostInfl] ) * [kC]
+// هزینه نگهداری = موجودی پایان ماه × بهای واحد × تورم × نرخ نگهداری ماهانه
+MEASURE Plan[Holding Cost] = SUM ( Plan[HoldingCost] )
+MEASURE Plan[Plan Operating Profit] = [Plan Gross Profit] - [Overtime Cost] - [Holding Cost]
+MEASURE Plan[Lost Sales] = SUMX ( Plan, Plan[shortage] * Plan[PriceNet] ) * [kP]
+
+// شاخص‌های ۱۲ ماه (ماه ۰ تا ۱۱ برنامه)
+MEASURE Plan[Plan Revenue 12M] = CALCULATE ( [Plan Revenue], Plan[MonthNo] < 12 )
+MEASURE Plan[Plan Gross 12M] = CALCULATE ( [Plan Gross Profit], Plan[MonthNo] < 12 )
+MEASURE Plan[Plan GM % 12M] = DIVIDE ( [Plan Gross 12M], [Plan Revenue 12M] )
+MEASURE Plan[Plan Operating 12M] =
+CALCULATE ( [Plan Gross Profit] - [Holding Cost], Plan[MonthNo] < 12 ) - CALCULATE ( [Overtime Cost], ResourceLoad[MonthNo] < 12 )
+MEASURE Plan[Lost Sales 12M] = CALCULATE ( [Lost Sales], Plan[MonthNo] < 12 )
+
+// شکاف با بودجه: درآمد برنامه در ماه‌هایی که بودجه دارند ÷ بودجه همان ماه‌ها − ۱
+MEASURE Plan[Budget Revenue (12M)] = CALCULATE ( SUM ( Plan[BudgetRevenue] ), Plan[MonthNo] < 12 )
+MEASURE Plan[Plan Revenue in Budget Months] =
+SUMX (
+    VALUES ( Company[CompanyCode] ),
+    VAR months = CALCULATETABLE ( VALUES ( Plan[period] ), Plan[HasBudgetRow] = 1, Plan[MonthNo] < 12 )
+    RETURN CALCULATE ( [Plan Revenue], Plan[MonthNo] < 12, TREATAS ( months, Plan[period] ) )
+)
+MEASURE Plan[Budget Gap %] = DIVIDE ( [Plan Revenue in Budget Months], [Budget Revenue (12M)] ) - 1
+
+// پل بودجه (همه ماه‌های برنامه که بودجه دارند): اثر حجم با قیمت بودجه، باقی‌مانده = اثر قیمت و ترکیب
+MEASURE Plan[Bridge Budget] = SUM ( Plan[BudgetRevenue] )
+MEASURE Plan[Bridge Volume Effect] =
+VAR kp = [kP]
+RETURN SUMX ( FILTER ( Plan, Plan[HasBudgetRow] = 1 ),
+    ( Plan[Sold] - Plan[BudgetQty] ) * IF ( Plan[BudgetQty] <> 0, Plan[BudgetPrice], Plan[PriceNet] * kp ) )
+MEASURE Plan[Bridge Plan Revenue] = CALCULATE ( [Plan Revenue], Plan[HasBudgetRow] = 1 )
+MEASURE Plan[Bridge Price-Mix Effect] = [Bridge Plan Revenue] - [Bridge Budget] - [Bridge Volume Effect]
+
+
+// ======================== 08 سرمایه در گردش ========================
+
+// دوره وصول = میانگین وزنی مهلت پرداخت مشتریان با فروش ۱۲ ماه اخیر (پیش‌فرض ۳۰ روز)
+MEASURE Sales[DSO Days] =
+VAR w = [Revenue LTM]
+VAR t = SUMX ( VALUES ( Company[CompanyCode] ), VAR c = CALCULATE ( MAX ( Company[CycleIndex] ) )
+    RETURN CALCULATE ( SUMX ( Sales, Sales[revenue] * RELATED ( Customer[paymentDays] ) ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 ) )
+RETURN IF ( w > 0, t / w, 30 )
+MEASURE Plan[Receivables] = SUMX ( VALUES ( Company[CompanyCode] ), CALCULATE ( [Plan Revenue] * [DSO Days] / 30 ) )
+MEASURE MRP[Purchases] =
+VAR km = [kM]
+VAR fx = [kFx]
+RETURN SUMX ( MRP, MRP[plannedReceipt] * MRP[unitCost] * km * IF ( MRP[CostOrigin] = "Import", fx, 1 ) )
+MEASURE MRP[Payables] = SUMX ( VALUES ( Company[CompanyCode] ), CALCULATE ( [Purchases] * MAX ( Company[dpoDays] ) / 30 ) )
+MEASURE Plan[Net Working Capital] = [Inventory Value (Plan)] + [Materials Stock Value] + [Receivables] - [Payables]
+
+
+// ======================== 09 پورتفوی (ستون‌های محاسباتی روی Product) ========================
+// این‌ها COLUMN هستند (New column روی جدول Product)، نه Measure.
+
+COLUMN Product[Revenue12] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+RETURN CALCULATE ( SUM ( Sales[revenue] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+COLUMN Product[Cost12] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+RETURN CALCULATE ( SUM ( Sales[CostDeflated] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+COLUMN Product[Qty12] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+RETURN CALCULATE ( SUM ( Sales[qty] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 12, 'Period'[MonthIndex] <= c - 1 )
+COLUMN Product[QtyPrev12] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+RETURN CALCULATE ( SUM ( Sales[qty] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 24, 'Period'[MonthIndex] <= c - 13 )
+COLUMN Product[Margin12] = IF ( Product[Revenue12] <> 0, 1 - Product[Cost12] / Product[Revenue12] )
+COLUMN Product[VolumeGrowth] = IF ( Product[QtyPrev12] > 0, Product[Qty12] / Product[QtyPrev12] - 1 )
+// سهم تجمعی محصولات پرفروش‌تر (بدون خود محصول) برای ABC
+COLUMN Product[CumShareBefore] =
+VAR co = Product[CompanyCode]
+VAR r = Product[Revenue12]
+VAR tot = SUMX ( FILTER ( ALL ( Product ), Product[CompanyCode] = co ), Product[Revenue12] )
+RETURN DIVIDE ( SUMX ( FILTER ( ALL ( Product ), Product[CompanyCode] = co && Product[Revenue12] > r ), Product[Revenue12] ), tot )
+COLUMN Product[ABC Class] =
+VAR a = LOOKUPVALUE ( Company[abcA], Company[CompanyCode], Product[CompanyCode] )
+VAR b = LOOKUPVALUE ( Company[abcB], Company[CompanyCode], Product[CompanyCode] )
+RETURN IF ( Product[Revenue12] <= 0, "C", IF ( Product[CumShareBefore] < a, "A", IF ( Product[CumShareBefore] < b, "B", "C" ) ) )
+// ضریب تغییرات فروش ماهانه ۱۲ ماه (ماه‌های بدون فروش = صفر؛ انحراف معیار جامعه)
+COLUMN Product[CV12] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+VAR t = ADDCOLUMNS ( GENERATESERIES ( c - 12, c - 1, 1 ), "q", CALCULATE ( SUM ( Sales[qty] ) + 0, REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] = [Value] ) )
+VAR m = AVERAGEX ( t, [q] )
+RETURN IF ( m > 0, SQRT ( AVERAGEX ( t, ( [q] - m ) ^ 2 ) ) / m )
+COLUMN Product[XYZ Class] =
+VAR x = LOOKUPVALUE ( Company[xyzX], Company[CompanyCode], Product[CompanyCode] )
+VAR y = LOOKUPVALUE ( Company[xyzY], Company[CompanyCode], Product[CompanyCode] )
+RETURN IF ( ISBLANK ( Product[CV12] ), "Z", IF ( Product[CV12] <= x, "X", IF ( Product[CV12] <= y, "Y", "Z" ) ) )
+// الگوی تقاضا (Syntetos-Boylan): ADI = ۱۲ ÷ ماه‌های دارای فروش، CV² روی ماه‌های دارای فروش
+COLUMN Product[Demand Pattern] =
+VAR c = LOOKUPVALUE ( Company[CycleIndex], Company[CompanyCode], Product[CompanyCode] )
+VAR t = ADDCOLUMNS ( GENERATESERIES ( c - 12, c - 1, 1 ), "q", CALCULATE ( SUM ( Sales[qty] ) + 0, REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] = [Value] ) )
+VAR nz = FILTER ( t, [q] > 0 )
+VAR n = COUNTROWS ( nz )
+VAR adi = DIVIDE ( 12, n )
+VAR mu = AVERAGEX ( nz, [q] )
+VAR cv2 = IF ( mu > 0, ( SQRT ( AVERAGEX ( nz, ( [q] - mu ) ^ 2 ) ) / mu ) ^ 2 )
+RETURN IF ( n > 0, IF ( adi < 1.32, IF ( cv2 < 0.49, "هموار", "نامنظم" ), IF ( cv2 < 0.49, "متناوب", "کلوخه‌ای" ) ) )
+// توصیه پورتفوی (به همین ترتیب اولویت)
+COLUMN Product[Portfolio Recommendation] =
+VAR co = Product[CompanyCode]
+VAR avgM = 1 - DIVIDE ( SUMX ( FILTER ( ALL ( Product ), Product[CompanyCode] = co ), Product[Cost12] ),
+                       SUMX ( FILTER ( ALL ( Product ), Product[CompanyCode] = co ), Product[Revenue12] ) )
+VAR g = Product[VolumeGrowth]
+VAR m = Product[Margin12]
+RETURN
+    SWITCH ( TRUE (),
+        Product[lifecycle] = "توقف" || Product[IsActive] = FALSE (), "خروج از سبد",
+        NOT ISBLANK ( Product[phaseOutDate] ) && Product[phaseOutDate] <> "", "مدیریت حذف تدریجی",
+        Product[lifecycle] = "معرفی", "پایش معرفی",
+        Product[ABC Class] = "C" && NOT ISBLANK ( g ) && g < -0.1 && ( ISBLANK ( m ) || m < avgM ), "کاندید حذف",
+        Product[ABC Class] <> "C" && NOT ISBLANK ( g ) && g > 0.1 && NOT ISBLANK ( m ) && m >= avgM * 0.9, "سرمایه‌گذاری و رشد",
+        Product[ABC Class] <> "C" && NOT ISBLANK ( m ) && m < avgM * 0.75, "بازبینی قیمت/هزینه",
+        Product[Demand Pattern] IN { "کلوخه‌ای", "نامنظم" } || Product[XYZ Class] = "Z", "افزایش ذخیره یا تولید سفارشی",
+        "نگهداری" )
+// نکته: Product[IsActive] در Power Query «توقف» را هم غیرفعال می‌کند؛ برای توصیه «خروج از سبد» همان کافی است.
+
+MEASURE Product[Top 20% Share] =
+VAR t = ADDCOLUMNS ( VALUES ( Product[ProductKey] ), "r", CALCULATE ( SUM ( Product[Revenue12] ) ) )
+VAR n = MAX ( 1, ROUND ( COUNTROWS ( t ) * 0.2, 0 ) )
+RETURN DIVIDE ( SUMX ( TOPN ( n, t, [r], DESC ), [r] ), SUMX ( t, [r] ) )
+
+
+// ======================== 10 هشدارها و کارنامه جلسه مدیریت (MBR) ========================
+
+MEASURE Company[Capacity Overload Resources (6M)] =
+VAR c = MAX ( Company[CycleIndex] )
+VAR umax = MAX ( Company[utilizationMax] )
+RETURN COUNTROWS ( FILTER ( VALUES ( Resource[ResourceKey] ),
+    CALCULATE ( MAXX ( VALUES ( 'Period'[MonthIndex] ), [RCCP Utilization] ), REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c, 'Period'[MonthIndex] <= c + 5 ) > umax ) )
+MEASURE Company[Biased Products (3M)] =
+VAR c = MAX ( Company[CycleIndex] )
+RETURN COUNTROWS ( FILTER ( VALUES ( Product[ProductKey] ),
+    VAR a = CALCULATE ( [Acc Actual], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 )
+    VAR b = CALCULATE ( [Forecast Bias], Accuracy[version] = "اجماعی", REMOVEFILTERS ( 'Period' ), 'Period'[MonthIndex] >= c - 3, 'Period'[MonthIndex] <= c - 1 )
+    RETURN a > 0 && ABS ( b ) > 0.2 ) )
+MEASURE Company[Critical Alerts] = [Stockout Risk Products] + [Capacity Overload Resources (6M)]
+
+// وضعیت: good / warning / critical (برای قالب‌بندی شرطی رنگ)
+MEASURE Company[Score Accuracy] =
+VAR v = [Accuracy 3M]
+VAR t = MAX ( Company[forecastAccuracyTarget] )
+RETURN IF ( v >= t, "good", IF ( v >= t - 0.1, "warning", "critical" ) )
+MEASURE Company[Score Bias] = VAR b = ABS ( [Bias 3M] ) RETURN IF ( b <= 0.05, "good", IF ( b <= 0.1, "warning", "critical" ) )
+MEASURE Company[Score Fill Rate] =
+VAR v = [Fill Rate]
+VAR t = MAX ( Company[serviceLevelTarget] )
+RETURN IF ( v >= t, "good", IF ( v >= t - 0.03, "warning", "critical" ) )
+MEASURE Company[Score Capacity] = VAR n = [Bottleneck Resource-Months] RETURN IF ( n = 0, "good", IF ( n <= 6, "warning", "critical" ) )
+MEASURE Company[Score Gross Margin] = VAR g = [Plan GM % 12M] RETURN IF ( g >= 0.2, "good", IF ( g >= 0.12, "warning", "critical" ) )
+MEASURE Company[Score Budget Gap] =
+VAR g = [Budget Gap %]
+RETURN IF ( ISBLANK ( g ), "neutral", IF ( g >= -0.02, "good", IF ( g >= -0.08, "warning", "critical" ) ) )
+MEASURE Company[Median Months of Cover] =
+MEDIANX ( FILTER ( CALCULATETABLE ( VALUES ( Product[ProductKey] ), Product[IsActive] = TRUE () ), CALCULATE ( [Months of Cover] ) < 999 ), CALCULATE ( [Months of Cover] ) )
+MEASURE Company[Score Coverage] =
+VAR v = [Median Months of Cover]
+VAR ex = MAX ( Company[excessMonths] )
+RETURN IF ( ISBLANK ( v ), "neutral", IF ( v >= 0.5 && v <= ex, "good", IF ( v <= ex + 1, "warning", "critical" ) ) )
+MEASURE Company[Score Critical Alerts] = VAR n = [Critical Alerts] RETURN IF ( n = 0, "good", IF ( n <= 3, "warning", "critical" ) )
+// رنگ برای Conditional formatting ← Field value
+// یک اندازه رنگ برای هر شاخص؛ نمونه برای دقت (برای بقیه فقط [Score Accuracy] را عوض کنید)
+MEASURE Company[Score Color Accuracy] =
+SWITCH ( [Score Accuracy], "good", "#0ca30c", "warning", "#fab219", "critical", "#d03b3b", "#94a3b8" )
+
+
+// ======================== 11 امنیت سطح ردیف (RLS) ========================
+// جدول UserAccess (UserEmail, CompanyCode) با «*» برای همه شرکت‌ها. نقش «Company Access» روی جدول Company:
+//   VAR u = USERPRINCIPALNAME ()
+//   RETURN CONTAINS ( FILTER ( UserAccess, UserAccess[UserEmail] = u ), UserAccess[CompanyCode], Company[CompanyCode] )
+//       || CONTAINS ( FILTER ( UserAccess, UserAccess[UserEmail] = u ), UserAccess[CompanyCode], "*" )

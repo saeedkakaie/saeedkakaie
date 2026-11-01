@@ -66,7 +66,7 @@
     var z = zOf(o.serviceLevel), L = 1 + o.productionLeadDays / 30;
     var rank = { A: 0, B: 1, C: 2 };
     var products = S.all('products').filter(function (p) { return p.active !== false && p.lifecycle !== 'توقف'; })
-      .sort(function (a, b) { return (rank[a.abc] || 2) - (rank[b.abc] || 2) || (b.unitPrice || 0) - (a.unitPrice || 0); });
+      .sort(function (a, b) { return (a.abc in rank ? rank[a.abc] : 2) - (b.abc in rank ? rank[b.abc] : 2) || (b.unitPrice || 0) - (a.unitPrice || 0); });
     var hist = J.range(J.addMonths(cycle, -12), 12), si = A.salesIndex();
     var routes = {};
     S.all('routings').forEach(function (r) { if (r.unitsPerHour > 0) (routes[r.productId] = routes[r.productId] || []).push(r); });
